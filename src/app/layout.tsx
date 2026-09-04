@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import { ToastProvider } from "@/components/ui/ToastProvider";
 import { AuthInterceptor } from "@/components/auth/AuthInterceptor";
 import "./globals.css";
@@ -61,7 +62,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           <AuthInterceptor />
           {children}
         </ToastProvider>
+        <SpeedInsights />
       </body>
     </html>
   );
 }
+
