@@ -47,3 +47,10 @@ next-env.d.ts
 .neon
 response.json
 
+# AI & Agent metadata
+.agents/
+skills-lock.json
+AGENTS.md
+CLAUDE.md
+
+
