@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import { SpeedInsights } from "@vercel/speed-insights/next";
+import { Analytics } from "@vercel/analytics/next";
 import { ToastProvider } from "@/components/ui/ToastProvider";
 import { AuthInterceptor } from "@/components/auth/AuthInterceptor";
 import { PwaRegister } from "@/components/pwa/PwaRegister";
@@ -67,9 +68,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           {children}
         </ToastProvider>
         <SpeedInsights />
+        <Analytics />
       </body>
     </html>
   );
 }
+
 
 
