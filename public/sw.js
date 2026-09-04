@@ -1,10 +1,14 @@
 // Cablecast Progressive Web App Service Worker
-const CACHE_NAME = "cablecast-v1";
+const CACHE_NAME = "cablecast-v2";
 const STATIC_ASSETS = [
   "/",
   "/manifest.json",
   "/icon-192.png",
   "/icon-512.png",
+  "/icon-maskable-192.png",
+  "/icon-maskable-512.png",
+  "/apple-touch-icon.png",
+  "/favicon.ico",
   "/icon.svg",
 ];
 

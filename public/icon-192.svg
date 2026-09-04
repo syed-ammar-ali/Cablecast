@@ -1,129 +1,108 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="192" height="192">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
   <defs>
-    <!-- Cobalt Blue TV Body Gradient -->
-    <linearGradient id="cobaltBody192" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#2563eb" />
-      <stop offset="40%" stop-color="#1d4ed8" />
-      <stop offset="100%" stop-color="#1e3a8a" />
-    </linearGradient>
-
-    <!-- Warm Amber Phosphor Screen Glow -->
-    <radialGradient id="amberPhosphor192" cx="50%" cy="45%" r="60%">
-      <stop offset="0%" stop-color="#fef08a" />
-      <stop offset="45%" stop-color="#fde047" />
-      <stop offset="80%" stop-color="#eab308" />
-      <stop offset="100%" stop-color="#ca8a04" />
+    <!-- Background Vignette Gradient -->
+    <radialGradient id="bgGrad" cx="50%" cy="50%" r="70%">
+      <stop offset="0%" stop-color="#181926" />
+      <stop offset="55%" stop-color="#0c0d14" />
+      <stop offset="100%" stop-color="#040407" />
     </radialGradient>
 
-    <!-- Antenna Metallic Gradient -->
-    <linearGradient id="metalChassis192" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#64748b" />
-      <stop offset="50%" stop-color="#94a3b8" />
-      <stop offset="100%" stop-color="#475569" />
+    <!-- Sleek Glass Rim Radial Gradient -->
+    <radialGradient id="rimGlow" cx="50%" cy="15%" r="85%">
+      <stop offset="0%" stop-color="#3b82f6" stop-opacity="0.18" />
+      <stop offset="60%" stop-color="#1e1b4b" stop-opacity="0.05" />
+      <stop offset="100%" stop-color="#000000" stop-opacity="0" />
+    </radialGradient>
+
+    <!-- Cablecast Master Brand Gold Phosphor Gradient -->
+    <linearGradient id="goldBeam" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fef08a" />
+      <stop offset="25%" stop-color="#fde047" />
+      <stop offset="65%" stop-color="#eab308" />
+      <stop offset="100%" stop-color="#ca8a04" />
     </linearGradient>
 
-    <!-- Pedestal Base Dark Slate Gradient -->
-    <linearGradient id="pedestalGrad192" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" stop-color="#334155" />
-      <stop offset="100%" stop-color="#0f172a" />
+    <!-- Wave 4 Soft Fade Gradient -->
+    <linearGradient id="waveFade" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#fde047" />
+      <stop offset="100%" stop-color="#fde047" stop-opacity="0.4" />
     </linearGradient>
 
-    <!-- Red LED Glow Filter -->
-    <filter id="redLedGlow192" x="-50%" y="-50%" width="200%" height="200%">
-      <feGaussianBlur stdDeviation="5" result="blur" />
-      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    <!-- Amber Neon Glow Filter for Broadcast Core -->
+    <filter id="amberNeonGlow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="8" result="blur1" />
+      <feGaussianBlur stdDeviation="18" result="blur2" />
+      <feMerge>
+        <feMergeNode in="blur2" />
+        <feMergeNode in="blur1" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
     </filter>
 
-    <!-- Drop Shadow for Standalone TV Cutout -->
-    <filter id="tvDropShadow192" x="-10%" y="-10%" width="120%" height="125%">
-      <feDropShadow dx="0" dy="12" stdDeviation="14" flood-color="#000000" flood-opacity="0.5" />
+    <!-- Subtle Drop Shadow for 'C' Monogram -->
+    <filter id="cShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="6" stdDeviation="12" flood-color="#000000" flood-opacity="0.8" />
     </filter>
   </defs>
 
-  <!-- Group with Drop Shadow for Standalone Cutout Effect -->
-  <g filter="url(#tvDropShadow192)">
-    <!-- 1. Retro Dual Rabbit-Ear Antennae -->
-    <g stroke="url(#metalChassis192)" stroke-linecap="round">
-      <line x1="200" y1="130" x2="128" y2="48" stroke-width="10" />
-      <line x1="312" y1="130" x2="384" y2="48" stroke-width="10" />
-    </g>
-    <!-- Chrome Antenna Tips -->
-    <circle cx="128" cy="48" r="11" fill="#f1f5f9" stroke="#94a3b8" stroke-width="2.5" />
-    <circle cx="384" cy="48" r="11" fill="#f1f5f9" stroke="#94a3b8" stroke-width="2.5" />
+  <!-- 1. Master Canvas Solid Base (100% Solid for Android Maskable & Apple Touch Icon) -->
+  <rect width="512" height="512" fill="#06070a" />
 
-    <!-- Antenna Mounts -->
-    <rect x="190" y="122" width="20" height="12" rx="4" fill="#334155" />
-    <rect x="302" y="122" width="20" height="12" rx="4" fill="#334155" />
+  <!-- 2. Screen Bezel Recess with Subtle Radial Gradient -->
+  <rect width="512" height="512" fill="url(#bgGrad)" />
 
-    <!-- 2. Dark Slate Pedestal Stand (Underneath Chassis) -->
-    <path d="M180 402 L198 446 L314 446 L332 402 Z" fill="url(#pedestalGrad192)" stroke="#0f172a" stroke-width="3" />
-    <rect x="170" y="444" width="172" height="15" rx="7.5" fill="#1e293b" stroke="#090d16" stroke-width="2" />
+  <!-- 3. CRT Monitor Rounded Chassis Outer Border Ring -->
+  <rect x="18" y="18" width="476" height="476" rx="104" fill="none" stroke="#27273a" stroke-width="2" opacity="0.6" />
+  <rect x="24" y="24" width="464" height="464" rx="98" fill="none" stroke="#12131c" stroke-width="1.5" />
 
-    <!-- 3. Wide Proportioned Cobalt Blue Retro CRT Chassis -->
-    <rect x="24" y="130" width="464" height="272" rx="38" fill="url(#cobaltBody192)" stroke="#3b82f6" stroke-width="4.5" />
+  <!-- 4. Subtle Radial Broadcast Ambient Glow in Background -->
+  <circle cx="222" cy="256" r="170" fill="url(#rimGlow)" />
+
+  <!-- Background Radar Range Rings (Faint Retro CRT Alignment Guides) -->
+  <g opacity="0.07" stroke="#eab308">
+    <circle cx="222" cy="256" r="75" fill="none" stroke-width="1" stroke-dasharray="4 6" />
+    <circle cx="222" cy="256" r="125" fill="none" stroke-width="1" stroke-dasharray="4 6" />
+    <circle cx="222" cy="256" r="175" fill="none" stroke-width="1" />
+  </g>
+
+  <!-- 5. Authentic CRT Scanlines Pattern -->
+  <g><line x1="80" y1="100" x2="432" y2="100" stroke="#ffffff" stroke-width="1" opacity="0.04" /><line x1="80" y1="106" x2="432" y2="106" stroke="#ffffff" stroke-width="1" opacity="0.04" /><line x1="80" y1="112" x2="432" y2="112" stroke="#ffffff" stroke-width="1" opacity="0.04" /><line x1="80" y1="118" x2="432" y2="118" stroke="#ffffff" stroke-width="1" opacity="0.04" /><line x1="80" y1="124" x2="432" y2="124" stroke="#ffffff" stroke-width="1" opacity="0.04" /><line x1="80" y1="130" x2="432" y2="130" stroke="#ffffff" stroke-width="1" opacity="0.04" /><line x1="80" y1="136" x2="432" y2="136" stroke="#ffffff" stroke-width="1" opacity="0.04" /><line x1="80" y1="142" x2="432" y2="142" stroke="#ffffff" stroke-width="1" opacity="0.04" /><line x1="80" y1="148" x2="432" y2="148" stroke="#ffffff" stroke-width="1" opacity="0.04" /><line x1="80" y1="154" x2="432" y2="154" stroke="#ffffff" stroke-width="1" opacity="0.04" /><line x1="80" y1="160" x2="432" y2="160" stroke="#ffffff" stroke-width="1" opacity="0.04" /><line x1="80" y1="166" x2="432" y2="166" stroke="#ffffff" stroke-width="1" opacity="0.04" /><line x1="80" y1="172" x2="432" y2="172" stroke="#ffffff" stroke-width="1" opacity="0.04" /><line x1="80" y1="178" x2="432" y2="178" stroke="#ffffff" stroke-width="1" opacity="0.04" /><line x1="80" y1="184" x2="432" y2="184" stroke="#ffffff" stroke-width="1" opacity="0.04" /><line x1="80" y1="190" x2="432" y2="190" stroke="#ffffff" stroke-width="1" opacity="0.04" /><line x1="80" y1="196" x2="432" y2="196" stroke="#ffffff" stroke-width="1" opacity="0.04" /><line x1="80" y1="202" x2="432" y2="202" stroke="#ffffff" stroke-width="1" opacity="0.04" /><line x1="80" y1="208" x2="432" y2="208" stroke="#ffffff" stroke-width="1" opacity="0.04" /><line x1="80" y1="214" x2="432" y2="214" stroke="#ffffff" stroke-width="1" opacity="0.04" /><line x1="80" y1="220" x2="432" y2="220" stroke="#ffffff" stroke-width="1" opacity="0.04" /><line x1="80" y1="226" x2="432" y2="226" stroke="#ffffff" stroke-width="1" opacity="0.04" /><line x1="80" y1="232" x2="432" y2="232" stroke="#ffffff" stroke-width="1" opacity="0.04" /><line x1="80" y1="238" x2="432" y2="238" stroke="#ffffff" stroke-width="1" opacity="0.04" /><line x1="80" y1="244" x2="432" y2="244" stroke="#ffffff" stroke-width="1" opacity="0.04" /><line x1="80" y1="250" x2="432" y2="250" stroke="#ffffff" stroke-width="1" opacity="0.04" /><line x1="80" y1="256" x2="432" y2="256" stroke="#ffffff" stroke-width="1" opacity="0.04" /><line x1="80" y1="262" x2="432" y2="262" stroke="#ffffff" stroke-width="1" opacity="0.04" /><line x1="80" y1="268" x2="432" y2="268" stroke="#ffffff" stroke-width="1" opacity="0.04" /><line x1="80" y1="274" x2="432" y2="274" stroke="#ffffff" stroke-width="1" opacity="0.04" /><line x1="80" y1="280" x2="432" y2="280" stroke="#ffffff" stroke-width="1" opacity="0.04" /><line x1="80" y1="286" x2="432" y2="286" stroke="#ffffff" stroke-width="1" opacity="0.04" /><line x1="80" y1="292" x2="432" y2="292" stroke="#ffffff" stroke-width="1" opacity="0.04" /><line x1="80" y1="298" x2="432" y2="298" stroke="#ffffff" stroke-width="1" opacity="0.04" /><line x1="80" y1="304" x2="432" y2="304" stroke="#ffffff" stroke-width="1" opacity="0.04" /><line x1="80" y1="310" x2="432" y2="310" stroke="#ffffff" stroke-width="1" opacity="0.04" /><line x1="80" y1="316" x2="432" y2="316" stroke="#ffffff" stroke-width="1" opacity="0.04" /><line x1="80" y1="322" x2="432" y2="322" stroke="#ffffff" stroke-width="1" opacity="0.04" /><line x1="80" y1="328" x2="432" y2="328" stroke="#ffffff" stroke-width="1" opacity="0.04" /><line x1="80" y1="334" x2="432" y2="334" stroke="#ffffff" stroke-width="1" opacity="0.04" /><line x1="80" y1="340" x2="432" y2="340" stroke="#ffffff" stroke-width="1" opacity="0.04" /><line x1="80" y1="346" x2="432" y2="346" stroke="#ffffff" stroke-width="1" opacity="0.04" /><line x1="80" y1="352" x2="432" y2="352" stroke="#ffffff" stroke-width="1" opacity="0.04" /><line x1="80" y1="358" x2="432" y2="358" stroke="#ffffff" stroke-width="1" opacity="0.04" /><line x1="80" y1="364" x2="432" y2="364" stroke="#ffffff" stroke-width="1" opacity="0.04" /><line x1="80" y1="370" x2="432" y2="370" stroke="#ffffff" stroke-width="1" opacity="0.04" /><line x1="80" y1="376" x2="432" y2="376" stroke="#ffffff" stroke-width="1" opacity="0.04" /><line x1="80" y1="382" x2="432" y2="382" stroke="#ffffff" stroke-width="1" opacity="0.04" /><line x1="80" y1="388" x2="432" y2="388" stroke="#ffffff" stroke-width="1" opacity="0.04" /><line x1="80" y1="394" x2="432" y2="394" stroke="#ffffff" stroke-width="1" opacity="0.04" /><line x1="80" y1="400" x2="432" y2="400" stroke="#ffffff" stroke-width="1" opacity="0.04" /><line x1="80" y1="406" x2="432" y2="406" stroke="#ffffff" stroke-width="1" opacity="0.04" /><line x1="80" y1="412" x2="432" y2="412" stroke="#ffffff" stroke-width="1" opacity="0.04" /></g>
+
+  <!-- 6. Monogram & Broadcast Artwork Group (Safe Zone Bound: strictly inside r < 180 of (256,256)) -->
+  <g filter="url(#cShadow)">
+    <!-- Broadcast Signal Waves (Radiating from C mouth) -->
+    <!-- Wave 1 (Inner pulse) -->
+    <path d="M 272.2294734194974 227 A 58 58 0 0 1 272.2294734194974 285" fill="none" stroke="#ca8a04" stroke-width="7.5" stroke-linecap="round" opacity="0.85" />
     
-    <!-- Top Highlight Lip on TV Casing -->
-    <path d="M54 138 Q256 132 458 138" stroke="#60a5fa" stroke-width="3" stroke-linecap="round" fill="none" opacity="0.65" />
-
-    <!-- 4. CRT 4:3 Rounded Phosphor Screen -->
-    <!-- Screen Bezel Recess -->
-    <rect x="48" y="152" width="320" height="228" rx="24" fill="#090d16" stroke="#172554" stroke-width="3.5" />
+    <!-- Wave 2 (Mid pulse) -->
+    <path d="M 293.23604007713976 211.48678180441078 A 84 84 0 0 1 293.23604007713976 300.5132181955892" fill="none" stroke="url(#goldBeam)" stroke-width="7.5" stroke-linecap="round" />
     
-    <!-- Amber/Yellow Phosphor Glass Surface -->
-    <rect x="56" y="160" width="304" height="212" rx="18" fill="url(#amberPhosphor192)" />
+    <!-- Wave 3 (Main energetic pulse) -->
+    <path d="M 313.19413298105457 194.48878061821785 A 110 110 0 0 1 313.19413298105457 317.51121938178215" fill="none" stroke="#fef08a" stroke-width="7" stroke-linecap="round" filter="url(#amberNeonGlow)" />
 
-    <!-- Authentic CRT Scanlines Texture Overlay -->
-    <g opacity="0.14">
-      <line x1="56" y1="182" x2="360" y2="182" stroke="#78350f" stroke-width="2" />
-      <line x1="56" y1="204" x2="360" y2="204" stroke="#78350f" stroke-width="2" />
-      <line x1="56" y1="226" x2="360" y2="226" stroke="#78350f" stroke-width="2" />
-      <line x1="56" y1="248" x2="360" y2="248" stroke="#78350f" stroke-width="2" />
-      <line x1="56" y1="270" x2="360" y2="270" stroke="#78350f" stroke-width="2" />
-      <line x1="56" y1="292" x2="360" y2="292" stroke="#78350f" stroke-width="2" />
-      <line x1="56" y1="314" x2="360" y2="314" stroke="#78350f" stroke-width="2" />
-      <line x1="56" y1="336" x2="360" y2="336" stroke="#78350f" stroke-width="2" />
-      <line x1="56" y1="358" x2="360" y2="358" stroke="#78350f" stroke-width="2" />
-    </g>
+    <!-- Wave 4 (Distant broadcast wave) -->
+    <path d="M 332.0263112349928 176.06120568822365 A 136 136 0 0 1 332.0263112349928 335.93879431177635" fill="none" stroke="url(#waveFade)" stroke-width="5.5" stroke-linecap="round" opacity="0.55" />
 
-    <!-- Diagonal Specular Glare Highlights on Curved Glass -->
-    <path d="M60 166 L175 166 L95 366 L60 366 Z" fill="#ffffff" opacity="0.28" />
-    <path d="M195 166 L230 166 L120 366 L100 366 Z" fill="#ffffff" opacity="0.14" />
+    <!-- The Bold Geometric 'C' Monogram -->
+    <path d="M 297.80077219869423 324.25132184860354 A 102 102 0 1 1 297.80077219869423 187.74867815139646" fill="none" stroke="url(#goldBeam)" stroke-width="36" stroke-linecap="round" stroke-linejoin="round" />
 
-    <!-- 5. Bold Retro Red "LIVE" Typography -->
-    <!-- Text Shadow -->
-    <text x="210" y="288" 
-          font-family="Impact, 'Arial Black', -apple-system, sans-serif" 
-          font-weight="900" 
-          font-size="70" 
-          fill="#7f1d1d" 
-          text-anchor="middle" 
-          letter-spacing="5">LIVE</text>
-    <!-- Foreground Text -->
-    <text x="208" y="285" 
-          font-family="Impact, 'Arial Black', -apple-system, sans-serif" 
-          font-weight="900" 
-          font-size="70" 
-          fill="#dc2626" 
-          text-anchor="middle" 
-          letter-spacing="5">LIVE</text>
+    <!-- High-Gloss Inner Core Highlight on 'C' -->
+    <path d="M 297.80077219869423 324.25132184860354 A 102 102 0 1 1 297.80077219869423 187.74867815139646" fill="none" stroke="#fef9c3" stroke-width="8" stroke-linecap="round" opacity="0.75" />
 
-    <!-- 6. Right-Hand Control Panel -->
-    <rect x="382" y="152" width="84" height="228" rx="16" fill="#0f172a" stroke="#1e293b" stroke-width="2.5" />
+    <!-- 7. Central Broadcast Transmitter Beacon Point -->
+    <circle cx="222" cy="256" r="18" fill="#eab308" opacity="0.25" filter="url(#amberNeonGlow)" />
+    <circle cx="222" cy="256" r="11" fill="url(#goldBeam)" />
+    <circle cx="222" cy="256" r="5" fill="#ffffff" />
+  </g>
 
-    <!-- Circular Rotary Channel Dial -->
-    <circle cx="424" cy="194" r="20" fill="#f8fafc" stroke="#94a3b8" stroke-width="3" />
-    <circle cx="424" cy="194" r="14" fill="#e2e8f0" />
-    <line x1="424" y1="180" x2="424" y2="192" stroke="#334155" stroke-width="3.5" stroke-linecap="round" />
+  <!-- 8. Specular CRT Curved Screen Glare (Authentic 90s Glass Sheen) -->
+  <path d="M 40 40 Q 256 12 472 40 Q 256 140 40 180 Z" fill="#ffffff" opacity="0.05" />
 
-    <!-- Red Power Indicator Light with Active Glow -->
-    <circle cx="424" cy="246" r="9" fill="#ef4444" filter="url(#redLedGlow192)" />
-    <circle cx="424" cy="246" r="5.5" fill="#f87171" />
-    <circle cx="422" cy="244" r="2" fill="#ffffff" />
-
-    <!-- Four Rounded Horizontal Speaker Grille Vents -->
-    <rect x="396" y="286" width="56" height="9" rx="4.5" fill="#020617" stroke="#1e293b" stroke-width="1" />
-    <rect x="396" y="306" width="56" height="9" rx="4.5" fill="#020617" stroke="#1e293b" stroke-width="1" />
-    <rect x="396" y="326" width="56" height="9" rx="4.5" fill="#020617" stroke="#1e293b" stroke-width="1" />
-    <rect x="396" y="346" width="56" height="9" rx="4.5" fill="#020617" stroke="#1e293b" stroke-width="1" />
+  <!-- 9. Crisp Metallic Corner Accents (Retro Studio Hardware Details) -->
+  <g opacity="0.4" stroke="#eab308" stroke-width="1.5" stroke-linecap="round">
+    <path d="M 68 84 L 84 84 L 84 68" fill="none" />
+    <path d="M 444 84 L 428 84 L 428 68" fill="none" />
+    <path d="M 68 428 L 84 428 L 84 444" fill="none" />
+    <path d="M 444 428 L 428 428 L 428 444" fill="none" />
   </g>
 </svg>
