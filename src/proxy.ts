@@ -13,7 +13,7 @@ import { isSessionActive } from "@/lib/auth/validity";
  * on new sign-ins.
  */
 
-const PUBLIC_PAGE_PREFIXES = ["/gate"];
+const PUBLIC_PAGE_PREFIXES = ["/gate", "/manifest.json", "/manifest.webmanifest", "/sw.js"];
 const PUBLIC_API_PREFIXES = ["/api/auth/"];
 const ADMIN_PAGE_PREFIXES = ["/admin"];
 const ADMIN_API_PREFIXES = ["/api/admin/"];
@@ -150,6 +150,6 @@ export async function proxy(request: NextRequest, event: NextFetchEvent) {
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml|.*\\.(?:png|jpg|jpeg|gif|svg|webp|ico)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml|manifest.json|manifest.webmanifest|sw.js|.*\\.(?:png|jpg|jpeg|gif|svg|webp|ico|woff2)$).*)",
   ],
 };

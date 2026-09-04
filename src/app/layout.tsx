@@ -29,7 +29,8 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "Cablecast — Retro TV Simulation & Appointment Matrix",
+  title: "Cablecast",
+  applicationName: "Cablecast",
   description:
     "A 90s-inspired retro TV simulation with TMDB search and an auto-retrying multi-provider player.",
   manifest: "/manifest.json",
