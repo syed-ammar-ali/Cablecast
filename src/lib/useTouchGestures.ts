@@ -6,6 +6,7 @@ interface TouchGestureHandlers {
   onSwipeLeft?: () => void;
   onSwipeRight?: () => void;
   onDoubleTap?: () => void;
+  onTap?: () => void;
   minSwipeDistance?: number;
   maxSwipeTimeMs?: number;
 }
@@ -16,6 +17,7 @@ export function useTouchGestures({
   onSwipeLeft,
   onSwipeRight,
   onDoubleTap,
+  onTap,
   minSwipeDistance = 45,
   maxSwipeTimeMs = 600,
 }: TouchGestureHandlers) {
@@ -62,7 +64,10 @@ export function useTouchGestures({
       const absX = Math.abs(deltaX);
       const absY = Math.abs(deltaY);
 
-      if (Math.max(absX, absY) < minSwipeDistance) return;
+      if (Math.max(absX, absY) < minSwipeDistance) {
+        onTap?.();
+        return;
+      }
 
       // Vertical Swipes (Channel Surfing)
       if (absY > absX) {
@@ -80,7 +85,7 @@ export function useTouchGestures({
         }
       }
     },
-    [maxSwipeTimeMs, minSwipeDistance, onSwipeDown, onSwipeLeft, onSwipeRight, onSwipeUp],
+    [maxSwipeTimeMs, minSwipeDistance, onTap, onSwipeDown, onSwipeLeft, onSwipeRight, onSwipeUp],
   );
 
   return {

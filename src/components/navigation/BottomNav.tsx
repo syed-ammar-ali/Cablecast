@@ -1,10 +1,12 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Bookmark, Radio, Search, ShieldCheck } from "lucide-react";
 
 interface BottomNavProps {
+  isAdmin?: boolean;
   onOpenBroadcastStudio: () => void;
   onOpenLibrary: () => void;
   onToggleSearch: () => void;
@@ -15,6 +17,7 @@ interface BottomNavProps {
 }
 
 export function BottomNav({
+  isAdmin: isAdminProp,
   onOpenBroadcastStudio,
   onOpenLibrary,
   onToggleSearch,
@@ -25,29 +28,52 @@ export function BottomNav({
 }: BottomNavProps) {
   const pathname = usePathname();
   const isAdminActive = pathname === "/admin" || pathname?.startsWith("/admin");
+  const [isAdmin, setIsAdmin] = useState(isAdminProp ?? false);
+
+  useEffect(() => {
+    if (isAdminProp !== undefined) {
+      setIsAdmin(isAdminProp);
+      return;
+    }
+    let cancelled = false;
+    fetch("/api/auth/me")
+      .then((res) => res.json())
+      .then((data: { role?: string | null }) => {
+        if (!cancelled && data?.role === "admin") {
+          setIsAdmin(true);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [isAdminProp]);
 
   return (
     <nav
       aria-label="Mobile Navigation"
       className="fixed bottom-0 left-0 right-0 z-40 block md:hidden border-t border-neutral-900/90 bg-neutral-950/95 backdrop-blur-xl pb-[max(0.375rem,env(safe-area-inset-bottom,0.375rem))] pt-1.5 shadow-2xl shadow-black"
     >
-      <div className="grid grid-cols-4 items-center px-1">
-        {/* 1. Admin */}
-        <Link
-          href="/admin"
-          className={`group flex flex-col items-center justify-center py-1 transition-all duration-150 active:scale-95 ${isAdminActive
-              ? "text-emerald-400 font-semibold"
-              : "text-neutral-400 hover:text-emerald-400"
+      <div className={`grid items-center px-1 ${isAdmin ? "grid-cols-4" : "grid-cols-3"}`}>
+        {/* 1. Admin (only rendered if authenticated as admin) */}
+        {isAdmin && (
+          <Link
+            href="/admin"
+            className={`group flex flex-col items-center justify-center py-1 transition-all duration-150 active:scale-95 ${
+              isAdminActive
+                ? "text-emerald-400 font-semibold"
+                : "text-neutral-400 hover:text-emerald-400"
             }`}
-          title="Admin Station Control"
-        >
-          <div className="relative flex items-center justify-center">
-            <ShieldCheck className="h-5 w-5 transition-transform group-hover:scale-110 group-active:scale-95" />
-          </div>
-          <span className="mt-1 text-[10px] font-medium uppercase tracking-wider">
-            Admin
-          </span>
-        </Link>
+            title="Admin Station Control"
+          >
+            <div className="relative flex items-center justify-center">
+              <ShieldCheck className="h-5 w-5 transition-transform group-hover:scale-110 group-active:scale-95" />
+            </div>
+            <span className="mt-1 text-[10px] font-medium uppercase tracking-wider">
+              Admin
+            </span>
+          </Link>
+        )}
 
         {/* 2. Broadcast */}
         <button

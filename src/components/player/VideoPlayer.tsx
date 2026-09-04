@@ -12,6 +12,7 @@ import {
   Volume2,
   Tv,
   Maximize,
+  X,
 } from "lucide-react";
 import {
   buildPlayerSource,
@@ -56,6 +57,7 @@ interface VideoPlayerProps {
    * first manual channel change.
    */
   initialLiveEntry?: ScheduleEntry;
+  onClose?: () => void;
 }
 
 interface OsdContent {
@@ -78,6 +80,7 @@ export function VideoPlayer({
   startOffsetSeconds = 0,
   title,
   initialLiveEntry,
+  onClose,
 }: VideoPlayerProps) {
   const [currentProviderIndex, setCurrentProviderIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
@@ -649,18 +652,6 @@ export function VideoPlayer({
 
     const request = container.requestFullscreen?.bind(container) ?? container.webkitRequestFullscreen?.bind(container);
     Promise.resolve(request?.())
-      .then(() => {
-        try {
-          const orientation = screen.orientation as unknown as
-            | { lock?: (orientation: string) => Promise<void>; unlock?: () => void }
-            | undefined;
-          if (orientation && typeof orientation.lock === "function") {
-            void orientation.lock("landscape").catch(() => {});
-          }
-        } catch {
-          // Non-fatal
-        }
-      })
       .catch((error: unknown) => {
         console.error("[VideoPlayer] Failed to enter fullscreen:", error);
       });
@@ -744,14 +735,27 @@ export function VideoPlayer({
   // - Swipe Right: Show OSD Banner
   // - Double Tap: Fullscreen Toggle
   const { handleTouchStart, handleTouchEnd } = useTouchGestures({
-    onSwipeUp: () => cycleChannel(1),
-    onSwipeDown: () => cycleChannel(-1),
-    onSwipeLeft: toggleMute,
+    onTap: showControls,
+    onSwipeUp: () => {
+      showControls();
+      cycleChannel(1);
+    },
+    onSwipeDown: () => {
+      showControls();
+      cycleChannel(-1);
+    },
+    onSwipeLeft: () => {
+      showControls();
+      toggleMute();
+    },
     onSwipeRight: () => {
       triggerInfoOsd();
       showControls();
     },
-    onDoubleTap: toggleFullscreen,
+    onDoubleTap: () => {
+      showControls();
+      toggleFullscreen();
+    },
   });
 
   const isLiveNow = isLiveMode && screenMode === "content";
@@ -771,12 +775,28 @@ export function VideoPlayer({
       ref={containerRef}
       onMouseMove={showControls}
       onClick={showControls}
-      onTouchStart={handleTouchStart}
+      onTouchStart={(e) => {
+        showControls();
+        handleTouchStart(e);
+      }}
       onTouchEnd={handleTouchEnd}
       className="group relative h-full w-full overflow-hidden bg-black touch-none overscroll-none select-none"
     >
       {/* Screen — fills the entire player now; there's no separate bezel/remote strip */}
       <div className="relative h-full w-full bg-black">
+        {/* Transparent tap zones along top & bottom edges to reveal overlay controls on mobile touch even when an iframe is active */}
+        <div
+          className="absolute top-0 inset-x-0 h-16 z-20 cursor-pointer"
+          onClick={showControls}
+          onTouchStart={showControls}
+          aria-hidden="true"
+        />
+        <div
+          className="absolute bottom-0 inset-x-0 h-12 z-20 cursor-pointer"
+          onClick={showControls}
+          onTouchStart={showControls}
+          aria-hidden="true"
+        />
         {screenMode === "content" && !exhausted && hasLoadableSource && (
           <div className="relative h-full w-full">
             <iframe
@@ -930,90 +950,102 @@ export function VideoPlayer({
         )}
 
         {/*
-         * Minimal controls cluster — source count and the "source not
-         * working" swap, inside a single unified pill (shared border/
-         * background, a thin divider between the two groups) — hover-
-         * revealed instead of a permanent bar, so there's nothing on screen
-         * by default. Sits top-right, right next to `PlayerModal`'s close
-         * button (at right-4 top-4, ~2.25rem wide).
+         * Top-right controls cluster:
+         * Unified overlay containing the source counter, swap button, provider dropdown,
+         * and close button. Appears on touch/tap or mouse move and automatically
+         * fades out after 3.5s of inactivity so the screen remains clean and cinema-grade.
          */}
         <div
-          className={`absolute right-[max(4.25rem,calc(env(safe-area-inset-right)+3.25rem))] top-[max(1rem,env(safe-area-inset-top))] z-30 flex items-center rounded-md border border-neutral-700/50 bg-black/75 text-neutral-300 backdrop-blur-md transition-all duration-300 ${
+          className={`absolute right-[max(1rem,env(safe-area-inset-right))] top-[max(1rem,env(safe-area-inset-top))] z-30 flex items-center gap-2.5 transition-opacity duration-300 ${
             isControlsVisible
               ? "opacity-100 pointer-events-auto"
               : "opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto"
           }`}
         >
-          {screenMode === "content" && (
-            <span className="flex h-9 items-center gap-1.5 rounded-l-md border-r border-neutral-700/50 px-3 text-[10px] uppercase tracking-widest text-neutral-400">
-              <SatelliteDish className="h-3.5 w-3.5" />
-              {String(currentProviderIndex + 1).padStart(2, "0")}/{String(PROVIDER_COUNT).padStart(2, "0")}
-            </span>
-          )}
-
-          <div ref={providerMenuRef} className="relative flex items-stretch">
-            <button
-              type="button"
-              onClick={advanceProvider}
-              disabled={exhausted || screenMode !== "content"}
-              title="Source not working? Swap"
-              aria-label="Source not working? Swap"
-              className={`flex h-9 items-center gap-1.5 px-2.5 transition-colors hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer ${
-                screenMode === "content" ? "" : "rounded-l-md"
-              }`}
-            >
-              <RefreshCw className="h-4 w-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() => setIsProviderMenuOpen((open) => !open)}
-              disabled={screenMode !== "content"}
-              aria-label="Choose a specific source"
-              aria-expanded={isProviderMenuOpen}
-              className="flex h-9 w-6 items-center justify-center rounded-r-md border-l border-neutral-700/50 transition-colors hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
-            >
-              <ChevronDown className={`h-3.5 w-3.5 transition-transform ${isProviderMenuOpen ? "rotate-180" : ""}`} />
-            </button>
-
-            {isProviderMenuOpen && (
-              <div className="absolute right-0 top-full mt-2 w-56 max-h-[50vh] overflow-hidden flex flex-col rounded-md border border-neutral-700/60 bg-neutral-950 shadow-[0_0_24px_rgba(0,0,0,0.85)] z-40">
-                <p className="border-b border-neutral-800 bg-white/5 px-3 py-1.5 text-[10px] uppercase tracking-widest text-neutral-400 shrink-0">
-                  Select Source ({currentProviderIndex + 1}/{PROVIDER_COUNT})
-                </p>
-                <ul className="flex-1 overflow-y-auto no-scrollbar">
-                  {providerList.map((provider) => {
-                    const isActive = provider.index === currentProviderIndex;
-                    return (
-                      <li key={provider.id}>
-                        <button
-                          type="button"
-                          onClick={() => jumpToProvider(provider.index)}
-                          className={`flex w-full items-center justify-between gap-2 px-3 py-1.5 text-left text-[11px] uppercase tracking-wide transition-colors hover:bg-white/10 cursor-pointer ${
-                            isActive ? "bg-white/10 text-white" : "text-neutral-300"
-                          }`}
-                        >
-                          <span className="flex items-center gap-1.5 truncate">
-                            <span
-                              className={`h-1.5 w-1.5 shrink-0 rounded-full ${
-                                provider.isDynamic ? "bg-amber-400" : "bg-emerald-400"
-                              }`}
-                              title={
-                                provider.isDynamic
-                                  ? "Dynamic Search Provider"
-                                  : "Standard Stream Provider"
-                              }
-                            />
-                            <span className="truncate">{provider.name}</span>
-                          </span>
-                          {isActive && <Check className="h-3 w-3 shrink-0 text-emerald-400" />}
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
+          <div className="flex items-center rounded-md border border-neutral-700/50 bg-black/75 text-neutral-300 backdrop-blur-md shadow-lg">
+            {screenMode === "content" && (
+              <span className="flex h-9 items-center gap-1.5 rounded-l-md border-r border-neutral-700/50 px-3 text-[10px] uppercase tracking-widest text-neutral-400">
+                <SatelliteDish className="h-3.5 w-3.5" />
+                {String(currentProviderIndex + 1).padStart(2, "0")}/{String(PROVIDER_COUNT).padStart(2, "0")}
+              </span>
             )}
+
+            <div ref={providerMenuRef} className="relative flex items-stretch">
+              <button
+                type="button"
+                onClick={advanceProvider}
+                disabled={exhausted || screenMode !== "content"}
+                title="Source not working? Swap"
+                aria-label="Source not working? Swap"
+                className={`flex h-9 items-center gap-1.5 px-2.5 transition-colors hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer ${
+                  screenMode === "content" ? "" : "rounded-l-md"
+                }`}
+              >
+                <RefreshCw className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsProviderMenuOpen((open) => !open)}
+                disabled={screenMode !== "content"}
+                aria-label="Choose a specific source"
+                aria-expanded={isProviderMenuOpen}
+                className="flex h-9 w-6 items-center justify-center rounded-r-md border-l border-neutral-700/50 transition-colors hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+              >
+                <ChevronDown className={`h-3.5 w-3.5 transition-transform ${isProviderMenuOpen ? "rotate-180" : ""}`} />
+              </button>
+
+              {isProviderMenuOpen && (
+                <div className="absolute right-0 top-full mt-2 w-56 max-h-[50vh] overflow-hidden flex flex-col rounded-md border border-neutral-700/60 bg-neutral-950 shadow-[0_0_24px_rgba(0,0,0,0.85)] z-40">
+                  <p className="border-b border-neutral-800 bg-white/5 px-3 py-1.5 text-[10px] uppercase tracking-widest text-neutral-400 shrink-0">
+                    Select Source ({currentProviderIndex + 1}/{PROVIDER_COUNT})
+                  </p>
+                  <ul className="flex-1 overflow-y-auto no-scrollbar">
+                    {providerList.map((provider) => {
+                      const isActive = provider.index === currentProviderIndex;
+                      return (
+                        <li key={provider.id}>
+                          <button
+                            type="button"
+                            onClick={() => jumpToProvider(provider.index)}
+                            className={`flex w-full items-center justify-between gap-2 px-3 py-1.5 text-left text-[11px] uppercase tracking-wide transition-colors hover:bg-white/10 cursor-pointer ${
+                              isActive ? "bg-white/10 text-white" : "text-neutral-300"
+                            }`}
+                          >
+                            <span className="flex items-center gap-1.5 truncate">
+                              <span
+                                className={`h-1.5 w-1.5 shrink-0 rounded-full ${
+                                  provider.isDynamic ? "bg-amber-400" : "bg-emerald-400"
+                                }`}
+                                title={
+                                  provider.isDynamic
+                                    ? "Dynamic Search Provider"
+                                    : "Standard Stream Provider"
+                                }
+                              />
+                              <span className="truncate">{provider.name}</span>
+                            </span>
+                            {isActive && <Check className="h-3 w-3 shrink-0 text-emerald-400" />}
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              )}
+            </div>
           </div>
+
+          {/* Close affordance - unified with controls overlay */}
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close player"
+              className="flex h-9 w-9 items-center justify-center rounded-full border border-neutral-700/60 bg-black/75 text-neutral-300 backdrop-blur-md transition-all duration-200 hover:scale-105 hover:text-white active:scale-95 cursor-pointer shadow-lg"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
         </div>
       </div>
     </div>

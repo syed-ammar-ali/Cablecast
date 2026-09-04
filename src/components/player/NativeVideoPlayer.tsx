@@ -401,18 +401,7 @@ export function NativeVideoPlayer({
         // Non-fatal
       }
     } else {
-      void container.requestFullscreen().then(() => {
-        try {
-          const orientation = screen.orientation as unknown as
-            | { lock?: (orientation: string) => Promise<void>; unlock?: () => void }
-            | undefined;
-          if (orientation && typeof orientation.lock === "function") {
-            void orientation.lock("landscape").catch(() => {});
-          }
-        } catch {
-          // Non-fatal
-        }
-      }).catch(() => {});
+      void container.requestFullscreen().catch(() => {});
     }
   }, [showControls, showGestureFeedback]);
 

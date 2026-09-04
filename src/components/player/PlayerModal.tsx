@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Loader2, X } from "lucide-react";
 import { VideoPlayer } from "@/components/player/VideoPlayer";
 import type { MediaSearchResult, ShowDetails } from "@/types/media";
@@ -36,25 +36,6 @@ interface PlayerModalProps {
   directBroadcast?: DirectBroadcast;
 }
 
-/**
- * A minimal, always-in-the-corner close affordance shared by every branch
- * below (loading, direct broadcast, embed, native) — fades in on hover/
- * focus of the fullscreen container instead of sitting on screen
- * permanently, since the screen itself is meant to be the only thing there.
- */
-function CloseButton({ onClose }: { onClose: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClose}
-      aria-label="Close player"
-      className="absolute right-[max(1rem,env(safe-area-inset-right))] top-[max(1rem,env(safe-area-inset-top))] z-40 flex h-9 w-9 items-center justify-center rounded-full border border-neutral-700/60 bg-black/75 text-neutral-300 backdrop-blur-sm transition-all duration-200 hover:text-white hover:scale-105 active:scale-95 opacity-80 md:opacity-0 focus-visible:opacity-100 group-hover:opacity-100 cursor-pointer shadow-lg"
-    >
-      <X className="h-4 w-4" />
-    </button>
-  );
-}
-
 export function PlayerModal({
   media,
   onClose,
@@ -73,55 +54,24 @@ export function PlayerModal({
   const [season, setSeason] = useState(initialSeason ?? 1);
   const episode = initialEpisode ?? 1;
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        onClose();
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onClose]);
+  // Touch-controlled overlay for direct broadcasts (auto-fades after 3.5s)
+  const [isDirectControlsVisible, setIsDirectControlsVisible] = useState(true);
+  const directControlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  useEffect(() => {
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = "";
-    };
+  const showDirectControls = useCallback(() => {
+    setIsDirectControlsVisible(true);
+    if (directControlsTimeoutRef.current) clearTimeout(directControlsTimeoutRef.current);
+    directControlsTimeoutRef.current = setTimeout(() => setIsDirectControlsVisible(false), 3500);
   }, []);
 
-  // Auto-lock / start in landscape mode on mobile phones
   useEffect(() => {
-    const isMobile = window.innerWidth < 768 || window.matchMedia("(max-width: 768px)").matches;
-    if (!isMobile) return;
-
-    try {
-      const orientation = (screen.orientation ||
-        (screen as unknown as { mozOrientation?: unknown; msOrientation?: unknown }).mozOrientation) as
-        | { lock?: (orientation: string) => Promise<void>; unlock?: () => void }
-        | undefined;
-      if (orientation && typeof orientation.lock === "function") {
-        void orientation.lock("landscape").catch(() => {
-          // Ignore if permission denied or browser requires explicit fullscreen
-        });
-      }
-    } catch {
-      // Non-fatal
+    if (directBroadcast) {
+      showDirectControls();
     }
-
     return () => {
-      try {
-        const orientation = screen.orientation as unknown as
-          | { lock?: (orientation: string) => Promise<void>; unlock?: () => void }
-          | undefined;
-        if (orientation && typeof orientation.unlock === "function") {
-          orientation.unlock();
-        }
-      } catch {
-        // Non-fatal
-      }
+      if (directControlsTimeoutRef.current) clearTimeout(directControlsTimeoutRef.current);
     };
-  }, []);
+  }, [directBroadcast, showDirectControls]);
 
   useEffect(() => {
     function handleEscape(event: KeyboardEvent) {
@@ -130,6 +80,13 @@ export function PlayerModal({
     window.addEventListener("keydown", handleEscape);
     return () => window.removeEventListener("keydown", handleEscape);
   }, [onClose]);
+
+  useEffect(() => {
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, []);
 
   // Only fetched to default `season` to the show's actual first season
   // (e.g. some shows start at 0 for specials) when the caller didn't pass
@@ -170,10 +127,20 @@ export function PlayerModal({
 
   return (
     <div className="group fixed inset-0 z-50 bg-black animate-in fade-in">
-      <CloseButton onClose={onClose} />
-
       {directBroadcast ? (
-        <div className="relative h-full w-full bg-black">
+        <div
+          className="relative h-full w-full bg-black"
+          onClick={showDirectControls}
+          onTouchStart={showDirectControls}
+        >
+          {/* Top tap-catcher to reveal controls on mobile over iframe */}
+          <div
+            className="absolute top-0 inset-x-0 h-16 z-20 cursor-pointer"
+            onClick={showDirectControls}
+            onTouchStart={showDirectControls}
+            aria-hidden="true"
+          />
+
           <iframe
             key={directBroadcast.embedUrl}
             src={directBroadcast.embedUrl}
@@ -186,15 +153,40 @@ export function PlayerModal({
             referrerPolicy="strict-origin-when-cross-origin"
           />
 
-          <div className="pointer-events-none absolute left-4 top-4 z-20 max-w-[70vw] rounded-md border border-neutral-700/50 bg-black/60 px-3 py-2 backdrop-blur-sm">
+          <div
+            className={`pointer-events-none absolute left-4 top-4 z-20 max-w-[70vw] rounded-md border border-neutral-700/50 bg-black/60 px-3 py-2 backdrop-blur-sm transition-opacity duration-300 ${
+              isDirectControlsVisible ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+            }`}
+          >
             <p className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-widest text-red-400">
               <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-red-500" />
               {directBroadcast.label}
             </p>
           </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close broadcast"
+            className={`absolute right-[max(1rem,env(safe-area-inset-right))] top-[max(1rem,env(safe-area-inset-top))] z-30 flex h-9 w-9 items-center justify-center rounded-full border border-neutral-700/60 bg-black/75 text-neutral-300 backdrop-blur-md transition-all duration-300 hover:text-white hover:scale-105 active:scale-95 cursor-pointer shadow-lg ${
+              isDirectControlsVisible
+                ? "opacity-100 pointer-events-auto"
+                : "opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto"
+            }`}
+          >
+            <X className="h-4 w-4" />
+          </button>
         </div>
       ) : !media || !showPlayer ? (
-        <div className="flex h-full w-full items-center justify-center bg-black text-neutral-500">
+        <div className="relative flex h-full w-full items-center justify-center bg-black text-neutral-500">
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close player"
+            className="absolute right-[max(1rem,env(safe-area-inset-right))] top-[max(1rem,env(safe-area-inset-top))] z-40 flex h-9 w-9 items-center justify-center rounded-full border border-neutral-700/60 bg-black/75 text-neutral-300 backdrop-blur-md transition-all duration-200 hover:text-white hover:scale-105 active:scale-95 cursor-pointer shadow-lg"
+          >
+            <X className="h-4 w-4" />
+          </button>
           <Loader2 className="h-8 w-8 animate-spin" />
         </div>
       ) : (
@@ -208,6 +200,7 @@ export function PlayerModal({
           startTime={startTime}
           initialLiveEntry={initialLiveEntry}
           title={isTv ? `${media.title} · S${season}E${episode}` : media.title}
+          onClose={onClose}
         />
       )}
     </div>
