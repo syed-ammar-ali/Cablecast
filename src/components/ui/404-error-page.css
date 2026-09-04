@@ -1,0 +1,421 @@
+/*
+ * Retro TV 404 error page — pure CSS/SVG art for the `RetroTvError`
+ * component (`404-error-page.tsx`).
+ *
+ * Only a single trailing `@keyframes b` was supplied alongside the
+ * component's markup — the rest of this stylesheet (colorbar screen,
+ * antenna, knobs, speaker grille, legs, background digits) was written
+ * from scratch to match the reference design, since the component renders
+ * a large set of empty, unstyled divs (`.antenna`, `.tv`, `.screen`, ...)
+ * that do nothing without it.
+ *
+ * Kept as its own file (imported directly by the component) instead of
+ * appended to `globals.css` — it's ~200 lines of selectors scoped to one
+ * decorative component, and none of it is a general-purpose Tailwind
+ * utility, so mixing it into the app-wide stylesheet would only make that
+ * file harder to scan.
+ */
+
+.main_wrapper {
+  --tv-shell: #f3941f;
+  --tv-shell-light: #ffb454;
+  --tv-shell-dark: #d9760f;
+  --tv-shell-deep: #9a4b09;
+  --tv-bezel: #17181b;
+  --tv-knob: #8a5227;
+  --tv-knob-dark: #4f2f14;
+
+  position: relative;
+  isolation: isolate;
+}
+
+.main {
+  position: relative;
+  width: 320px;
+}
+
+/* ============ Antenna ============ */
+
+.antenna {
+  position: relative;
+  height: 84px;
+  width: 100%;
+}
+
+.antenna_shadow {
+  position: absolute;
+  left: 50%;
+  bottom: -2px;
+  width: 46px;
+  height: 12px;
+  transform: translateX(-50%);
+  background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.3), transparent 75%);
+  border-radius: 50%;
+}
+
+.a_base {
+  position: absolute;
+  left: 50%;
+  bottom: -6px;
+  width: 38px;
+  height: 16px;
+  transform: translateX(-50%);
+  background: linear-gradient(180deg, var(--tv-shell-dark), var(--tv-shell-deep));
+  border-radius: 10px 10px 4px 4px;
+}
+
+.a1,
+.a2 {
+  position: absolute;
+  bottom: 6px;
+  left: 50%;
+  width: 4px;
+  height: 76px;
+  border-radius: 3px;
+  background: linear-gradient(180deg, #a3a3a3, #464646);
+  transform-origin: bottom center;
+}
+
+.a1 {
+  transform: translateX(-5px) rotate(-25deg);
+}
+
+.a2 {
+  transform: translateX(5px) rotate(25deg);
+}
+
+.a1d,
+.a2d {
+  position: absolute;
+  left: 50%;
+  bottom: 6px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #3a3a3a;
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.12);
+}
+
+.a1d {
+  transform: translate(-34px, -68px);
+}
+
+.a2d {
+  transform: translate(25px, -68px);
+}
+
+/* ============ TV shell ============ */
+
+.tv {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: stretch;
+  gap: 12px;
+  width: 320px;
+  height: 208px;
+  padding: 16px;
+  border-radius: 22px 22px 36px 36px;
+  background: linear-gradient(155deg, var(--tv-shell-light) 0%, var(--tv-shell) 45%, var(--tv-shell-dark) 100%);
+  box-shadow:
+    0 20px 32px -12px rgba(0, 0, 0, 0.45),
+    inset 0 -12px 18px rgba(0, 0, 0, 0.18),
+    inset 0 3px 0 rgba(255, 255, 255, 0.3);
+}
+
+.cruve {
+  position: absolute;
+  top: 10px;
+  left: 14px;
+  width: 42px;
+  height: 42px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.curve_svg path {
+  fill: rgba(255, 255, 255, 0.32);
+}
+
+/* ============ Screen ============ */
+
+.display_div {
+  flex: 1 1 60%;
+  display: flex;
+  background: var(--tv-bezel);
+  border-radius: 12px;
+  padding: 9px;
+  box-shadow:
+    inset 0 0 0 2px rgba(0, 0, 0, 0.5),
+    inset 0 6px 16px rgba(0, 0, 0, 0.65);
+}
+
+.screen_out {
+  flex: 1;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #000;
+}
+
+.screen_out1 {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.screen {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(
+    90deg,
+    #d9d9d9 0 14.28%,
+    #cbb92a 14.28% 28.56%,
+    #3fb9c2 28.56% 42.84%,
+    #3fac4c 42.84% 57.12%,
+    #bd3fbd 57.12% 71.4%,
+    #c93a3a 71.4% 85.68%,
+    #2e4fbf 85.68% 100%
+  );
+}
+
+.screen::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 24%;
+  background: linear-gradient(
+    90deg,
+    #13202e 0 20%,
+    #e7e7e7 20% 32%,
+    #1a1a4d 32% 46%,
+    #4d4d4d 46% 58%,
+    #7a7a7a 58% 70%,
+    #a8a8a8 70% 82%,
+    #050505 82% 100%
+  );
+}
+
+.notfound_text {
+  position: relative;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+  padding: 5px 12px;
+  border: 2px solid #fff;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.78);
+  color: #fff;
+  font-family: var(--font-mono, ui-monospace, "SF Mono", Menlo, monospace);
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+}
+
+/* Faint duplicate layer for a CRT ghosting/interference flicker over the
+   colorbars — a subtle nod to analog "no signal" static, not a full effect. */
+.screenM {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  mix-blend-mode: screen;
+  opacity: 0.5;
+  pointer-events: none;
+  background-image:
+    radial-gradient(rgba(255, 255, 255, 0.16) 1px, transparent 1.4px),
+    radial-gradient(rgba(255, 255, 255, 0.1) 1px, transparent 1.4px);
+  background-size: 3px 3px, 5px 5px;
+  background-position: 0% 0, 0% 50%;
+  animation: b 0.25s steps(2, end) infinite;
+}
+
+.screenM .notfound_text {
+  border-color: transparent;
+  background: transparent;
+  color: transparent;
+  transform: translate(1.5px, -1px);
+  text-shadow: -1.5px 0 rgba(255, 0, 60, 0.55), 1.5px 0 rgba(0, 210, 255, 0.55);
+  opacity: 0.7;
+}
+
+@keyframes b {
+  100% {
+    background-position: 50% 0, 60% 50%;
+  }
+}
+
+/* Subtle bottom-edge ridge detail, purely decorative. */
+.lines {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: 7px;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  pointer-events: none;
+}
+
+.line1,
+.line2,
+.line3 {
+  height: 2px;
+  border-radius: 2px;
+  background: rgba(0, 0, 0, 0.16);
+}
+
+.line1 {
+  width: 100%;
+}
+
+.line2 {
+  width: 90%;
+}
+
+.line3 {
+  width: 78%;
+}
+
+/* ============ Controls ============ */
+
+.buttons_div {
+  flex: 0 0 32%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 0 6px;
+}
+
+.b1 {
+  position: relative;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, var(--tv-knob), var(--tv-knob-dark));
+  box-shadow: inset 0 -3px 5px rgba(0, 0, 0, 0.5), 0 2px 3px rgba(0, 0, 0, 0.35);
+}
+
+.b1 div {
+  position: absolute;
+  top: 4px;
+  left: 50%;
+  width: 2px;
+  height: 11px;
+  border-radius: 2px;
+  background: #f4e3c8;
+  transform: translateX(-50%) rotate(18deg);
+  transform-origin: bottom center;
+}
+
+.b2 {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, var(--tv-knob), var(--tv-knob-dark));
+  box-shadow: inset 0 -2px 4px rgba(0, 0, 0, 0.5), 0 2px 3px rgba(0, 0, 0, 0.35);
+}
+
+.speakers {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+}
+
+.g1 {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.g11,
+.g12,
+.g13 {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--tv-shell-deep);
+  opacity: 0.65;
+}
+
+.g12 {
+  margin-left: 5px;
+}
+
+.g {
+  width: 3px;
+  height: 40px;
+  border-radius: 2px;
+  background: var(--tv-shell-deep);
+  opacity: 0.55;
+}
+
+/* ============ Legs ============ */
+
+.bottom {
+  position: relative;
+  z-index: 1;
+  height: 28px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 44px;
+}
+
+.base1,
+.base2,
+.base3 {
+  width: 10px;
+  height: 24px;
+  border-radius: 0 0 4px 4px;
+  background: linear-gradient(180deg, #2c2c2c, #0f0f0f);
+}
+
+.base1 {
+  transform: rotate(-9deg);
+  transform-origin: top center;
+}
+
+.base3 {
+  transform: rotate(9deg);
+  transform-origin: top center;
+}
+
+.base2 {
+  height: 20px;
+}
+
+/* ============ Background "404" digits ============ */
+
+.text_404 {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  overflow: hidden;
+  pointer-events: none;
+  user-select: none;
+}
+
+.text_404 > div {
+  font-family: var(--font-mono, ui-monospace, "SF Mono", Menlo, monospace);
+  font-weight: 800;
+  font-size: clamp(72px, 16vw, 200px);
+  line-height: 1;
+  color: rgba(120, 120, 135, 0.07);
+}

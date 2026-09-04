@@ -1,0 +1,129 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="192" height="192">
+  <defs>
+    <!-- Cobalt Blue TV Body Gradient -->
+    <linearGradient id="cobaltBody192" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2563eb" />
+      <stop offset="40%" stop-color="#1d4ed8" />
+      <stop offset="100%" stop-color="#1e3a8a" />
+    </linearGradient>
+
+    <!-- Warm Amber Phosphor Screen Glow -->
+    <radialGradient id="amberPhosphor192" cx="50%" cy="45%" r="60%">
+      <stop offset="0%" stop-color="#fef08a" />
+      <stop offset="45%" stop-color="#fde047" />
+      <stop offset="80%" stop-color="#eab308" />
+      <stop offset="100%" stop-color="#ca8a04" />
+    </radialGradient>
+
+    <!-- Antenna Metallic Gradient -->
+    <linearGradient id="metalChassis192" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#64748b" />
+      <stop offset="50%" stop-color="#94a3b8" />
+      <stop offset="100%" stop-color="#475569" />
+    </linearGradient>
+
+    <!-- Pedestal Base Dark Slate Gradient -->
+    <linearGradient id="pedestalGrad192" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#334155" />
+      <stop offset="100%" stop-color="#0f172a" />
+    </linearGradient>
+
+    <!-- Red LED Glow Filter -->
+    <filter id="redLedGlow192" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="5" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+
+    <!-- Drop Shadow for Standalone TV Cutout -->
+    <filter id="tvDropShadow192" x="-10%" y="-10%" width="120%" height="125%">
+      <feDropShadow dx="0" dy="12" stdDeviation="14" flood-color="#000000" flood-opacity="0.5" />
+    </filter>
+  </defs>
+
+  <!-- Group with Drop Shadow for Standalone Cutout Effect -->
+  <g filter="url(#tvDropShadow192)">
+    <!-- 1. Retro Dual Rabbit-Ear Antennae -->
+    <g stroke="url(#metalChassis192)" stroke-linecap="round">
+      <line x1="200" y1="130" x2="128" y2="48" stroke-width="10" />
+      <line x1="312" y1="130" x2="384" y2="48" stroke-width="10" />
+    </g>
+    <!-- Chrome Antenna Tips -->
+    <circle cx="128" cy="48" r="11" fill="#f1f5f9" stroke="#94a3b8" stroke-width="2.5" />
+    <circle cx="384" cy="48" r="11" fill="#f1f5f9" stroke="#94a3b8" stroke-width="2.5" />
+
+    <!-- Antenna Mounts -->
+    <rect x="190" y="122" width="20" height="12" rx="4" fill="#334155" />
+    <rect x="302" y="122" width="20" height="12" rx="4" fill="#334155" />
+
+    <!-- 2. Dark Slate Pedestal Stand (Underneath Chassis) -->
+    <path d="M180 402 L198 446 L314 446 L332 402 Z" fill="url(#pedestalGrad192)" stroke="#0f172a" stroke-width="3" />
+    <rect x="170" y="444" width="172" height="15" rx="7.5" fill="#1e293b" stroke="#090d16" stroke-width="2" />
+
+    <!-- 3. Wide Proportioned Cobalt Blue Retro CRT Chassis -->
+    <rect x="24" y="130" width="464" height="272" rx="38" fill="url(#cobaltBody192)" stroke="#3b82f6" stroke-width="4.5" />
+    
+    <!-- Top Highlight Lip on TV Casing -->
+    <path d="M54 138 Q256 132 458 138" stroke="#60a5fa" stroke-width="3" stroke-linecap="round" fill="none" opacity="0.65" />
+
+    <!-- 4. CRT 4:3 Rounded Phosphor Screen -->
+    <!-- Screen Bezel Recess -->
+    <rect x="48" y="152" width="320" height="228" rx="24" fill="#090d16" stroke="#172554" stroke-width="3.5" />
+    
+    <!-- Amber/Yellow Phosphor Glass Surface -->
+    <rect x="56" y="160" width="304" height="212" rx="18" fill="url(#amberPhosphor192)" />
+
+    <!-- Authentic CRT Scanlines Texture Overlay -->
+    <g opacity="0.14">
+      <line x1="56" y1="182" x2="360" y2="182" stroke="#78350f" stroke-width="2" />
+      <line x1="56" y1="204" x2="360" y2="204" stroke="#78350f" stroke-width="2" />
+      <line x1="56" y1="226" x2="360" y2="226" stroke="#78350f" stroke-width="2" />
+      <line x1="56" y1="248" x2="360" y2="248" stroke="#78350f" stroke-width="2" />
+      <line x1="56" y1="270" x2="360" y2="270" stroke="#78350f" stroke-width="2" />
+      <line x1="56" y1="292" x2="360" y2="292" stroke="#78350f" stroke-width="2" />
+      <line x1="56" y1="314" x2="360" y2="314" stroke="#78350f" stroke-width="2" />
+      <line x1="56" y1="336" x2="360" y2="336" stroke="#78350f" stroke-width="2" />
+      <line x1="56" y1="358" x2="360" y2="358" stroke="#78350f" stroke-width="2" />
+    </g>
+
+    <!-- Diagonal Specular Glare Highlights on Curved Glass -->
+    <path d="M60 166 L175 166 L95 366 L60 366 Z" fill="#ffffff" opacity="0.28" />
+    <path d="M195 166 L230 166 L120 366 L100 366 Z" fill="#ffffff" opacity="0.14" />
+
+    <!-- 5. Bold Retro Red "LIVE" Typography -->
+    <!-- Text Shadow -->
+    <text x="210" y="288" 
+          font-family="Impact, 'Arial Black', -apple-system, sans-serif" 
+          font-weight="900" 
+          font-size="70" 
+          fill="#7f1d1d" 
+          text-anchor="middle" 
+          letter-spacing="5">LIVE</text>
+    <!-- Foreground Text -->
+    <text x="208" y="285" 
+          font-family="Impact, 'Arial Black', -apple-system, sans-serif" 
+          font-weight="900" 
+          font-size="70" 
+          fill="#dc2626" 
+          text-anchor="middle" 
+          letter-spacing="5">LIVE</text>
+
+    <!-- 6. Right-Hand Control Panel -->
+    <rect x="382" y="152" width="84" height="228" rx="16" fill="#0f172a" stroke="#1e293b" stroke-width="2.5" />
+
+    <!-- Circular Rotary Channel Dial -->
+    <circle cx="424" cy="194" r="20" fill="#f8fafc" stroke="#94a3b8" stroke-width="3" />
+    <circle cx="424" cy="194" r="14" fill="#e2e8f0" />
+    <line x1="424" y1="180" x2="424" y2="192" stroke="#334155" stroke-width="3.5" stroke-linecap="round" />
+
+    <!-- Red Power Indicator Light with Active Glow -->
+    <circle cx="424" cy="246" r="9" fill="#ef4444" filter="url(#redLedGlow192)" />
+    <circle cx="424" cy="246" r="5.5" fill="#f87171" />
+    <circle cx="422" cy="244" r="2" fill="#ffffff" />
+
+    <!-- Four Rounded Horizontal Speaker Grille Vents -->
+    <rect x="396" y="286" width="56" height="9" rx="4.5" fill="#020617" stroke="#1e293b" stroke-width="1" />
+    <rect x="396" y="306" width="56" height="9" rx="4.5" fill="#020617" stroke="#1e293b" stroke-width="1" />
+    <rect x="396" y="326" width="56" height="9" rx="4.5" fill="#020617" stroke="#1e293b" stroke-width="1" />
+    <rect x="396" y="346" width="56" height="9" rx="4.5" fill="#020617" stroke="#1e293b" stroke-width="1" />
+  </g>
+</svg>

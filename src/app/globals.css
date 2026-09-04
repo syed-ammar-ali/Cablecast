@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #030305;
+  --foreground: #e6faff;
 }
 
 @theme inline {
@@ -12,15 +12,218 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+*:focus,
+*:focus-visible {
+  outline: none;
+}
+
+html,
+body {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+html {
+  color-scheme: dark;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+  background-image:
+    radial-gradient(circle at 15% 10%, rgba(232, 121, 249, 0.08), transparent 40%),
+    radial-gradient(circle at 85% 0%, rgba(34, 211, 238, 0.1), transparent 45%);
+}
+
+@keyframes loading-scan {
+  0% {
+    transform: translateX(-100%);
+  }
+
+  100% {
+    transform: translateX(300%);
+  }
+}
+
+@keyframes crt-flicker {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.97;
+  }
+}
+
+.crt-flicker {
+  animation: crt-flicker 4s infinite;
+}
+
+/* Fully hides the scrollbar chrome (still scrollable via wheel/touch/JS) —
+   used for the guide's horizontal timeline, where a visible bar clutters
+   the retro-EPG look more than it helps. */
+.no-scrollbar {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+/* ── Hardware-Accelerated Smooth Animation System ──────────────────────── */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes zoomIn95 {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 8px, 0) scale3d(0.985, 0.985, 1);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale3d(1, 1, 1);
+  }
+}
+
+@keyframes zoomOut95 {
+  from {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale3d(1, 1, 1);
+  }
+  to {
+    opacity: 0;
+    transform: translate3d(0, 4px, 0) scale3d(0.99, 0.99, 1);
+  }
+}
+
+@keyframes slideInFromRight {
+  from { transform: translate3d(100%, 0, 0); }
+  to { transform: translate3d(0, 0, 0); }
+}
+
+@keyframes slideOutToRight {
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(100%, 0, 0); }
+}
+
+@keyframes slideInFromBottom {
+  from { opacity: 0; transform: translate3d(0, 16px, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+@keyframes slideOutToBottom {
+  from { opacity: 1; transform: translate3d(0, 0, 0); }
+  to { opacity: 0; transform: translate3d(0, 16px, 0); }
+}
+
+@keyframes slideInFromTop {
+  from { opacity: 0; transform: translate3d(0, -12px, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+@keyframes slideUpRemote {
+  from { opacity: 0; transform: translate3d(0, 16px, 0) scale3d(0.96, 0.96, 1); }
+  to { opacity: 1; transform: translate3d(0, 0, 0) scale3d(1, 1, 1); }
+}
+
+@keyframes slideDownRemote {
+  from { opacity: 1; transform: translate3d(0, 0, 0) scale3d(1, 1, 1); }
+  to { opacity: 0; transform: translate3d(0, 12px, 0) scale3d(0.96, 0.96, 1); }
+}
+
+.animate-in {
+  animation-duration: 150ms;
+  animation-fill-mode: both;
+  animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform, opacity;
+}
+
+.animate-out {
+  animation-duration: 120ms;
+  animation-fill-mode: forwards;
+  animation-timing-function: cubic-bezier(0.4, 0, 1, 1);
+  will-change: transform, opacity;
+  pointer-events: none;
+}
+
+.fade-in {
+  animation-name: fadeIn;
+}
+
+.fade-out,
+.animate-out.fade-out {
+  animation-name: fadeOut;
+}
+
+.zoom-in-95,
+.zoom-in-90 {
+  animation-name: zoomIn95;
+}
+
+.zoom-out-95,
+.animate-out.zoom-out-95 {
+  animation-name: zoomOut95;
+}
+
+.slide-in-from-right {
+  animation-name: slideInFromRight;
+}
+
+.slide-out-to-right,
+.animate-out.slide-out-to-right {
+  animation-name: slideOutToRight;
+}
+
+.slide-in-from-bottom,
+.slide-in-from-bottom-3 {
+  animation-name: slideInFromBottom;
+}
+
+.slide-out-to-bottom,
+.slide-out-to-bottom-3,
+.animate-out.slide-out-to-bottom,
+.animate-out.slide-out-to-bottom-3 {
+  animation-name: slideOutToBottom;
+}
+
+.slide-in-from-top,
+.slide-in-from-top-2 {
+  animation-name: slideInFromTop;
+}
+
+.slide-up-remote,
+.animate-slide-up-remote {
+  animation: slideUpRemote 150ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  will-change: transform, opacity;
+}
+
+.slide-down-remote,
+.animate-slide-down-remote {
+  animation: slideDownRemote 120ms cubic-bezier(0.4, 0, 1, 1) both;
+  will-change: transform, opacity;
+  pointer-events: none;
 }

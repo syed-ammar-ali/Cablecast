@@ -1,0 +1,358 @@
+// Prisma schema for the Retro TV Simulation & Appointment Matrix app.
+// Local development uses SQLite; swap the datasource for Postgres/MySQL in production.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// A single slot on the "Appointment Matrix" — a scheduled channel block that
+/// binds a TMDB media item to a fixed day-of-week / start-time grid position,
+/// mirroring 90s-style "must-see-TV" scheduling.
+model ScheduledAppointment {
+  id        String   @id @default(cuid())
+  /// Session that owns this appointment — scopes all reads/writes/deletes so
+  /// one user cannot see or delete another user's personal schedule.
+  sessionId String   @default("anonymous")
+  tmdbId    Int
+  mediaType String // "movie" | "tv"
+  title     String
+  season    Int? // null for movies
+  episode   Int? // null for movies
+
+  /// Channel lineup number — see src/config/channels.ts for the fixed lineup.
+  channelNumber Int
+
+  /// 0 (Sunday) - 6 (Saturday), matches JS Date#getDay()
+  dayOfWeek Int
+  /// Minutes from midnight, snapped to a 30-minute grid (0, 30, 60, ...)
+  blockStartMinutes Int
+  /// Number of consecutive 30-minute blocks this appointment occupies
+  blockCount Int @default(1)
+  /// Exact TMDB runtime in minutes, if known — used to time station bumper
+  /// filler between the actual content ending and the block's top-of-hour.
+  runtimeMinutes Int?
+
+  posterPath String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([sessionId])
+  @@index([sessionId, dayOfWeek, blockStartMinutes])
+  @@index([dayOfWeek, blockStartMinutes])
+  @@index([channelNumber, dayOfWeek])
+}
+
+/// A TV show the admin has "registered" for the channel-code system.
+/// Each show gets a short prefix (e.g. "F" for Friends) and a channel
+/// assignment. The admin then generates EpisodeCodes in bulk from TMDB data.
+model RegisteredShow {
+  id            String        @id @default(cuid())
+  /// Short uppercase prefix used in codes, e.g. "F". Must be unique.
+  prefix        String        @unique
+  title         String
+  tmdbId        Int
+  channelNumber Int
+  posterPath    String?
+  /// Total number of seasons fetched from TMDB (set during generate)
+  totalSeasons  Int           @default(0)
+  /// Total episode codes generated
+  totalCodes    Int           @default(0)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  episodeCodes  EpisodeCode[]
+  accessCodes   AccessCode[]
+
+  @@index([tmdbId])
+}
+
+/// A single episode code entry, e.g. "F0101" → Friends S1E1 → 1994-09-22.
+/// The code field is the full string: prefix + zero-padded season + zero-padded episode.
+model EpisodeCode {
+  id             String         @id @default(cuid())
+  /// Full code string, e.g. "F0101". Unique across all shows.
+  code           String         @unique
+  showId         String
+  show           RegisteredShow @relation(fields: [showId], references: [id], onDelete: Cascade)
+  season         Int
+  episode        Int
+  /// ISO date string (YYYY-MM-DD) of the original TMDB air date for this episode.
+  airDate        String?
+  /// Human-readable episode title from TMDB.
+  episodeTitle   String?
+  createdAt      DateTime       @default(now())
+
+  @@index([showId])
+  @@index([code])
+}
+
+
+/// Persisted per-item playback position, so the retro player can resume
+/// a title exactly where the viewer left off (used for startOffsetSeconds).
+model WatchProgress {
+  id                 String   @id @default(cuid())
+  tmdbId             Int
+  mediaType          String // "movie" | "tv"
+  season             Int?
+  episode            Int?
+  positionSeconds    Int      @default(0)
+  durationSeconds    Int?
+  updatedAt          DateTime @updatedAt
+
+  @@unique([tmdbId, mediaType, season, episode])
+}
+
+/// An invite code the admin hands out — the only way a "user" role can ever
+/// get past the /gate. Revoking a code immediately invalidates every session
+/// that was ever redeemed from it (checked live in `src/proxy.ts`), not just
+/// future redemptions.
+model AccessCode {
+  id        String    @id @default(cuid())
+  /// Human-typable, e.g. "K7H2-9QRT" — see `generateAccessCode()`.
+  code      String    @unique
+  label     String?
+  createdAt DateTime  @default(now())
+  expiresAt DateTime?
+  /// Null = unlimited redemptions.
+  maxUses   Int?
+  useCount  Int       @default(0)
+  /// Null = unlimited concurrent devices. Int = maximum allowed device slots.
+  maxDevices Int?
+  revoked   Boolean   @default(false)
+  revokedAt DateTime?
+
+  sessions      Session[]
+  assignedShows RegisteredShow[]
+
+  @@index([revoked])
+}
+
+/// A signed-in browser. The cookie only ever holds the opaque `token` below
+/// — role, expiry, and revocation all live here so the admin can kill any
+/// session (or, via its code, a whole batch of them) instantly.
+model Session {
+  id              String      @id @default(cuid())
+  token           String      @unique
+  role            String      // "admin" | "user"
+
+  /// Free-typed display name for the header's identity slot — either role
+  /// can set their own, purely cosmetic and scoped to this one session.
+  displayName     String?
+  /// Human-readable device name (e.g. "Chrome on Windows", "Safari on iPhone")
+  deviceLabel     String?
+  /// Stable server-computed device entropy signature
+  deviceSignature String?
+
+  accessCodeId    String?
+  accessCode      AccessCode? @relation(fields: [accessCodeId], references: [id])
+
+  createdAt       DateTime    @default(now())
+  lastSeenAt      DateTime    @default(now())
+  expiresAt       DateTime?
+  revokedAt       DateTime?
+
+  userAgent       String?
+  ip              String?
+
+  @@index([accessCodeId])
+  @@index([deviceSignature])
+  @@index([revokedAt])
+}
+
+/// A user's bookmarked / favorited movie or TV show.
+model UserFavorite {
+  id          String   @id @default(cuid())
+  sessionId   String   @default("anonymous")
+  tmdbId      Int
+  mediaType   String // "movie" | "tv"
+  title       String
+  posterPath  String?
+  backdropUrl String?
+  releaseYear String?
+  overview    String?
+  voteAverage Float?
+  createdAt   DateTime @default(now())
+
+  @@unique([sessionId, tmdbId, mediaType])
+  @@index([sessionId])
+  @@index([tmdbId])
+}
+
+/// A user's playback history and resume point.
+model UserWatchHistory {
+  id              String   @id @default(cuid())
+  sessionId       String   @default("anonymous")
+  tmdbId          Int
+  mediaType       String // "movie" | "tv"
+  title           String
+  posterPath      String?
+  backdropUrl     String?
+  releaseYear     String?
+  season          Int      @default(0)
+  episode         Int      @default(0)
+  episodeTitle    String?
+  progressSeconds Int      @default(0)
+  durationSeconds Int?
+  completed       Boolean  @default(false)
+  lastWatchedAt   DateTime @default(now()) @updatedAt
+
+  @@unique([sessionId, tmdbId, mediaType, season, episode])
+  @@index([sessionId])
+  @@index([lastWatchedAt])
+}
+
+/// A recurring appointment on the user's personal broadcast schedule
+model UserPersonalSchedule {
+  id                String   @id @default(cuid())
+  sessionId         String   @default("anonymous")
+  tmdbId            Int
+  mediaType         String   // "movie" | "tv"
+  title             String
+  posterPath        String?
+  backdropUrl       String?
+  runtimeMinutes    Int?
+  
+  // Weekly recurring slot: dayOfWeek 0 (Sun) - 6 (Sat), blockStartMinutes (0-1410 in 30-min increments)
+  dayOfWeek         Int
+  blockStartMinutes Int
+  blockCount        Int      @default(1)
+  
+  // For TV Shows: tracks current episode sequence
+  currentSeason     Int      @default(1)
+  currentEpisode    Int      @default(1)
+  totalEpisodes     Int?
+  
+  // Last broadcast tracking
+  lastAiredDate     String?  // ISO date "YYYY-MM-DD" of last broadcast run
+  lastAiredSeason   Int?
+  lastAiredEpisode  Int?
+  wasWatched        Boolean  @default(false)
+  isRerun           Boolean  @default(false)
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([sessionId, dayOfWeek, blockStartMinutes])
+  @@index([sessionId])
+  @@index([sessionId, dayOfWeek])
+}
+
+/// Log of missed or unwatched broadcasts available for repeat rescheduling
+model UserMissedBroadcast {
+  id                String   @id @default(cuid())
+  sessionId         String   @default("anonymous")
+  scheduleId        String?
+  tmdbId            Int
+  mediaType         String
+  title             String
+  posterPath        String?
+  backdropUrl       String?
+  runtimeMinutes    Int?
+  blockCount        Int      @default(1)
+  season            Int?
+  episode           Int?
+  episodeTitle      String?
+  originalAirDate   String   // "YYYY-MM-DD"
+  originalAirTime   String   // e.g. "9:00 PM"
+  isResolved        Boolean  @default(false) // Marked true when rescheduled or watched
+  createdAt         DateTime @default(now())
+
+  @@index([sessionId, isResolved])
+}
+
+/// Custom channel name & preferences for the user's personal TV broadcast
+model UserChannelSettings {
+  id          String   @id @default(cuid())
+  sessionId   String   @unique
+  channelName String   @default("My Lineup")
+  updatedAt   DateTime @updatedAt
+}
+
+/// Alert when a show's scheduled season finishes so user can schedule next season
+model UserSeasonCompletedAlert {
+  id              String   @id @default(cuid())
+  sessionId       String   @default("anonymous")
+  tmdbId          Int
+  title           String
+  posterPath      String?
+  backdropUrl     String?
+  completedSeason Int
+  nextSeason      Int?
+  isDismissed     Boolean  @default(false)
+  createdAt       DateTime @default(now())
+
+  @@index([sessionId, isDismissed])
+}
+
+enum MediaType {
+  MOVIE
+  TV
+}
+
+/// Stores temporary access passes / VHS rentals with an expiration timestamp.
+model Rental {
+  id           String    @id @default(cuid())
+  userId       String
+  mediaId      Int
+  mediaType    MediaType
+  seasonNumber Int       @default(0)
+  rentedAt     DateTime  @default(now())
+  expiresAt    DateTime
+
+  // Embedded metadata — no external API needed to display this item.
+  title        String?
+  posterPath   String?
+  backdropUrl  String?
+  releaseYear  String?
+  overview     String?
+
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([userId, mediaId, seasonNumber])
+  @@index([userId, expiresAt])
+}
+
+/// Stores permanent VHS collection / watchlist ownership.
+model LibraryItem {
+  id           String    @id @default(cuid())
+  userId       String
+  mediaId      Int
+  mediaType    MediaType
+  seasonNumber Int       @default(0)
+
+  // Embedded metadata — no external API needed to display this item.
+  title        String?
+  posterPath   String?
+  backdropUrl  String?
+  releaseYear  String?
+  overview     String?
+
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@unique([userId, mediaId, seasonNumber])
+  @@index([userId])
+}
+
+/// Stores scheduled broadcast airing slots tied to a user.
+model BroadcastSlot {
+  id           String     @id @default(cuid())
+  userId       String
+  mediaId      Int
+  mediaType    MediaType?
+  seasonNumber Int        @default(0)
+  scheduledFor DateTime
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@index([userId, scheduledFor])
+  @@index([userId, mediaId, seasonNumber])
+}
+
+
