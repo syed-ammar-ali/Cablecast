@@ -99,7 +99,7 @@ export function MobileSearchOverlay({
           <div className="flex flex-col items-center justify-center py-16 text-center text-neutral-500 space-y-2">
             <Loader2 className="h-6 w-6 animate-spin text-cyan-400" />
             <p className="text-xs font-mono uppercase tracking-wider text-neutral-400">
-              Searching TMDB directory...
+              Searching Cablecast archives...
             </p>
           </div>
         )}
@@ -124,7 +124,7 @@ export function MobileSearchOverlay({
               <Clapperboard className="h-5 w-5 text-neutral-400" />
             </div>
             <p className="text-sm font-bold text-neutral-300">
-              Search TMDB Catalog
+              Search Broadcast Catalog
             </p>
             <p className="text-xs text-neutral-500 max-w-xs">
               Type the title of any movie or TV series to search and tune in immediately.

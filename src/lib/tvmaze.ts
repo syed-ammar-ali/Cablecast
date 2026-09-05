@@ -102,11 +102,11 @@ export async function getScheduleForCountryAndDate(
         continue;
       }
       const message = error instanceof Error ? error.message : "Unknown network error.";
-      throw new Error(`Could not reach TVmaze: ${message}`);
+      throw new Error(`Unable to reach broadcast listings: ${message}`);
     }
 
     if (!res.ok) {
-      throw new Error(`TVmaze request failed with status ${res.status}`);
+      throw new Error(`Broadcast listings request failed with status ${res.status}`);
     }
 
     const raw = (await res.json()) as TvMazeEpisodeRaw[];
@@ -137,5 +137,5 @@ export async function getScheduleForCountryAndDate(
     });
   }
 
-  throw new Error("Failed to reach TVmaze.");
+  throw new Error("Unable to connect to live broadcast listings.");
 }

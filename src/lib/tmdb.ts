@@ -99,7 +99,7 @@ async function tmdbFetch<T>(
         continue;
       }
       throw new TmdbApiError(
-        "Could not reach TMDB — the connection was reset. Please try again.",
+        "Could not reach the media catalog — the connection was reset. Please try again.",
         503,
       );
     }
@@ -107,7 +107,7 @@ async function tmdbFetch<T>(
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
       throw new TmdbApiError(
-        body?.status_message ?? `TMDB request failed with status ${res.status}`,
+        body?.status_message ?? `Media catalog request failed with status ${res.status}`,
         res.status,
       );
     }
@@ -118,8 +118,8 @@ async function tmdbFetch<T>(
   // Fallback if all retry loops exit unexpectedly
   throw new TmdbApiError(
     lastNetworkError instanceof Error
-      ? `TMDB network error: ${lastNetworkError.message}`
-      : "Failed to reach TMDB.",
+      ? `Catalog network error: ${lastNetworkError.message}`
+      : "Failed to reach media catalog.",
     503,
   );
 }

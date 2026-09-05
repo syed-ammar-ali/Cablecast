@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
     }
     console.error("[api/tmdb/search] unexpected error:", error);
     return NextResponse.json(
-      { error: "Unexpected error while searching TMDB." },
+      { error: "Unexpected error while searching broadcast catalog." },
       { status: 500 },
     );
   }

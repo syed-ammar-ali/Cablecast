@@ -1,7 +1,7 @@
 {
   "name": "Cablecast",
   "short_name": "Cablecast",
-  "description": "90s-inspired retro TV simulation with TMDB search and multi-provider player.",
+  "description": "90s-inspired retro TV simulation with broadcast schedules and personal video tapes.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

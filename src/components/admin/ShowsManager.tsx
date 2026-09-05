@@ -368,10 +368,10 @@ export function ShowsManager() {
           </div>
         </div>
 
-        {/* TMDB Search Input */}
+        {/* Catalog Search Input */}
         <div className="relative mb-5">
           <label className="mb-2 block text-xs font-medium uppercase tracking-wider text-neutral-400">
-            1. Search TMDB Catalog
+            1. Search Broadcast Catalog
           </label>
           <div className="relative">
             <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-500" />
@@ -416,7 +416,7 @@ export function ShowsManager() {
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium text-neutral-100">{r.title}</p>
                     <p className="text-xs text-neutral-500">
-                      First Aired: {r.releaseYear ?? "N/A"} · TMDB #{r.tmdbId}
+                      First Aired: {r.releaseYear ?? "N/A"} · Catalog ID #{r.tmdbId}
                     </p>
                   </div>
                   <span className="rounded-md border border-neutral-800 bg-neutral-900 px-2.5 py-1 text-[11px] font-medium text-neutral-400">
@@ -442,7 +442,7 @@ export function ShowsManager() {
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-bold text-white">{selectedResult.title}</p>
               <p className="mt-0.5 text-xs text-neutral-400">
-                TMDB #{selectedResult.tmdbId} · Premiere: {selectedResult.releaseYear ?? "—"}
+                Catalog ID #{selectedResult.tmdbId} · Premiere: {selectedResult.releaseYear ?? "—"}
               </p>
             </div>
             <button

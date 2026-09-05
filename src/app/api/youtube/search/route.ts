@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error("[api/youtube/search] GET error:", error);
     return NextResponse.json(
-      { match: null, error: "Unexpected error while searching YouTube." },
+      { match: null, error: "Unexpected error while searching broadcast stream." },
       { status: 500 },
     );
   }

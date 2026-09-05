@@ -131,7 +131,7 @@ export function useBroadcastResolver({ onSelectBroadcast, onSelectDirectBroadcas
 
         if (!match) {
           setUnavailableIds((prev) => new Set(prev).add(item.id));
-          flashResolveMessage(`No TMDB match found for "${item.showName}".`);
+          flashResolveMessage(`No broadcast tape found for "${item.showName}".`);
           return;
         }
 

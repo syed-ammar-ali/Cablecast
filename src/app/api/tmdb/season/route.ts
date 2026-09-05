@@ -8,7 +8,7 @@ export async function GET(request: NextRequest) {
 
   if (!tmdbId || !Number.isFinite(season) || season < 0) {
     return NextResponse.json(
-      { error: "Missing or invalid `tmdbId` / `season` search parameters." },
+      { error: "Missing or invalid `id` / `season` search parameters." },
       { status: 400 },
     );
   }

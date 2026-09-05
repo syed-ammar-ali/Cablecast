@@ -48,7 +48,7 @@ function getStartParam(offset?: number, paramName = "start"): string {
 export const PROVIDERS: Provider[] = [
   {
     id: "vidlink-primary",
-    name: "VidLink (Fast)",
+    name: "Feed 01 (Primary Relay)",
     buildUrl: (kind, { tmdbId, season, episode, startOffsetSeconds }) => {
       const offsetParam =
         startOffsetSeconds && startOffsetSeconds > 0
@@ -63,7 +63,7 @@ export const PROVIDERS: Provider[] = [
   },
   {
     id: "smashystream",
-    name: "SmashyStream (Multi-Server)",
+    name: "Feed 02 (Multi-Relay)",
     buildUrl: (kind, { tmdbId, season, episode, startOffsetSeconds }) => {
       const offsetParam = getStartParam(startOffsetSeconds, "start");
       if (kind === "movie") {
@@ -74,7 +74,7 @@ export const PROVIDERS: Provider[] = [
   },
   {
     id: "autoembed-clean",
-    name: "AutoEmbed Clean Player",
+    name: "Feed 03 (Auto Signal)",
     buildUrl: (kind, { tmdbId, season, episode, startOffsetSeconds }) => {
       const offsetParam = getStartParam(startOffsetSeconds, "time");
       if (kind === "movie") {
@@ -85,7 +85,7 @@ export const PROVIDERS: Provider[] = [
   },
   {
     id: "vidfast",
-    name: "VidFast",
+    name: "Feed 04 (Fast Stream)",
     buildUrl: (kind, { tmdbId, season, episode, startOffsetSeconds }) => {
       const offsetParam = getStartParam(startOffsetSeconds, "start");
       if (kind === "movie") {
@@ -96,7 +96,7 @@ export const PROVIDERS: Provider[] = [
   },
   {
     id: "vidcore",
-    name: "VidCore",
+    name: "Feed 05 (Core Relay)",
     buildUrl: (kind, { tmdbId, season, episode, startOffsetSeconds }) => {
       const offsetParam = getStartParam(startOffsetSeconds, "start");
       if (kind === "movie") {
@@ -107,7 +107,7 @@ export const PROVIDERS: Provider[] = [
   },
   {
     id: "multiembed-asian",
-    name: "MultiEmbed (Asian / Global)",
+    name: "Feed 06 (Global Relay)",
     buildUrl: (kind, { tmdbId, season, episode, startOffsetSeconds }) => {
       const offsetParam = getStartParam(startOffsetSeconds, "start");
       if (kind === "movie") {
@@ -118,7 +118,7 @@ export const PROVIDERS: Provider[] = [
   },
   {
     id: "embedsu-fast",
-    name: "EmbedSu (Global / Anime)",
+    name: "Feed 07 (High-Res Signal)",
     buildUrl: (kind, { tmdbId, season, episode, startOffsetSeconds }) => {
       const offsetParam = getStartParam(startOffsetSeconds, "start");
       if (kind === "movie") {
@@ -129,7 +129,7 @@ export const PROVIDERS: Provider[] = [
   },
   {
     id: "vidsrc-cc",
-    name: "VidSrc CC (V2)",
+    name: "Feed 08 (Direct Feed)",
     buildUrl: (kind, { tmdbId, season, episode, startOffsetSeconds }) => {
       const offsetParam = getStartParam(startOffsetSeconds, "start");
       if (kind === "movie") {
@@ -140,7 +140,7 @@ export const PROVIDERS: Provider[] = [
   },
   {
     id: "vidsrc-icu",
-    name: "VidSrc VIP (ICU)",
+    name: "Feed 09 (Satellite Relay)",
     buildUrl: (kind, { tmdbId, season, episode, startOffsetSeconds }) => {
       const offsetParam = getStartParam(startOffsetSeconds, "start");
       if (kind === "movie") {
@@ -151,7 +151,7 @@ export const PROVIDERS: Provider[] = [
   },
   {
     id: "vidzen",
-    name: "VidZen",
+    name: "Feed 10 (Stream Relay)",
     buildUrl: (kind, { tmdbId, season, episode, startOffsetSeconds }) => {
       const offsetParam = getStartParam(startOffsetSeconds, "start");
       if (kind === "movie") {
@@ -162,7 +162,7 @@ export const PROVIDERS: Provider[] = [
   },
   {
     id: "vidlove",
-    name: "Vidlove",
+    name: "Feed 11 (Secondary Signal)",
     buildUrl: (kind, { tmdbId, season, episode, startOffsetSeconds }) => {
       const offsetParam = getStartParam(startOffsetSeconds, "start");
       if (kind === "movie") {
@@ -173,7 +173,7 @@ export const PROVIDERS: Provider[] = [
   },
   {
     id: "vidzee",
-    name: "Vidzee",
+    name: "Feed 12 (Digital Stream)",
     buildUrl: (kind, { tmdbId, season, episode, startOffsetSeconds }) => {
       const offsetParam = getStartParam(startOffsetSeconds, "start");
       if (kind === "movie") {
@@ -184,7 +184,7 @@ export const PROVIDERS: Provider[] = [
   },
   {
     id: "moviesap",
-    name: "MovieSap",
+    name: "Feed 13 (Media Relay)",
     buildUrl: (kind, { tmdbId, season, episode, startOffsetSeconds }) => {
       const offsetParam = getStartParam(startOffsetSeconds, "start");
       if (kind === "movie") {
@@ -195,7 +195,7 @@ export const PROVIDERS: Provider[] = [
   },
   {
     id: "cinesrc",
-    name: "CineSrc",
+    name: "Feed 14 (Cinema Signal)",
     buildUrl: (kind, { tmdbId, season, episode, startOffsetSeconds }) => {
       const offsetParam = getStartParam(startOffsetSeconds, "start");
       if (kind === "movie") {
@@ -206,7 +206,7 @@ export const PROVIDERS: Provider[] = [
   },
   {
     id: "moviesapi-intl",
-    name: "MoviesAPI (International)",
+    name: "Feed 15 (Global Broadcast)",
     buildUrl: (kind, { tmdbId, season, episode, startOffsetSeconds }) => {
       const offsetParam = getStartParam(startOffsetSeconds, "start");
       if (kind === "movie") {
@@ -217,7 +217,7 @@ export const PROVIDERS: Provider[] = [
   },
   {
     id: "rivestream",
-    name: "RiveStream",
+    name: "Feed 16 (Line Relay)",
     buildUrl: (kind, { tmdbId, season, episode, startOffsetSeconds }) => {
       const offsetParam = getStartParam(startOffsetSeconds, "start");
       if (kind === "movie") {
@@ -228,37 +228,37 @@ export const PROVIDERS: Provider[] = [
   },
   {
     id: "kisskh-asian",
-    name: "KissKH (K-Drama / Asian)",
+    name: "Feed 17 (Specialty Relay)",
     isDynamic: true,
     buildUrl: () => "",
   },
   {
     id: "dramacool-asian",
-    name: "DramaCool (Asian Series)",
+    name: "Feed 18 (Specialty Broadcast)",
     isDynamic: true,
     buildUrl: () => "",
   },
   {
     id: "kartoons-me",
-    name: "Kartoons.me (Cartoons & Kids)",
+    name: "Feed 19 (Animation Relay)",
     isDynamic: true,
     buildUrl: () => "",
   },
   {
     id: "kimcartoon",
-    name: "KimCartoon (Cartoons & Animation)",
+    name: "Feed 20 (Toon Signal)",
     isDynamic: true,
     buildUrl: () => "",
   },
   {
     id: "gogoanime",
-    name: "GogoAnime (Anime & Cartoons)",
+    name: "Feed 21 (Anime Archive Feed)",
     isDynamic: true,
     buildUrl: () => "",
   },
   {
     id: "youtube-official",
-    name: "YouTube",
+    name: "Feed 22 (Official Broadcast Feed)",
     isDynamic: true,
     buildUrl: () => "",
   },

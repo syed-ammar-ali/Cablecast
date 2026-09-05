@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
     }
     console.error("[api/tmdb/details] unexpected error:", error);
     return NextResponse.json(
-      { error: "Unexpected error while fetching TMDB details." },
+      { error: "Unexpected error while fetching media details." },
       { status: 500 },
     );
   }

@@ -32,7 +32,7 @@ export const metadata: Metadata = {
   title: "Cablecast",
   applicationName: "Cablecast",
   description:
-    "A 90s-inspired retro TV simulation with TMDB search and an auto-retrying multi-provider player.",
+    "A 90s-inspired retro TV simulation with broadcast schedules and personal video tapes.",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,

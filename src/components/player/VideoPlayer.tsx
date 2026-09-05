@@ -936,7 +936,7 @@ export function VideoPlayer({
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-black/95 px-6 text-center text-neutral-300">
             <SatelliteDish className="h-10 w-10" />
             <p className="text-sm uppercase tracking-widest">
-              All channels exhausted — no signal on any provider.
+              All broadcast feeds exhausted — no signal detected.
             </p>
             <button
               type="button"
@@ -944,7 +944,7 @@ export function VideoPlayer({
               className="flex items-center gap-2 rounded-md border border-neutral-600 bg-white/5 px-4 py-2 text-xs uppercase tracking-widest text-neutral-200 transition-colors hover:bg-white/10 cursor-pointer"
             >
               <RefreshCw className="h-4 w-4" />
-              Retry From Channel 1
+              Retry From Feed 1
             </button>
           </div>
         )}
@@ -975,8 +975,8 @@ export function VideoPlayer({
                 type="button"
                 onClick={advanceProvider}
                 disabled={exhausted || screenMode !== "content"}
-                title="Source not working? Swap"
-                aria-label="Source not working? Swap"
+                title="Feed not working? Swap"
+                aria-label="Feed not working? Swap"
                 className={`flex h-9 items-center gap-1.5 px-2.5 transition-colors hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer ${
                   screenMode === "content" ? "" : "rounded-l-md"
                 }`}
@@ -987,7 +987,7 @@ export function VideoPlayer({
                 type="button"
                 onClick={() => setIsProviderMenuOpen((open) => !open)}
                 disabled={screenMode !== "content"}
-                aria-label="Choose a specific source"
+                aria-label="Choose a specific feed"
                 aria-expanded={isProviderMenuOpen}
                 className="flex h-9 w-6 items-center justify-center rounded-r-md border-l border-neutral-700/50 transition-colors hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
               >
@@ -997,7 +997,7 @@ export function VideoPlayer({
               {isProviderMenuOpen && (
                 <div className="absolute right-0 top-full mt-2 w-56 max-h-[50vh] overflow-hidden flex flex-col rounded-md border border-neutral-700/60 bg-neutral-950 shadow-[0_0_24px_rgba(0,0,0,0.85)] z-40">
                   <p className="border-b border-neutral-800 bg-white/5 px-3 py-1.5 text-[10px] uppercase tracking-widest text-neutral-400 shrink-0">
-                    Select Source ({currentProviderIndex + 1}/{PROVIDER_COUNT})
+                    Select Feed ({currentProviderIndex + 1}/{PROVIDER_COUNT})
                   </p>
                   <ul className="flex-1 overflow-y-auto no-scrollbar">
                     {providerList.map((provider) => {

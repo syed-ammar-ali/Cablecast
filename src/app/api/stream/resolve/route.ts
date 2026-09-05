@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
 
   if (!tmdbId || !type) {
     return NextResponse.json(
-      { error: "Missing required query params: tmdbId and type." },
+      { error: "Missing required query params: id and type." },
       { status: 400 },
     );
   }

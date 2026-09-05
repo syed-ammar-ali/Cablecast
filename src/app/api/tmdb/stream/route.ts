@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
 
   if (!tmdbId || (mediaType !== "movie" && mediaType !== "tv")) {
     return NextResponse.json(
-      { success: false, error: "Missing or invalid `tmdbId` / `type` search parameters." },
+      { success: false, error: "Missing or invalid media identification parameters." },
       { status: 400 },
     );
   }
