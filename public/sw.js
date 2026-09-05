@@ -1,5 +1,5 @@
 // Cablecast Progressive Web App Service Worker
-const CACHE_NAME = "cablecast-v2";
+const CACHE_NAME = "cablecast-v3";
 const STATIC_ASSETS = [
   "/",
   "/manifest.json",
@@ -56,8 +56,9 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Cache-first for local static assets (icons, static fonts, manifest)
+  // Cache-first for local static assets (icons, static fonts, manifest, immutable Next.js chunks)
   if (
+    url.pathname.startsWith("/_next/static/") ||
     url.pathname.startsWith("/fonts/") ||
     url.pathname.startsWith("/logos/") ||
     url.pathname.startsWith("/flags/") ||

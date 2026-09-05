@@ -63,20 +63,28 @@ export async function GET(request: NextRequest) {
     ) {
       const isTv = mediaType.toLowerCase() === "tv";
 
-      // If all required fields (including releaseYear and voteAverage) are present, return immediately
-      if (
-        existing.title &&
-        existing.posterPath &&
-        existing.releaseYear &&
-        existing.voteAverage != null
-      ) {
+      // If title and poster are already present in DB, return immediately (0 external network calls)
+      if (existing.title && existing.posterPath) {
         return {
           title: existing.title,
           posterPath: existing.posterPath,
           backdropUrl: existing.backdropUrl ?? null,
-          releaseYear: existing.releaseYear,
+          releaseYear: existing.releaseYear ?? null,
           overview: existing.overview ?? null,
-          voteAverage: existing.voteAverage,
+          voteAverage: existing.voteAverage ?? null,
+        };
+      }
+
+      // Check local favorites map before making an outbound request
+      const fav = favMap.get(`${mediaType.toLowerCase()}_${mediaId}`);
+      if (fav?.title && fav?.posterPath) {
+        return {
+          title: fav.title,
+          posterPath: fav.posterPath,
+          backdropUrl: fav.backdropUrl ?? null,
+          releaseYear: fav.releaseYear ?? null,
+          overview: fav.overview ?? null,
+          voteAverage: fav.voteAverage ?? null,
         };
       }
 

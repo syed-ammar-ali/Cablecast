@@ -596,6 +596,15 @@ export function AdminDashboard() {
                             <div className="grid grid-cols-2 gap-2 text-xs">
                               <div>
                                 <span className="text-[10px] uppercase font-bold text-neutral-500 tracking-wider block">
+                                  Created
+                                </span>
+                                <span className="text-neutral-400 font-mono text-[11px] whitespace-nowrap">
+                                  {formatDateTime(code.createdAt)}
+                                </span>
+                              </div>
+
+                              <div>
+                                <span className="text-[10px] uppercase font-bold text-neutral-500 tracking-wider block">
                                   Label
                                 </span>
                                 <span className="text-neutral-200 truncate block font-medium">
@@ -883,10 +892,10 @@ export function AdminDashboard() {
 
                               <div>
                                 <span className="text-[10px] uppercase font-bold text-neutral-500 tracking-wider block">
-                                  Last Seen
+                                  Logged In
                                 </span>
                                 <span className="text-neutral-400 font-mono text-[11px] whitespace-nowrap">
-                                  {formatDateTime(session.lastSeenAt)}
+                                  {formatDateTime(session.createdAt)}
                                 </span>
                               </div>
 
@@ -949,7 +958,7 @@ export function AdminDashboard() {
                           <th className="px-4 py-3">Role</th>
                           <th className="px-4 py-3">Name / Label</th>
                           <th className="px-4 py-3">Redeemed Code</th>
-                          <th className="px-4 py-3">Last Seen</th>
+                          <th className="px-4 py-3">Logged In</th>
                           <th className="px-4 py-3">Device</th>
                           <th className="px-4 py-3 text-center">Status</th>
                           <th className="px-4 py-3 text-right">Actions</th>
@@ -985,7 +994,7 @@ export function AdminDashboard() {
                                   {session.accessCode?.code ?? "—"}
                                 </td>
 
-                                <td className="px-4 py-3 text-neutral-400">{formatDateTime(session.lastSeenAt)}</td>
+                                <td className="px-4 py-3 text-neutral-400">{formatDateTime(session.createdAt)}</td>
 
                                 <td className="truncate px-4 py-3 text-xs max-w-[200px]" title={session.userAgent ?? undefined}>
                                   <span className="text-neutral-200 font-medium block">

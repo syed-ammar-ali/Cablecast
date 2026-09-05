@@ -5,7 +5,14 @@ import { getTrendingMedia, TmdbApiError } from "@/lib/tmdb";
 export async function GET() {
   try {
     const results = await getTrendingMedia();
-    return NextResponse.json({ results });
+    return NextResponse.json(
+      { results },
+      {
+        headers: {
+          "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400",
+        },
+      },
+    );
   } catch (error) {
     if (error instanceof TmdbApiError) {
       return NextResponse.json({ error: error.message }, { status: error.status });

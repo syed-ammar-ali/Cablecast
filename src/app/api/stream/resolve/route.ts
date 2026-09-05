@@ -27,10 +27,17 @@ export async function GET(request: NextRequest) {
       category,
     });
 
-    return NextResponse.json({
-      ok: true,
-      stream,
-    });
+    return NextResponse.json(
+      {
+        ok: true,
+        stream,
+      },
+      {
+        headers: {
+          "Cache-Control": "private, max-age=300, stale-while-revalidate=600",
+        },
+      },
+    );
   } catch (error) {
     console.error("[api/stream/resolve] Resolution error:", error);
     return NextResponse.json(

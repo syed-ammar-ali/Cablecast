@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import {
   ArrowLeft,
   CalendarCheck2,
@@ -321,11 +322,12 @@ export function LibraryDrawer({
                         {/* Poster Thumbnail */}
                         <div className="relative h-16 w-11 shrink-0 rounded-lg overflow-hidden border border-neutral-800 bg-neutral-900 shadow transition-transform group-hover/info:scale-105">
                           {posterUrl ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img
+                            <Image
                               src={posterUrl}
-                              alt=""
-                              className="h-full w-full object-cover object-center"
+                              alt={item.title}
+                              fill
+                              sizes="44px"
+                              className="object-cover object-center"
                             />
                           ) : (
                             <div className="h-full w-full flex items-center justify-center text-neutral-600">

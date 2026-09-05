@@ -23,8 +23,29 @@ export interface CurrentSession {
   displayName: string | null;
 }
 
-/** Reads the session cookie and validates it against the DB. `null` if missing/invalid/revoked/expired. */
+/** Reads the session: fast-path from proxy headers (0 DB queries), fallback to cookie & DB. */
 export async function getSession(): Promise<CurrentSession | null> {
+  // Fast Path: Check if proxy middleware already verified and attached session headers
+  try {
+    const headerStore = await headers();
+    const sessionId = headerStore.get("x-cc-session-id");
+    const role = headerStore.get("x-cc-role") as Role | null;
+    if (sessionId && role) {
+      const accessCodeId = headerStore.get("x-cc-access-code-id") || null;
+      const rawDisplayName = headerStore.get("x-cc-display-name");
+      const displayName = rawDisplayName ? decodeURIComponent(rawDisplayName) : null;
+      return {
+        id: sessionId,
+        role,
+        accessCodeId,
+        displayName,
+      };
+    }
+  } catch {
+    // In environments where headers() is unavailable (e.g. standalone scripts or tests), continue to DB lookup
+  }
+
+  // Fallback Path: For non-proxied requests or unit tests, read session token from cookies & DB
   const token = (await cookies()).get(SESSION_COOKIE_NAME)?.value;
   if (!token) return null;
 
@@ -34,25 +55,12 @@ export async function getSession(): Promise<CurrentSession | null> {
   });
   if (!session || !isSessionActive(session)) return null;
 
-  // Keep lastSeenAt fresh if not updated in the last 15 seconds
-  if (Date.now() - session.lastSeenAt.getTime() > 15_000) {
-    prisma.session
-      .update({ where: { id: session.id }, data: { lastSeenAt: new Date() } })
-      .catch(() => {});
-  }
-
   // Filter out any legacy display names that were set to the access code's internal label
   const isLabelAsName = Boolean(
     session.displayName &&
     session.accessCode?.label &&
     session.displayName.toLowerCase() === session.accessCode.label.toLowerCase(),
   );
-
-  if (isLabelAsName) {
-    prisma.session
-      .update({ where: { id: session.id }, data: { displayName: null } })
-      .catch(() => {});
-  }
 
   return {
     id: session.id,

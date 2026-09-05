@@ -12,14 +12,21 @@ interface UseBroadcastScheduleResult {
  * the hero banner (to find what's live right now) and the World Guide grid
  * (to render it) so both read from one fetch instead of two.
  */
-export function useBroadcastSchedule(date: string, country: string): UseBroadcastScheduleResult {
+export function useBroadcastSchedule(
+  date: string,
+  country: string,
+  enabled: boolean = true,
+): UseBroadcastScheduleResult {
   const [schedule, setSchedule] = useState<BroadcastScheduleItem[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(enabled);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!enabled) {
+      setIsLoading(false);
+      return;
+    }
     let cancelled = false;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsLoading(true);
     setError(null);
 

@@ -15,7 +15,11 @@ export async function GET(request: NextRequest) {
 
   try {
     const results = await searchMedia(query, page);
-    return NextResponse.json(results);
+    return NextResponse.json(results, {
+      headers: {
+        "Cache-Control": "public, s-maxage=1800, stale-while-revalidate=86400",
+      },
+    });
   } catch (error) {
     if (error instanceof TmdbApiError) {
       return NextResponse.json({ error: error.message }, { status: error.status });

@@ -12,7 +12,7 @@ export async function GET() {
   }
 
   const sessions = await prisma.session.findMany({
-    orderBy: { lastSeenAt: "desc" },
+    orderBy: { createdAt: "desc" },
     select: {
       id: true,
       role: true,

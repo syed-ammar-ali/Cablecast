@@ -73,20 +73,7 @@ export function usePushNotifications() {
     checkSubscription();
   }, []);
 
-  // Background sync heartbeat: checks notifications while the user has Cablecast open
-  useEffect(() => {
-    if (!isSubscribed) return;
 
-    // Ping on mount
-    fetch("/api/cron/notifications", { method: "POST" }).catch(() => {});
-
-    // Periodic heartbeat every 4 minutes while app tab is open
-    const interval = setInterval(() => {
-      fetch("/api/cron/notifications", { method: "POST" }).catch(() => {});
-    }, 4 * 60 * 1000);
-
-    return () => clearInterval(interval);
-  }, [isSubscribed]);
 
   const subscribe = useCallback(async (): Promise<{ success: boolean; error?: string }> => {
     if (!isSupported) {

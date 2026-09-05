@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { Clapperboard, Heart, Star, Tv } from "lucide-react";
 import type { MediaSearchResult } from "@/types/media";
 
@@ -28,12 +29,12 @@ export function MediaCard({ media, onSelect, isFavorite, onToggleFavorite }: Med
     >
       <div className="relative aspect-[2/3] w-full overflow-hidden bg-neutral-900">
         {media.posterUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
+          <Image
             src={media.posterUrl}
             alt={media.title}
-            loading="lazy"
-            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+            fill
+            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
+            className="object-cover transition-transform duration-300 group-hover:scale-105"
           />
         ) : (
           <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-neutral-600">

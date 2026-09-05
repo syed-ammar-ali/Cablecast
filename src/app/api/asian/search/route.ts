@@ -28,7 +28,14 @@ export async function GET(request: NextRequest) {
       match = await searchDramaCool(title, mediaType, season, episode);
     }
 
-    return NextResponse.json({ match });
+    return NextResponse.json(
+      { match },
+      {
+        headers: {
+          "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400",
+        },
+      },
+    );
   } catch (error) {
     console.error("[api/asian/search] GET error:", error);
     return NextResponse.json(

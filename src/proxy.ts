@@ -131,16 +131,16 @@ export async function proxy(request: NextRequest, event: NextFetchEvent) {
       return deny(request, 403, "Admin access required.");
     }
 
-    // Fire-and-forget "last seen" touch for the admin's sessions list —
-    // `waitUntil` keeps it alive past the response without delaying it.
-    event.waitUntil(
-      prisma.session
-        .update({ where: { id: session.id }, data: { lastSeenAt: new Date() } })
-        .catch(() => {}),
-    );
-
+    // Attach verified session credentials to downstream request headers (0-DB-lookup fast path)
     const requestHeaders = new Headers(request.headers);
+    requestHeaders.set("x-cc-session-id", session.id);
     requestHeaders.set("x-cc-role", session.role);
+    if (session.accessCodeId) {
+      requestHeaders.set("x-cc-access-code-id", session.accessCodeId);
+    }
+    if (session.displayName) {
+      requestHeaders.set("x-cc-display-name", encodeURIComponent(session.displayName));
+    }
     return NextResponse.next({ request: { headers: requestHeaders } });
   } catch (error) {
     console.error("[proxy] Error in proxy authentication:", error);

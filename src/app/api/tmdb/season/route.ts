@@ -15,7 +15,14 @@ export async function GET(request: NextRequest) {
 
   try {
     const episodes = await getSeasonEpisodes(tmdbId, season);
-    return NextResponse.json({ episodes });
+    return NextResponse.json(
+      { episodes },
+      {
+        headers: {
+          "Cache-Control": "public, s-maxage=86400, stale-while-revalidate=604800",
+        },
+      },
+    );
   } catch (error) {
     if (error instanceof TmdbApiError) {
       return NextResponse.json({ error: error.message }, { status: error.status });

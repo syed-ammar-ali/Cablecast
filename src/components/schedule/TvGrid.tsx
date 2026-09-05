@@ -77,17 +77,8 @@ export function TvGrid({
   const { resolvingId, resolveMessage, unavailableIds, resolveBroadcast, clearUnavailable } = resolver;
   const gridScrollRef = useRef<HTMLDivElement | null>(null);
 
-  // Self-clocking second-resolution tick: the parent may only pass `now` once
-  // per minute, but the red sweep line must advance every second.
-  const [tickNow, setTickNow] = useState<Date>(() => new Date());
-  useEffect(() => {
-    const id = setInterval(() => setTickNow(new Date()), 1000);
-    return () => clearInterval(id);
-  }, []);
-
-  // Both the red line AND the block highlight use the internal tick clock
-  // so they advance every second and never drift from wall time.
-  const minutesNow = tickNow.getHours() * 60 + tickNow.getMinutes() + tickNow.getSeconds() / 60;
+  // Current time in minutes from the provided `now` prop (ticks every 20s from root)
+  const minutesNow = now.getHours() * 60 + now.getMinutes() + now.getSeconds() / 60;
   const currentBlockStart = Math.floor(minutesNow / BLOCK_MINUTES) * BLOCK_MINUTES;
 
   // Clear unavailable cache whenever the date changes — a show unavailable on
@@ -108,7 +99,9 @@ export function TvGrid({
       if (!gridScrollRef.current) return;
       const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
       const pxPerMin = isMobile ? 4 : 6;
-      const liveLineLeftPx = minutesNow * pxPerMin;
+      const d = new Date();
+      const currentMin = d.getHours() * 60 + d.getMinutes() + d.getSeconds() / 60;
+      const liveLineLeftPx = currentMin * pxPerMin;
       const containerWidth = gridScrollRef.current.clientWidth || 800;
       const targetScroll = Math.max(0, liveLineLeftPx - containerWidth * 0.3);
       gridScrollRef.current.scrollLeft = targetScroll;
@@ -122,7 +115,7 @@ export function TvGrid({
     });
 
     return () => cancelAnimationFrame(rafId);
-  }, [schedule.length, selectedDate, minutesNow]);
+  }, [schedule.length, selectedDate]);
 
   const handleSlotClick = useCallback(
     (item: BroadcastScheduleItem) => {
@@ -268,16 +261,35 @@ export function TvGrid({
             ))}
           </div>
 
-          {/* Red Live Line (Starts strictly at top-[44px] below header so it NEVER overlaps time slot numbers, and z-10 so it passes cleanly underneath z-30 sticky channel sidebar) */}
-          <div
-            className="pointer-events-none absolute top-[44px] bottom-0 z-10 w-px bg-red-500/90 shadow-[0_0_8px_rgba(239,68,68,0.7)] left-24 md:left-52"
-            style={{
-              transform: `translateX(calc(${minutesNow} * var(--px-per-min)))`,
-            }}
-          />
+          {/* Red Live Line (Isolated sub-component: second-by-second updates do not cause whole-grid re-renders) */}
+          <LiveSweepLine />
         </div>
       </div>
     </div>
+  );
+}
+
+function LiveSweepLine() {
+  const [minutesNow, setMinutesNow] = useState(() => {
+    const d = new Date();
+    return d.getHours() * 60 + d.getMinutes() + d.getSeconds() / 60;
+  });
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      const d = new Date();
+      setMinutesNow(d.getHours() * 60 + d.getMinutes() + d.getSeconds() / 60);
+    }, 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  return (
+    <div
+      className="pointer-events-none absolute top-[44px] bottom-0 z-10 w-px bg-red-500/90 shadow-[0_0_8px_rgba(239,68,68,0.7)] left-24 md:left-52"
+      style={{
+        transform: `translateX(calc(${minutesNow} * var(--px-per-min)))`,
+      }}
+    />
   );
 }
 
@@ -527,7 +539,7 @@ function NetworkRow({
         <div className="hidden md:flex items-center shrink-0">
           {logo ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={logo} alt="" className="h-6 w-6 shrink-0 rounded-sm object-contain" />
+            <img src={logo} alt="" loading="lazy" decoding="async" className="h-6 w-6 shrink-0 rounded-sm object-contain" />
           ) : (
             <Tv className="h-5 w-5 shrink-0 text-neutral-500" />
           )}

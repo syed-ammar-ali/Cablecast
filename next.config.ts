@@ -20,8 +20,9 @@ const cspHeader = `
   .trim();
 
 const nextConfig: NextConfig = {
-  // Remote image patterns
+  // Remote image patterns & modern AVIF/WebP optimization
   images: {
+    formats: ["image/avif", "image/webp"],
     remotePatterns: [
       {
         protocol: "https",
@@ -30,6 +31,10 @@ const nextConfig: NextConfig = {
       {
         protocol: "https",
         hostname: "**.tmdb.org",
+      },
+      {
+        protocol: "https",
+        hostname: "static.tvmaze.com",
       },
     ],
   },

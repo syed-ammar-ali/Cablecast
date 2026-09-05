@@ -1,20 +1,16 @@
 "use client";
 
 import { useEffect, useMemo, useState, useCallback } from "react";
+import dynamic from "next/dynamic";
 import { MediaCard } from "@/components/search/MediaCard";
 import { MobileSearchOverlay } from "@/components/search/MobileSearchOverlay";
 import { AppHeader } from "@/components/home/AppHeader";
 import { HeroBanner } from "@/components/home/HeroBanner";
-import { MediaDetailsModal, type EpisodeSelection } from "@/components/media/MediaDetailsModal";
-import { VhsModal } from "@/components/vhs/VhsModal";
+import type { EpisodeSelection } from "@/components/media/MediaDetailsModal";
 import { VhsShelf } from "@/components/vhs/VhsShelf";
-import { PlayerModal, type DirectBroadcast } from "@/components/player/PlayerModal";
+import type { DirectBroadcast } from "@/components/player/PlayerModal";
 import { TvGrid } from "@/components/schedule/TvGrid";
-import { ChannelRemote } from "@/components/remote/ChannelRemote";
 import { BottomNav } from "@/components/navigation/BottomNav";
-import { LibraryDrawer } from "@/components/library/LibraryDrawer";
-import { PersonalBroadcastModal } from "@/components/broadcast/PersonalBroadcastModal";
-import { ScheduleBroadcastModal } from "@/components/broadcast/ScheduleBroadcastModal";
 import { useBroadcastSchedule } from "@/lib/useBroadcastSchedule";
 import { useBroadcastResolver } from "@/lib/useBroadcastResolver";
 import { useLibrary } from "@/lib/useLibrary";
@@ -23,6 +19,36 @@ import { formatLocalDate, isBroadcastLiveNow } from "@/lib/broadcastLive";
 import { useToast } from "@/components/ui/ToastProvider";
 import { notifyLibraryMutation, notifyBroadcastMutation } from "@/lib/syncEvents";
 import type { MediaSearchResult } from "@/types/media";
+
+// Dynamically imported heavy modals to minimize initial bundle size and boost Core Web Vitals
+const PlayerModal = dynamic(
+  () => import("@/components/player/PlayerModal").then((mod) => mod.PlayerModal),
+  { ssr: false }
+);
+const VhsModal = dynamic(
+  () => import("@/components/vhs/VhsModal").then((mod) => mod.VhsModal),
+  { ssr: false }
+);
+const MediaDetailsModal = dynamic(
+  () => import("@/components/media/MediaDetailsModal").then((mod) => mod.MediaDetailsModal),
+  { ssr: false }
+);
+const LibraryDrawer = dynamic(
+  () => import("@/components/library/LibraryDrawer").then((mod) => mod.LibraryDrawer),
+  { ssr: false }
+);
+const PersonalBroadcastModal = dynamic(
+  () => import("@/components/broadcast/PersonalBroadcastModal").then((mod) => mod.PersonalBroadcastModal),
+  { ssr: false }
+);
+const ScheduleBroadcastModal = dynamic(
+  () => import("@/components/broadcast/ScheduleBroadcastModal").then((mod) => mod.ScheduleBroadcastModal),
+  { ssr: false }
+);
+const ChannelRemote = dynamic(
+  () => import("@/components/remote/ChannelRemote").then((mod) => mod.ChannelRemote),
+  { ssr: false }
+);
 
 const SEARCH_DEBOUNCE_MS = 400;
 const CLOCK_TICK_MS = 20_000;
@@ -52,6 +78,7 @@ export function CablecastApp({ initialView = "home" }: CablecastAppProps) {
   // Library & Favourites state
   const library = useLibrary();
   const [isLibraryOpen, setIsLibraryOpen] = useState(initialView === "library");
+  const [isAdmin, setIsAdmin] = useState(false);
 
   // Personalized Broadcast Schedule state
   const personalBroadcast = usePersonalBroadcast();
@@ -84,9 +111,11 @@ export function CablecastApp({ initialView = "home" }: CablecastAppProps) {
   const [directBroadcastTarget, setDirectBroadcastTarget] = useState<DirectBroadcast | null>(null);
   const [detailsTarget, setDetailsTarget] = useState<MediaSearchResult | null>(null);
 
+  const isScheduleEnabled = !isLibraryOpen && !isBroadcastStudioOpen;
   const { schedule, isLoading: isGuideLoading, error: guideError } = useBroadcastSchedule(
     selectedDate,
     selectedCountry,
+    isScheduleEnabled,
   );
 
   const resolver = useBroadcastResolver({
@@ -365,6 +394,7 @@ export function CablecastApp({ initialView = "home" }: CablecastAppProps) {
           isMobileSearchOpen={isMobileSearchOpen}
           onCloseMobileSearch={() => navigateTo("home")}
           onHomeClick={handleHomeClick}
+          onAuthLoaded={(role) => setIsAdmin(role === "admin")}
         />
       </div>
 
@@ -403,6 +433,7 @@ export function CablecastApp({ initialView = "home" }: CablecastAppProps) {
               onBuy={handleHeroBuy}
               isOwned={(tmdbId) => library.owned.some((item) => item.tmdbId === tmdbId)}
               isRented={(tmdbId) => library.rented.some((item) => item.tmdbId === tmdbId)}
+              enabled={isScheduleEnabled}
             />
           </div>
 
@@ -606,6 +637,7 @@ export function CablecastApp({ initialView = "home" }: CablecastAppProps) {
 
       {/* Mobile Bottom Navigation Bar */}
       <BottomNav
+        isAdmin={isAdmin}
         onOpenBroadcastStudio={() => navigateTo("broadcast")}
         onOpenLibrary={() => navigateTo("library")}
         onToggleSearch={() => {

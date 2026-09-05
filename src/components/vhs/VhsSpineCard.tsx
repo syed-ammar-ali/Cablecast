@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useMemo } from "react";
+import Image from "next/image";
 import type { MediaSearchResult } from "@/types/media";
 import { Film, Star, Tv } from "lucide-react";
 
@@ -86,12 +87,12 @@ export function VhsSpineCard({ media, onSelect }: VhsSpineCardProps) {
         {/* Framed Poster Thumbnail Window with Inset Bezel & Glass Glare */}
         <div className="relative h-20 sm:h-14 w-full overflow-hidden border-b border-neutral-800/90 bg-neutral-950 shadow-inner">
           {posterUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
+            <Image
               src={posterUrl}
-              alt=""
-              className="h-full w-full object-cover object-top filter brightness-95 contrast-[1.08]"
-              loading="lazy"
+              alt={media.title}
+              fill
+              sizes="(max-width: 640px) 96px, 64px"
+              className="object-cover object-top filter brightness-95 contrast-[1.08]"
             />
           ) : (
             <div className="flex h-full w-full items-center justify-center text-neutral-600">

@@ -34,6 +34,7 @@ interface AppHeaderProps {
   missedBroadcastCount?: number;
   isMobileSearchOpen?: boolean;
   onCloseMobileSearch?: () => void;
+  onAuthLoaded?: (role: "admin" | "user" | null) => void;
 }
 
 /**
@@ -183,6 +184,7 @@ export function AppHeader({
   missedBroadcastCount,
   isMobileSearchOpen = false,
   onCloseMobileSearch,
+  onAuthLoaded,
 }: AppHeaderProps) {
   const isSearching = searchQuery.trim().length > 0;
   const [displayName, setDisplayName] = useState<string | null>(null);
@@ -196,6 +198,7 @@ export function AppHeader({
       .then((data: { role: "admin" | "user" | null; displayName: string | null }) => {
         if (cancelled) return;
         setRole(data.role);
+        onAuthLoaded?.(data.role);
         if (data.displayName) {
           setDisplayName(data.displayName);
         } else if (data.role) {

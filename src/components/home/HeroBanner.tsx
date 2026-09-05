@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Image from "next/image";
 import { ChevronLeft, ChevronRight, Clock, Loader2, PlayCircle, ShoppingBag } from "lucide-react";
 import { useTouchGestures } from "@/lib/useTouchGestures";
 import type { MediaSearchResult } from "@/types/media";
@@ -20,6 +21,7 @@ interface HeroBannerProps {
   onBuy?: (media: MediaSearchResult) => Promise<void> | void;
   isOwned?: (tmdbId: number) => boolean;
   isRented?: (tmdbId: number) => boolean;
+  enabled?: boolean;
 }
 
 export function HeroBanner({
@@ -33,6 +35,7 @@ export function HeroBanner({
   onBuy,
   isOwned,
   isRented,
+  enabled = true,
 }: HeroBannerProps) {
   const [slides, setSlides] = useState<MediaSearchResult[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -42,6 +45,7 @@ export function HeroBanner({
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
+    if (!enabled) return;
     let cancelled = false;
     fetch("/api/tmdb/trending")
       .then((r) => r.json())
@@ -52,7 +56,7 @@ export function HeroBanner({
       })
       .catch(() => { if (!cancelled) setSlides([]); });
     return () => { cancelled = true; };
-  }, []);
+  }, [enabled]);
 
   const goToSlide = useCallback((nextIndex: number) => {
     setActiveIndex(nextIndex);
@@ -97,18 +101,27 @@ export function HeroBanner({
       {slides.length > 0 ? (
         slides.map((slide, idx) => {
           const isActive = idx === activeIndex;
-          if (!slide.backdropUrl) return null;
+          const isPreloadNext = slides.length > 1 && idx === (activeIndex + 1) % slides.length;
+          // Only mount active slide and the immediate next slide to prevent downloading 8 huge images in parallel
+          if (!slide.backdropUrl || (!isActive && !isPreloadNext)) return null;
           return (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
+            <div
               key={slide.backdropUrl}
-              src={slide.backdropUrl}
-              alt={slide.title}
-              draggable={false}
-              className={`pointer-events-none absolute inset-0 h-full w-full object-cover object-[center_20%] sm:object-top transition-opacity duration-700 ease-in-out will-change-transform ${
+              className={`pointer-events-none absolute inset-0 h-full w-full transition-opacity duration-700 ease-in-out will-change-transform ${
                 isActive ? "opacity-95 z-0" : "opacity-0 -z-10 pointer-events-none"
               }`}
-            />
+            >
+              <Image
+                src={slide.backdropUrl}
+                alt={slide.title}
+                fill
+                priority={idx === 0}
+                fetchPriority={idx === 0 ? "high" : "auto"}
+                sizes="100vw"
+                draggable={false}
+                className="object-cover object-[center_20%] sm:object-top"
+              />
+            </div>
           );
         })
       ) : (
