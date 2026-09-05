@@ -52,9 +52,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: redemptionError }, { status: 403 });
   }
 
-  // Priority: 1. Admin-assigned code label (safest) -> 2. Client-remembered name (sanitized)
-  const clientName = typeof displayName === "string" ? sanitizeDisplayName(displayName) : null;
-  const initialName = sanitizeDisplayName(accessCode.label) || clientName || null;
+  // Priority: 1. Client-remembered viewer name (if this device has one saved)
+  let clientName = typeof displayName === "string" ? sanitizeDisplayName(displayName) : null;
+  // If clientName matches the access code label, it was saved under the old bug — discard it
+  if (clientName && accessCode.label && clientName.toLowerCase() === accessCode.label.toLowerCase()) {
+    clientName = null;
+  }
+  const initialName = clientName || null;
 
   const sessionResult = await createUserSessionWithDeviceLimit(
     accessCode.id,

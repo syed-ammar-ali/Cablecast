@@ -185,7 +185,9 @@ export function AppHeader({
   onCloseMobileSearch,
 }: AppHeaderProps) {
   const isSearching = searchQuery.trim().length > 0;
-  const [displayName, setDisplayName] = useState("Ammar");
+  const [displayName, setDisplayName] = useState<string | null>(null);
+  const [role, setRole] = useState<"admin" | "user" | null>(null);
+  const [isLoadingAuth, setIsLoadingAuth] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
@@ -193,11 +195,17 @@ export function AppHeader({
       .then((res) => res.json())
       .then((data: { role: "admin" | "user" | null; displayName: string | null }) => {
         if (cancelled) return;
+        setRole(data.role);
         if (data.displayName) {
           setDisplayName(data.displayName);
+        } else if (data.role) {
+          setDisplayName(data.role === "admin" ? "Admin" : "Viewer");
         }
       })
-      .catch(() => { });
+      .catch(() => { })
+      .finally(() => {
+        if (!cancelled) setIsLoadingAuth(false);
+      });
     return () => {
       cancelled = true;
     };
@@ -211,18 +219,22 @@ export function AppHeader({
 
   return (
     <header className="border-b border-neutral-900 bg-black">
-      {/* ── Mobile Viewport Header (< md): Left = Pure Name Text only ("Ammar"), Right = Calendar Icon only ── */}
+      {/* ── Mobile Viewport Header (< md): Left = Pure Name Text only, Right = Calendar Icon only ── */}
       <div className="flex items-center justify-between px-4 py-2.5 sm:px-6 sm:py-3 md:hidden">
-        {/* Left: User's Name ("Ammar") — Pure text without any icon */}
+        {/* Left: User's Name — Pure text without any icon */}
         <button
           type="button"
           onClick={handleHomeClick}
           className="text-left cursor-pointer transition-colors active:scale-95"
           title="Home"
         >
-          <span className="text-xl font-bold tracking-tight text-white transition-colors hover:text-neutral-300">
-            {displayName || "Ammar"}
-          </span>
+          {isLoadingAuth ? (
+            <span className="inline-block h-6 w-24 animate-pulse rounded bg-neutral-800" />
+          ) : (
+            <span className="text-xl font-bold tracking-tight text-white transition-colors hover:text-neutral-300">
+              {displayName || (role === "admin" ? "Admin" : "Viewer")}
+            </span>
+          )}
         </button>
 
         {/* Right: Calendar Icon trigger only */}
@@ -234,7 +246,12 @@ export function AppHeader({
       {/* ── Desktop Viewport Header (>= md): Full Featured 3-Column Bar ── */}
       <div className="hidden h-20 grid-cols-[1fr_auto_1fr] items-center gap-4 px-6 sm:gap-6 md:grid">
         <div className="flex items-center gap-3">
-          <IdentityControls onHomeClick={handleHomeClick} displayName={displayName} />
+          <IdentityControls
+            onHomeClick={handleHomeClick}
+            displayName={displayName}
+            role={role}
+            isLoading={isLoadingAuth}
+          />
         </div>
 
         <div className="flex w-full max-w-md items-center gap-2 justify-self-center sm:w-[32rem]">
@@ -306,34 +323,29 @@ export function AppHeader({
 function IdentityControls({
   onHomeClick,
   displayName,
+  role,
+  isLoading,
 }: {
   onHomeClick?: () => void;
-  displayName?: string;
+  displayName?: string | null;
+  role?: "admin" | "user" | null;
+  isLoading?: boolean;
 }) {
   const router = useRouter();
-  const [role, setRole] = useState<"admin" | "user" | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    fetch("/api/auth/me")
-      .then((res) => res.json())
-      .then((data: { role: "admin" | "user" | null }) => {
-        if (cancelled) return;
-        setRole(data.role);
-      })
-      .catch(() => { });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   async function signOut() {
+    try {
+      localStorage.removeItem("cablecast_viewer_name");
+      localStorage.removeItem("cablecast_admin_name");
+    } catch {
+      // ignore
+    }
     await fetch("/api/auth/logout", { method: "POST" });
     router.push("/gate");
     router.refresh();
   }
 
-  const name = displayName || "Ammar";
+  const name = displayName || (role === "admin" ? "Admin" : "Viewer");
 
   return (
     <div className="flex items-center gap-3">
@@ -345,9 +357,13 @@ function IdentityControls({
         className="text-left cursor-pointer transition-colors active:scale-95"
         title="Home"
       >
-        <span className="text-xl font-bold tracking-tight text-white transition-colors hover:text-neutral-300 sm:text-2xl">
-          {name}
-        </span>
+        {isLoading ? (
+          <span className="inline-block h-7 w-28 animate-pulse rounded bg-neutral-800" />
+        ) : (
+          <span className="text-xl font-bold tracking-tight text-white transition-colors hover:text-neutral-300 sm:text-2xl">
+            {name}
+          </span>
+        )}
       </button>
 
       <div className="flex items-center gap-2">

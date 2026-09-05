@@ -30,7 +30,7 @@ export async function getSession(): Promise<CurrentSession | null> {
 
   const session = await prisma.session.findUnique({
     where: { token },
-    include: { accessCode: { select: { revoked: true, expiresAt: true } } },
+    include: { accessCode: { select: { revoked: true, expiresAt: true, label: true } } },
   });
   if (!session || !isSessionActive(session)) return null;
 
@@ -41,11 +41,24 @@ export async function getSession(): Promise<CurrentSession | null> {
       .catch(() => {});
   }
 
+  // Filter out any legacy display names that were set to the access code's internal label
+  const isLabelAsName = Boolean(
+    session.displayName &&
+    session.accessCode?.label &&
+    session.displayName.toLowerCase() === session.accessCode.label.toLowerCase(),
+  );
+
+  if (isLabelAsName) {
+    prisma.session
+      .update({ where: { id: session.id }, data: { displayName: null } })
+      .catch(() => {});
+  }
+
   return {
     id: session.id,
     role: session.role as Role,
     accessCodeId: session.accessCodeId,
-    displayName: session.displayName,
+    displayName: isLabelAsName ? null : session.displayName,
   };
 }
 
