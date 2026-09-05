@@ -5,6 +5,7 @@ import {
   AlertCircle,
   AlertTriangle,
   ArrowLeft,
+  Bell,
   Calendar,
   CalendarCheck2,
   Clock,
@@ -21,6 +22,7 @@ import type { PersonalScheduleItem } from "@/types/broadcast";
 import { DAYS_OF_WEEK, formatBlockTime } from "@/types/broadcast";
 import { BLOCK_MINUTES } from "@/lib/runtime";
 import { notifyLibraryMutation, notifyBroadcastMutation } from "@/lib/syncEvents";
+import { usePushNotifications } from "@/lib/usePushNotifications";
 
 interface ScheduleBroadcastModalProps {
   isOpen: boolean;
@@ -37,6 +39,7 @@ interface ScheduleBroadcastModalProps {
     runtimeMinutes?: number | null;
     daysOfWeek: number[];
     blockStartMinutes: number;
+    timezoneOffset?: number;
     startSeason?: number;
     startEpisode?: number;
   }) => Promise<{ success: boolean; error?: string }>;
@@ -186,6 +189,10 @@ export function ScheduleBroadcastModal({
   const [selectedDays, setSelectedDays] = useState<number[]>([now.getDay()]);
   const [meridiem, setMeridiem] = useState<"AM" | "PM">("PM");
   const [selectedSlotIndex, setSelectedSlotIndex] = useState<number>(18);
+
+  const { isSupported: isPushSupported, isSubscribed, needsHomeScreenInstall, subscribe } =
+    usePushNotifications();
+  const [enableReminder, setEnableReminder] = useState(true);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -506,6 +513,15 @@ export function ScheduleBroadcastModal({
     setIsSubmitting(true);
     setErrorMessage(null);
 
+    // If reminder is enabled and user has not yet subscribed, request permission & register subscription
+    if (enableReminder && !isSubscribed && isPushSupported) {
+      try {
+        await subscribe();
+      } catch (err) {
+        console.warn("[ScheduleBroadcastModal] Failed auto-subscribing for alerts:", err);
+      }
+    }
+
     const res = await onSchedule({
       tmdbId: media.tmdbId,
       mediaType: media.mediaType,
@@ -517,6 +533,7 @@ export function ScheduleBroadcastModal({
       runtimeMinutes: defaultRuntime,
       daysOfWeek: selectedDays,
       blockStartMinutes,
+      timezoneOffset: new Date().getTimezoneOffset(),
       startSeason: isTv ? initialSeason : undefined,
       startEpisode: 1,
     });
@@ -925,6 +942,46 @@ export function ScheduleBroadcastModal({
                 <span>{successMessage}</span>
               </div>
             )}
+
+            {/* 10-Minute Broadcast Push Reminder Toggle */}
+            <div className="flex items-center justify-between rounded-xl border border-neutral-800 bg-neutral-900/50 p-3 transition-colors hover:border-neutral-700">
+              <div className="flex items-center gap-2.5 pr-2">
+                <div
+                  className={`p-2 rounded-lg border transition-colors ${
+                    enableReminder
+                      ? "border-amber-500/50 bg-amber-950/40 text-amber-400 shadow-sm"
+                      : "border-neutral-800 bg-neutral-900 text-neutral-500"
+                  }`}
+                >
+                  <Bell className="h-4 w-4" />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-neutral-200">10-Minute Push Reminder</p>
+                  <p className="text-[11px] text-neutral-400">
+                    {needsHomeScreenInstall
+                      ? "On iPhone: Tap Share ⎋ -> 'Add to Home Screen' for alerts"
+                      : isSubscribed
+                      ? "Alerts enabled on this device"
+                      : "Receive a notification before your broadcast starts"}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={enableReminder}
+                onClick={() => setEnableReminder((prev) => !prev)}
+                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                  enableReminder ? "bg-amber-500" : "bg-neutral-800"
+                }`}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                    enableReminder ? "translate-x-4" : "translate-x-0"
+                  }`}
+                />
+              </button>
+            </div>
 
             {/* Submit Button */}
             <button

@@ -429,6 +429,7 @@ export async function POST(request: NextRequest) {
           currentSeason: input.startSeason ?? 1,
           currentEpisode: input.startEpisode ?? 1,
           totalEpisodes: input.totalEpisodes ?? (input.mediaType === "tv" ? 24 : null),
+          timezoneOffset: typeof input.timezoneOffset === "number" ? input.timezoneOffset : null,
         },
       });
       created.push(item);

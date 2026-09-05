@@ -2,11 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession, getPersistentUserId } from "@/lib/auth/server";
 
+import { VAPID_PUBLIC_KEY } from "@/lib/notifications/webpush";
+
 export async function GET() {
   try {
     const session = await getSession();
     const userId = getPersistentUserId(session);
-    const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || "";
+    const publicKey = VAPID_PUBLIC_KEY;
 
     const userKeys = Array.from(new Set([userId, session?.id, session?.accessCodeId])).filter(Boolean) as string[];
 
@@ -37,6 +39,8 @@ export async function POST(request: NextRequest) {
           auth: string;
         };
       };
+      timezone?: string;
+      timezoneOffset?: number;
     };
 
     if (!body?.subscription?.endpoint || !body.subscription?.keys?.p256dh || !body.subscription?.keys?.auth) {
@@ -44,14 +48,18 @@ export async function POST(request: NextRequest) {
     }
 
     const { endpoint, keys } = body.subscription;
+    const timezone = typeof body.timezone === "string" ? body.timezone : null;
+    const timezoneOffset = typeof body.timezoneOffset === "number" ? body.timezoneOffset : null;
 
-    // Upsert subscription tied to this user
+    // Upsert subscription tied to this user with their client timezone
     await prisma.pushSubscription.upsert({
       where: { endpoint },
       update: {
         userId,
         p256dh: keys.p256dh,
         auth: keys.auth,
+        timezone,
+        timezoneOffset,
         updatedAt: new Date(),
       },
       create: {
@@ -59,6 +67,8 @@ export async function POST(request: NextRequest) {
         endpoint,
         p256dh: keys.p256dh,
         auth: keys.auth,
+        timezone,
+        timezoneOffset,
       },
     });
 

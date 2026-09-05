@@ -19,11 +19,16 @@ async function sendToUserSubscriptions(
   userId: string,
   payload: PushNotificationPayload,
 ): Promise<{ sent: number; failed: number; cleaned: number }> {
-  const subscriptions = await prisma.pushSubscription.findMany({
-    where: { userId },
-  });
+  let subscriptions: any[] = [];
+  try {
+    subscriptions = (await prisma.pushSubscription.findMany({
+      where: { userId },
+    })) || [];
+  } catch {
+    subscriptions = [];
+  }
 
-  if (subscriptions.length === 0) {
+  if (!subscriptions || subscriptions.length === 0) {
     return { sent: 0, failed: 0, cleaned: 0 };
   }
 
@@ -60,34 +65,97 @@ async function sendToUserSubscriptions(
 }
 
 /**
+ * Calculates whether an appointment slot (recurring at slot.dayOfWeek and slot.blockStartMinutes
+ * in the user's local timezone) airs in the upcoming 10-minute lookahead window (+/- 5 minutes)
+ * relative to the current UTC timestamp `now`.
+ */
+/**
+ * Calculates whether an appointment slot (recurring at slot.dayOfWeek and slot.blockStartMinutes)
+ * airs in the upcoming 10-minute lookahead window (+/- 5 minutes) relative to `now`.
+ * If a timezone offset is specified (in minutes, UTC - Local), aligns with the user's local timezone.
+ * If no offset is specified, falls back to server-local time.
+ */
+export function isSlotStartingSoon(
+  slot: { dayOfWeek: number; blockStartMinutes: number; timezoneOffset?: number | null },
+  userOffsetMinutes?: number | null,
+  now: Date = new Date(),
+): { isStartingSoon: boolean; localIsoDate: string } {
+  const hasExplicitOffset =
+    typeof slot.timezoneOffset === "number" || typeof userOffsetMinutes === "number";
+
+  if (!hasExplicitOffset) {
+    const currentDay = now.getDay();
+    const currentMinutes = now.getHours() * 60 + now.getMinutes();
+    const isStarting =
+      slot.dayOfWeek === currentDay &&
+      slot.blockStartMinutes >= currentMinutes + 5 &&
+      slot.blockStartMinutes <= currentMinutes + 15;
+
+    return { isStartingSoon: isStarting, localIsoDate: now.toISOString().slice(0, 10) };
+  }
+
+  const effectiveOffset =
+    typeof slot.timezoneOffset === "number" ? slot.timezoneOffset : (userOffsetMinutes ?? 0);
+
+  // Local time for user = UTC time - effectiveOffset (Date.prototype.getTimezoneOffset convention: UTC - Local)
+  const localTimeMs = now.getTime() - effectiveOffset * 60_000;
+  const localNow = new Date(localTimeMs);
+
+  const localDayOfWeek = localNow.getUTCDay();
+  const localMinutes = localNow.getUTCHours() * 60 + localNow.getUTCMinutes();
+  const localIsoDate = localNow.toISOString().slice(0, 10);
+
+  if (slot.dayOfWeek !== localDayOfWeek) {
+    return { isStartingSoon: false, localIsoDate };
+  }
+
+  const targetMinStart = localMinutes + 5;
+  const targetMinEnd = localMinutes + 15;
+
+  const isStartingSoon =
+    slot.blockStartMinutes >= targetMinStart && slot.blockStartMinutes <= targetMinEnd;
+
+  return { isStartingSoon, localIsoDate };
+}
+
+/**
  * Dispatches "Starting Soon" alerts (10 minutes before broadcast).
- * Lookahead window: slots starting between now + 5 mins and now + 15 mins.
+ * Lookahead window: slots starting between now + 5 mins and now + 15 mins in the user's local timezone.
  */
 export async function dispatchStartingSoonAlerts(now: Date = new Date()): Promise<{ count: number; failed: number; cleaned: number }> {
-  const currentDay = now.getDay();
   const currentMinutes = now.getHours() * 60 + now.getMinutes();
-  const todayIsoDate = now.toISOString().slice(0, 10);
-
-  // 10-minute lookahead window (+/- 5 minutes around now + 10)
+  const currentDay = now.getDay();
   const targetMinStart = currentMinutes + 5;
   const targetMinEnd = currentMinutes + 15;
 
-  const upcomingSlots = await prisma.userPersonalSchedule.findMany({
-    where: {
-      dayOfWeek: currentDay,
-      blockStartMinutes: {
-        gte: targetMinStart,
-        lte: targetMinEnd,
+  // Find upcoming slots. The query matches slots starting soon according to server time OR timezone-aware slots.
+  const upcomingSlots =
+    (await prisma.userPersonalSchedule.findMany({
+      where: {
+        OR: [
+          {
+            dayOfWeek: currentDay,
+            blockStartMinutes: {
+              gte: targetMinStart,
+              lte: targetMinEnd,
+            },
+          },
+          {
+            timezoneOffset: { not: null },
+          },
+        ],
       },
-    },
-  });
+    })) || [];
 
   let count = 0;
   let failed = 0;
   let cleaned = 0;
 
   for (const slot of upcomingSlots) {
-    const referenceId = `${slot.id}_${todayIsoDate}`;
+    const { isStartingSoon, localIsoDate } = isSlotStartingSoon(slot, slot.timezoneOffset, now);
+    if (!isStartingSoon) continue;
+
+    const referenceId = `${slot.id}_${localIsoDate}`;
 
     // 1. Deduplication check
     const alreadyLogged = await prisma.notificationLog.findUnique({

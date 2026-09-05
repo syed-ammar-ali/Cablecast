@@ -20,6 +20,7 @@ export interface PersonalScheduleItem {
   lastAiredEpisode?: number | null;
   wasWatched: boolean;
   isRerun?: boolean;
+  timezoneOffset?: number | null;
   createdAt?: string;
   updatedAt?: string;
 
@@ -74,6 +75,7 @@ export interface CreatePersonalScheduleInput {
   runtimeMinutes?: number | null;
   daysOfWeek: number[]; // 0-6
   blockStartMinutes: number; // 0-1410
+  timezoneOffset?: number; // client's Date.prototype.getTimezoneOffset()
   startSeason?: number;
   startEpisode?: number;
   totalEpisodes?: number;

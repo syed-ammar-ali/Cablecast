@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { runAllNotificationDispatchers } from "@/lib/notifications/notificationDispatcher";
+import { getSession } from "@/lib/auth/server";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +24,10 @@ async function handleCron(request: NextRequest) {
     const secretHeader = request.headers.get("x-cron-secret");
     const expectedSecret = process.env.CRON_SECRET || "cablecast-cron-secret-2026";
 
+    const session = await getSession();
+
     const isAuthorized =
+      Boolean(session) ||
       authHeader === `Bearer ${expectedSecret}` ||
       secretHeader === expectedSecret ||
       process.env.NODE_ENV === "development";

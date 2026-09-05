@@ -233,6 +233,7 @@ model UserPersonalSchedule {
   lastAiredEpisode  Int?
   wasWatched        Boolean  @default(false)
   isRerun           Boolean  @default(false)
+  timezoneOffset    Int?     // User's timezone offset in minutes at scheduling time (e.g. -330)
   
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
@@ -357,13 +358,15 @@ model BroadcastSlot {
 
 /// Stores browser Web Push API subscriptions for appointment & rental reminders
 model PushSubscription {
-  id        String   @id @default(cuid())
-  userId    String
-  endpoint  String   @unique
-  p256dh    String
-  auth      String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id             String   @id @default(cuid())
+  userId         String
+  endpoint       String   @unique
+  p256dh         String
+  auth           String
+  timezone       String?  // e.g. "Asia/Kolkata"
+  timezoneOffset Int?     // Offset in minutes, e.g. -330 for UTC+5:30
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   @@index([userId])
 }

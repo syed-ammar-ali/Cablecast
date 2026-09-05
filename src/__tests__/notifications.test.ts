@@ -4,6 +4,7 @@ import {
   dispatchMissedBroadcastAlerts,
   dispatchTapeExpiringAlerts,
   runAllNotificationDispatchers,
+  isSlotStartingSoon,
 } from "@/lib/notifications/notificationDispatcher";
 import { prisma } from "@/lib/prisma";
 import * as webpushModule from "@/lib/notifications/webpush";
@@ -244,6 +245,63 @@ describe("Notification Dispatcher Suite", () => {
         failedDeliveries: 0,
         cleanedSubscriptions: 0,
       });
+    });
+  });
+
+  describe("isSlotStartingSoon timezone calculations", () => {
+    it("correctly identifies a 4:00 PM show in India (IST, UTC+5:30) when UTC is 10:20 AM", () => {
+      // 10:20 AM UTC on Saturday, Sept 5, 2026
+      const mockNowUtc = new Date("2026-09-05T10:20:00Z");
+      // Dabbe at 4:00 PM (16:00 = 960 minutes) on Saturday (day 6)
+      const slot = {
+        dayOfWeek: 6,
+        blockStartMinutes: 960,
+        timezoneOffset: -330, // IST offset
+      };
+
+      const { isStartingSoon, localIsoDate } = isSlotStartingSoon(slot, null, mockNowUtc);
+      expect(isStartingSoon).toBe(true);
+      expect(localIsoDate).toBe("2026-09-05");
+    });
+
+    it("correctly identifies an 8:00 PM show in New York (EDT, UTC-4) when UTC is 23:50", () => {
+      // 23:50 UTC on Saturday, Sept 5, 2026 -> 7:50 PM EDT (10 mins before 8:00 PM)
+      const mockNowUtc = new Date("2026-09-05T23:50:00Z");
+      // 8:00 PM = 1200 minutes from midnight on Saturday (day 6)
+      const slot = {
+        dayOfWeek: 6,
+        blockStartMinutes: 1200,
+        timezoneOffset: 240, // EDT offset
+      };
+
+      const { isStartingSoon, localIsoDate } = isSlotStartingSoon(slot, null, mockNowUtc);
+      expect(isStartingSoon).toBe(true);
+      expect(localIsoDate).toBe("2026-09-05");
+    });
+
+    it("rejects shows that are not in the 10-minute lookahead window", () => {
+      // 10:00 AM UTC (3:30 PM IST) -> 30 minutes before 4:00 PM show
+      const mockNowUtc = new Date("2026-09-05T10:00:00Z");
+      const slot = {
+        dayOfWeek: 6,
+        blockStartMinutes: 960,
+        timezoneOffset: -330,
+      };
+
+      const { isStartingSoon } = isSlotStartingSoon(slot, null, mockNowUtc);
+      expect(isStartingSoon).toBe(false);
+    });
+
+    it("rejects shows that are on a different day of the week", () => {
+      const mockNowUtc = new Date("2026-09-05T10:20:00Z"); // Saturday
+      const slot = {
+        dayOfWeek: 0, // Sunday
+        blockStartMinutes: 960,
+        timezoneOffset: -330,
+      };
+
+      const { isStartingSoon } = isSlotStartingSoon(slot, null, mockNowUtc);
+      expect(isStartingSoon).toBe(false);
     });
   });
 });

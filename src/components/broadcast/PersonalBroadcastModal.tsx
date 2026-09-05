@@ -145,9 +145,14 @@ export function PersonalBroadcastModal({
     isSupported: isPushSupported,
     isSubscribed,
     isLoading: isPushLoading,
+    needsHomeScreenInstall,
     subscribe,
     unsubscribe,
+    sendTestNotification,
   } = usePushNotifications();
+
+  const [isTestingAlert, setIsTestingAlert] = useState(false);
+  const [alertFeedback, setAlertFeedback] = useState<string | null>(null);
 
   // Channel name inline editing
   const [isEditingName, setIsEditingName] = useState(false);
@@ -263,32 +268,64 @@ export function PersonalBroadcastModal({
             </div>
 
             <div className="flex items-center gap-2 shrink-0">
+              {needsHomeScreenInstall && (
+                <div className="hidden sm:flex items-center gap-1.5 rounded-md border border-neutral-800 bg-neutral-900/80 px-2 py-1 text-[10px] text-neutral-400">
+                  <span className="text-amber-400 font-semibold">iPhone:</span>
+                  <span>Add to Home Screen (⎋) for alerts</span>
+                </div>
+              )}
+
               {isPushSupported && (
-                <button
-                  type="button"
-                  onClick={async () => {
-                    if (isSubscribed) {
-                      await unsubscribe();
-                    } else {
-                      await subscribe();
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (isSubscribed) {
+                        await unsubscribe();
+                      } else {
+                        await subscribe();
+                      }
+                    }}
+                    disabled={isPushLoading}
+                    className={`group flex items-center gap-1.5 rounded-md border px-2 sm:px-2.5 py-1 text-[11px] sm:text-xs font-semibold transition-all cursor-pointer shadow-sm ${
+                      isSubscribed
+                        ? "border-amber-500/60 bg-amber-950/30 text-amber-300 hover:bg-amber-950/50"
+                        : "border-neutral-800 bg-neutral-900/60 text-neutral-400 hover:border-neutral-700 hover:text-neutral-200"
+                    }`}
+                    title={
+                      isSubscribed
+                        ? "Broadcast reminders are active (Starting soon & Missed shows). Click to disable."
+                        : "Click to enable push reminders for upcoming airings and missed shows."
                     }
-                  }}
-                  disabled={isPushLoading}
-                  className={`group flex items-center gap-1.5 rounded-md border px-2 sm:px-2.5 py-1 text-[11px] sm:text-xs font-semibold transition-all cursor-pointer shadow-sm ${
-                    isSubscribed
-                      ? "border-amber-500/60 bg-amber-950/30 text-amber-300 hover:bg-amber-950/50"
-                      : "border-neutral-800 bg-neutral-900/60 text-neutral-400 hover:border-neutral-700 hover:text-neutral-200"
-                  }`}
-                  title={
-                    isSubscribed
-                      ? "Broadcast reminders are active (Starting soon & Missed shows). Click to disable."
-                      : "Click to enable push reminders for upcoming airings and missed shows."
-                  }
-                >
-                  <Bell className={`h-3 w-3 ${isSubscribed ? "text-amber-400 fill-amber-400/30" : "text-neutral-500 group-hover:text-neutral-300"}`} />
-                  <span className="hidden sm:inline">{isSubscribed ? "Alerts On" : "Enable Alerts"}</span>
-                  <span className="sm:hidden">{isSubscribed ? "On" : "Alerts"}</span>
-                </button>
+                  >
+                    <Bell className={`h-3 w-3 ${isSubscribed ? "text-amber-400 fill-amber-400/30" : "text-neutral-500 group-hover:text-neutral-300"}`} />
+                    <span className="hidden sm:inline">{isSubscribed ? "Alerts On" : "Enable Alerts"}</span>
+                    <span className="sm:hidden">{isSubscribed ? "On" : "Alerts"}</span>
+                  </button>
+
+                  {isSubscribed && (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        setIsTestingAlert(true);
+                        setAlertFeedback(null);
+                        const res = await sendTestNotification();
+                        if (res.success) {
+                          setAlertFeedback("🔔 Alert sent! Check your phone.");
+                        } else {
+                          setAlertFeedback(res.error || "Failed to send alert.");
+                        }
+                        setIsTestingAlert(false);
+                        setTimeout(() => setAlertFeedback(null), 5000);
+                      }}
+                      disabled={isTestingAlert}
+                      className="flex items-center gap-1 rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-[11px] font-semibold text-amber-300 hover:bg-amber-500/20 transition-all cursor-pointer active:scale-95 disabled:opacity-50"
+                      title="Send an immediate push alert to test your device"
+                    >
+                      <span>{isTestingAlert ? "Testing..." : "Test Alert"}</span>
+                    </button>
+                  )}
+                </div>
               )}
 
               {isEditingName ? (
@@ -340,7 +377,19 @@ export function PersonalBroadcastModal({
           </div>
         </header>
 
-        {/* Live on-air banner */}
+        {/* Test Alert Feedback Banner */}
+        {alertFeedback && (
+          <div className="flex items-center justify-between border-b border-amber-500/40 bg-amber-950/40 px-6 py-2 text-xs text-amber-200 animate-in fade-in">
+            <span>{alertFeedback}</span>
+            <button
+              type="button"
+              onClick={() => setAlertFeedback(null)}
+              className="text-amber-400 hover:text-amber-200"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        )}
         {liveNow && (
           <div className="flex items-center justify-between border-b border-red-900/40 bg-red-950/20 px-6 py-2.5 text-xs text-red-200">
             <div className="flex items-center gap-2.5">
