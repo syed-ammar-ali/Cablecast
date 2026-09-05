@@ -24,5 +24,4 @@ const png48 = fs.readFileSync(path.join(process.cwd(), "public", "favicon-48.png
 const icoBuffer = createIcoFromPng(png48);
 
 fs.writeFileSync(path.join(process.cwd(), "public", "favicon.ico"), icoBuffer);
-fs.writeFileSync(path.join(process.cwd(), "src", "app", "favicon.ico"), icoBuffer);
-console.log("favicon.ico written successfully!");
+console.log("favicon.ico written to public/ successfully!");
