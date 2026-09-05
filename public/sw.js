@@ -94,3 +94,54 @@ self.addEventListener("fetch", (event) => {
       })
   );
 });
+
+// Push event — displays rich system notification
+self.addEventListener("push", (event) => {
+  if (!event.data) return;
+
+  let payload;
+  try {
+    payload = event.data.json();
+  } catch (e) {
+    payload = { title: "Cablecast", body: event.data.text(), data: { url: "/" } };
+  }
+
+  const title = payload.title || "Cablecast Alert";
+  const options = {
+    body: payload.body || "New update in your TV lineup.",
+    icon: payload.icon || "/icon-192.png",
+    badge: payload.badge || "/icon-192.png",
+    tag: payload.tag || "cablecast-alert",
+    data: payload.data || { url: "/" },
+    vibrate: [100, 50, 100],
+    requireInteraction: true,
+  };
+
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+// Notification click event — deep-link to target page
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+
+  const targetUrl = event.notification.data?.url || "/";
+
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
+      // If a tab is already open, focus it and navigate
+      for (const client of clientList) {
+        if ("focus" in client) {
+          client.focus();
+          if ("navigate" in client) {
+            return client.navigate(targetUrl);
+          }
+        }
+      }
+      // Otherwise open a new window
+      if (self.clients.openWindow) {
+        return self.clients.openWindow(targetUrl);
+      }
+    })
+  );
+});
+

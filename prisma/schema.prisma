@@ -355,4 +355,27 @@ model BroadcastSlot {
   @@index([userId, mediaId, seasonNumber])
 }
 
+/// Stores browser Web Push API subscriptions for appointment & rental reminders
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
+  @@index([userId])
+}
+
+/// Deduplication log to prevent sending duplicate notifications for the same broadcast or rental
+model NotificationLog {
+  id          String   @id @default(cuid())
+  userId      String
+  type        String   // "STARTING_SOON" | "MISSED_BROADCAST" | "TAPE_EXPIRING"
+  referenceId String   // e.g. scheduleId_YYYY-MM-DD or missedId or rentalId
+  sentAt      DateTime @default(now())
+
+  @@unique([userId, type, referenceId])
+  @@index([userId, type])
+}

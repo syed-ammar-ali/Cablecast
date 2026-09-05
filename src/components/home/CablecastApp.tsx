@@ -56,6 +56,8 @@ export function CablecastApp({ initialView = "home" }: CablecastAppProps) {
   // Personalized Broadcast Schedule state
   const personalBroadcast = usePersonalBroadcast();
   const [isBroadcastStudioOpen, setIsBroadcastStudioOpen] = useState(initialView === "broadcast");
+  const [broadcastInitialTab, setBroadcastInitialTab] = useState<"grid" | "lineup" | "missed" | undefined>(undefined);
+  const [broadcastTargetMissedId, setBroadcastTargetMissedId] = useState<string | null>(null);
   const [schedulingTarget, setSchedulingTarget] = useState<{
     media: MediaSearchResult;
     season?: number;
@@ -150,6 +152,41 @@ export function CablecastApp({ initialView = "home" }: CablecastAppProps) {
   useEffect(() => {
     const interval = setInterval(() => setNow(new Date()), CLOCK_TICK_MS);
     return () => clearInterval(interval);
+  }, []);
+
+  // Deep link listener for notification clicks and query params
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const parseDeepLinks = () => {
+      const url = new URL(window.location.href);
+      const tabParam = url.searchParams.get("tab");
+      const itemParam = url.searchParams.get("item") || url.searchParams.get("missedId");
+      const focusParam = url.searchParams.get("focus");
+
+      if (url.pathname.includes("broadcast") || tabParam === "missed") {
+        setIsBroadcastStudioOpen(true);
+        if (tabParam === "missed" || tabParam === "lineup" || tabParam === "grid") {
+          setBroadcastInitialTab(tabParam as "grid" | "lineup" | "missed");
+        }
+        if (itemParam) {
+          setBroadcastTargetMissedId(itemParam);
+        }
+      } else if (url.pathname.includes("library") || tabParam === "rented") {
+        setIsLibraryOpen(true);
+      }
+
+      if (focusParam === "schedule" || window.location.hash === "#schedule") {
+        setTimeout(() => {
+          const el = document.getElementById("broadcast-schedule-grid");
+          if (el) {
+            el.scrollIntoView({ behavior: "smooth" });
+          }
+        }, 150);
+      }
+    };
+
+    parseDeepLinks();
   }, []);
 
   const liveNow = useMemo(
@@ -372,7 +409,7 @@ export function CablecastApp({ initialView = "home" }: CablecastAppProps) {
           <div className="relative z-20 h-auto">
             <div className="pointer-events-none h-16 bg-gradient-to-b from-transparent to-black" />
 
-            <div className="bg-black px-0 md:px-4 pb-0 pt-2 h-auto">
+            <div id="broadcast-schedule-grid" className="bg-black px-0 md:px-4 pb-0 pt-2 h-auto">
               <TvGrid
                 schedule={schedule}
                 isLoading={isGuideLoading}
@@ -460,6 +497,8 @@ export function CablecastApp({ initialView = "home" }: CablecastAppProps) {
         missed={personalBroadcast.missed}
         seasonAlerts={personalBroadcast.seasonAlerts}
         channelName={personalBroadcast.channelName}
+        initialTab={broadcastInitialTab}
+        targetMissedId={broadcastTargetMissedId}
         onUpdateChannelName={personalBroadcast.updateChannelName}
         onDismissSeasonAlert={personalBroadcast.dismissSeasonAlert}
         onScheduleNextSeason={(media, nextSeason) => {

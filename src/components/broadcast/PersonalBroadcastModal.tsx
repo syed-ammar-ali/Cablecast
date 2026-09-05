@@ -17,10 +17,13 @@ import {
   Sparkles,
   Sun,
   Trash2,
+  Bell,
+  BellOff,
   Tv,
   X,
 } from "lucide-react";
 import { BroadcastSlotCard } from "./BroadcastSlotCard";
+import { usePushNotifications } from "@/lib/usePushNotifications";
 import type {
   MissedBroadcastItem,
   PersonalScheduleItem,
@@ -41,6 +44,8 @@ interface PersonalBroadcastModalProps {
   missed: MissedBroadcastItem[];
   seasonAlerts?: SeasonCompletedAlertItem[];
   channelName?: string;
+  initialTab?: "grid" | "lineup" | "missed";
+  targetMissedId?: string | null;
   onUpdateChannelName?: (name: string) => void;
   onDismissSeasonAlert?: (alertId: string) => void;
   onScheduleNextSeason?: (media: MediaSearchResult, nextSeason: number) => void;
@@ -118,6 +123,8 @@ export function PersonalBroadcastModal({
   missed,
   seasonAlerts = [],
   channelName = "My Lineup",
+  initialTab,
+  targetMissedId,
   onUpdateChannelName,
   onDismissSeasonAlert,
   onScheduleNextSeason,
@@ -129,14 +136,37 @@ export function PersonalBroadcastModal({
   onPlay,
 }: PersonalBroadcastModalProps) {
   const [activeTab, setActiveTab] = useState<TabKey>(
-    missed.length > 0 ? "missed" : seasonAlerts.length > 0 ? "lineup" : "grid",
+    initialTab ?? (missed.length > 0 ? "missed" : seasonAlerts.length > 0 ? "lineup" : "grid"),
   );
   const [selectedDay, setSelectedDay] = useState<number>(new Date().getDay());
   const [reschedulingItem, setReschedulingItem] = useState<MissedBroadcastItem | null>(null);
 
+  const {
+    isSupported: isPushSupported,
+    isSubscribed,
+    isLoading: isPushLoading,
+    subscribe,
+    unsubscribe,
+  } = usePushNotifications();
+
   // Channel name inline editing
   const [isEditingName, setIsEditingName] = useState(false);
   const [tempName, setTempName] = useState(channelName);
+
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
+
+  useEffect(() => {
+    if (targetMissedId && missed.length > 0) {
+      const match = missed.find((m) => m.id === targetMissedId);
+      if (match) {
+        setReschedulingItem(match);
+      }
+    }
+  }, [targetMissedId, missed]);
   // Lock body scroll and handle Escape key
   useEffect(() => {
     if (!isOpen) return;
@@ -232,7 +262,35 @@ export function PersonalBroadcastModal({
               )}
             </div>
 
-            <div className="shrink-0">
+            <div className="flex items-center gap-2 shrink-0">
+              {isPushSupported && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (isSubscribed) {
+                      await unsubscribe();
+                    } else {
+                      await subscribe();
+                    }
+                  }}
+                  disabled={isPushLoading}
+                  className={`group flex items-center gap-1.5 rounded-md border px-2 sm:px-2.5 py-1 text-[11px] sm:text-xs font-semibold transition-all cursor-pointer shadow-sm ${
+                    isSubscribed
+                      ? "border-amber-500/60 bg-amber-950/30 text-amber-300 hover:bg-amber-950/50"
+                      : "border-neutral-800 bg-neutral-900/60 text-neutral-400 hover:border-neutral-700 hover:text-neutral-200"
+                  }`}
+                  title={
+                    isSubscribed
+                      ? "Broadcast reminders are active (Starting soon & Missed shows). Click to disable."
+                      : "Click to enable push reminders for upcoming airings and missed shows."
+                  }
+                >
+                  <Bell className={`h-3 w-3 ${isSubscribed ? "text-amber-400 fill-amber-400/30" : "text-neutral-500 group-hover:text-neutral-300"}`} />
+                  <span className="hidden sm:inline">{isSubscribed ? "Alerts On" : "Enable Alerts"}</span>
+                  <span className="sm:hidden">{isSubscribed ? "On" : "Alerts"}</span>
+                </button>
+              )}
+
               {isEditingName ? (
                 <div className="flex items-center gap-1">
                   <input
