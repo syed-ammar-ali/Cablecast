@@ -14,7 +14,7 @@ import { isSessionActive } from "@/lib/auth/validity";
  */
 
 const PUBLIC_PAGE_PREFIXES = ["/gate", "/manifest.json", "/manifest.webmanifest", "/sw.js"];
-const PUBLIC_API_PREFIXES = ["/api/auth/"];
+const PUBLIC_API_PREFIXES = ["/api/auth/", "/api/cron/"];
 const ADMIN_PAGE_PREFIXES = ["/admin"];
 const ADMIN_API_PREFIXES = ["/api/admin/"];
 
