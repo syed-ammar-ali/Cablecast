@@ -134,24 +134,25 @@ export function isSlotStartingSoon(
 }
 
 /**
- * Resolves crisp, high-DPI icon URLs for push notifications.
- * Uses 500px wide poster for sharp display on modern mobile/desktop trays (fallback to /icon-192.png)
+ * Resolves crisp, high-DPI icon and hero cover image URLs for push notifications.
+ * Uses 780px wide poster for sharp expanded cover card (fallback to /badge-96.png for icon)
  */
 export function getNotificationImages(
   posterPath?: string | null,
-): { icon: string } {
-  let icon = "/icon-192.png";
+): { icon: string; image?: string } {
+  const icon = "/badge-96.png";
+  let image: string | undefined = undefined;
 
   if (posterPath) {
     if (posterPath.startsWith("http://") || posterPath.startsWith("https://")) {
-      icon = posterPath;
+      image = posterPath;
     } else {
       const clean = posterPath.startsWith("/") ? posterPath : `/${posterPath}`;
-      icon = `https://image.tmdb.org/t/p/w500${clean}`;
+      image = `https://image.tmdb.org/t/p/w780${clean}`;
     }
   }
 
-  return { icon };
+  return { icon, image };
 }
 
 /**
@@ -231,15 +232,20 @@ export async function dispatchStartingSoonAlerts(now: Date = new Date()): Promis
       }
     }
 
-    // 3. Dispatch push notification
-    const epDetails = slot.mediaType === "tv" ? ` (S${slot.currentSeason}:E${slot.currentEpisode})` : "";
-    const { icon } = getNotificationImages(slot.posterPath);
+    // 3. Dispatch push notification with catchy line, sleek info, and hero cover
+    const { icon, image } = getNotificationImages(slot.posterPath);
+    const title = "📺 Showtime in 10 Minutes";
+    const body =
+      slot.mediaType === "tv" && slot.currentSeason && slot.currentEpisode
+        ? `"${slot.title}" · Season ${slot.currentSeason}, Ep ${slot.currentEpisode}\nScheduled broadcast is about to start. Tune in live!`
+        : `"${slot.title}"\nScheduled broadcast is about to start on your channel. Tune in live!`;
 
     const payload: PushNotificationPayload = {
-      title: "Starting Soon on Cablecast",
-      body: `"${slot.title}"${epDetails} starts in 10 minutes on your channel!`,
+      title,
+      body,
+      image,
       icon,
-      badge: "/icon-maskable-192.png",
+      badge: "/badge-96.png",
       tag: `starting-soon-${slot.id}`,
       renotify: true,
       requireInteraction: true,
@@ -310,14 +316,15 @@ export async function dispatchMissedBroadcastAlerts(): Promise<{ count: number; 
     if (alreadyLogged) continue;
 
     // 2. Dispatch push notification
-    const epDetails = item.season && item.episode ? ` (S${item.season}:E${item.episode})` : "";
-    const { icon } = getNotificationImages(item.posterPath);
+    const epDetails = item.season && item.episode ? ` · Season ${item.season}, Ep ${item.episode}` : "";
+    const { icon, image } = getNotificationImages(item.posterPath);
 
     const payload: PushNotificationPayload = {
-      title: "Missed Broadcast",
-      body: `You missed "${item.title}"${epDetails}. Tap to reschedule a one-off rerun.`,
+      title: "📼 Missed Broadcast",
+      body: `You missed "${item.title}"${epDetails}.\nReschedule a one-off rerun anytime from your guide.`,
+      image,
       icon,
-      badge: "/icon-maskable-192.png",
+      badge: "/badge-96.png",
       tag: `missed-${item.id}`,
       renotify: true,
       requireInteraction: true,
@@ -412,13 +419,14 @@ export async function dispatchTapeExpiringAlerts(now: Date = new Date()): Promis
     const bodyText = scheduled
       ? `Your rental for "${title}" expires in 2 hours! Scheduled broadcasts will be disabled unless renewed.`
       : `Your rental pass for "${title}" expires in 2 hours. Watch now or extend your rental.`;
-    const { icon } = getNotificationImages(rental.posterPath);
+    const { icon, image } = getNotificationImages(rental.posterPath);
 
     const payload: PushNotificationPayload = {
       title: "⏳ VHS Rental Expiring Soon",
       body: bodyText,
+      image,
       icon,
-      badge: "/icon-maskable-192.png",
+      badge: "/badge-96.png",
       tag: `rental-expiring-${rental.id}`,
       renotify: true,
       requireInteraction: true,

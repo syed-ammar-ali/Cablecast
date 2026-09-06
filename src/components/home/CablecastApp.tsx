@@ -18,6 +18,7 @@ import { usePersonalBroadcast } from "@/lib/usePersonalBroadcast";
 import { formatLocalDate, isBroadcastLiveNow } from "@/lib/broadcastLive";
 import { useToast } from "@/components/ui/ToastProvider";
 import { notifyLibraryMutation, notifyBroadcastMutation } from "@/lib/syncEvents";
+import { NotificationPermissionPrompt } from "@/components/notifications/NotificationPermissionPrompt";
 import type { MediaSearchResult } from "@/types/media";
 
 // Dynamically imported heavy modals to minimize initial bundle size and boost Core Web Vitals
@@ -216,6 +217,21 @@ export function CablecastApp({ initialView = "home" }: CablecastAppProps) {
     };
 
     parseDeepLinks();
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/auth/me")
+      .then((res) => res.json())
+      .then((data: { role?: string | null }) => {
+        if (!cancelled && data?.role === "admin") {
+          setIsAdmin(true);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const liveNow = useMemo(
@@ -530,6 +546,7 @@ export function CablecastApp({ initialView = "home" }: CablecastAppProps) {
         channelName={personalBroadcast.channelName}
         initialTab={broadcastInitialTab}
         targetMissedId={broadcastTargetMissedId}
+        isAdmin={isAdmin}
         onUpdateChannelName={personalBroadcast.updateChannelName}
         onDismissSeasonAlert={personalBroadcast.dismissSeasonAlert}
         onScheduleNextSeason={(media, nextSeason) => {
@@ -652,6 +669,9 @@ export function CablecastApp({ initialView = "home" }: CablecastAppProps) {
         isLibraryOpen={isLibraryOpen}
         isSearchActive={isMobileSearchOpen}
       />
+
+      {/* First-time visitor push notification prompt */}
+      <NotificationPermissionPrompt />
     </main>
   );
 }

@@ -1,5 +1,5 @@
 // Cablecast Progressive Web App Service Worker
-const CACHE_NAME = "cablecast-v6";
+const CACHE_NAME = "cablecast-v7";
 const STATIC_ASSETS = [
   "/",
   "/manifest.json",
@@ -10,6 +10,7 @@ const STATIC_ASSETS = [
   "/apple-touch-icon.png",
   "/favicon.ico",
   "/icon.svg",
+  "/badge-96.png",
 ];
 
 // Install event — precache static shell
@@ -110,8 +111,8 @@ self.addEventListener("push", (event) => {
   const title = payload.title || "Cablecast Alert";
   const options = {
     body: payload.body || "New update in your TV lineup.",
-    icon: payload.icon || "/icon-192.png",
-    badge: payload.badge || "/icon-maskable-192.png",
+    icon: payload.icon || "/badge-96.png",
+    badge: payload.badge || "/badge-96.png",
     tag: payload.tag || "cablecast-alert",
     renotify: payload.renotify !== undefined ? payload.renotify : true,
     requireInteraction: payload.requireInteraction !== undefined ? payload.requireInteraction : true,
@@ -119,6 +120,11 @@ self.addEventListener("push", (event) => {
     vibrate: payload.vibrate || [120, 80, 120, 80, 240],
     data: payload.data || { url: "/" },
   };
+
+  // Large cover hero image (movie/TV artwork)
+  if (payload.image) {
+    options.image = payload.image;
+  }
 
   // Interactive action buttons (Tune in, Reschedule, Watch, Dismiss)
   if (payload.actions && Array.isArray(payload.actions) && payload.actions.length > 0) {

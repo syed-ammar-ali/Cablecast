@@ -59,6 +59,7 @@ interface PersonalBroadcastModalProps {
     mode?: "move" | "one_off",
   ) => Promise<{ success: boolean; error?: string }>;
   onDismissMissed: (missedId: string) => void;
+  isAdmin?: boolean;
   onPlay: (target: {
     media: MediaSearchResult;
     season?: number;
@@ -133,6 +134,7 @@ export function PersonalBroadcastModal({
   onRemoveShowSchedule,
   onRescheduleMissed,
   onDismissMissed,
+  isAdmin: isAdminProp,
   onPlay,
 }: PersonalBroadcastModalProps) {
   const [activeTab, setActiveTab] = useState<TabKey>(
@@ -140,6 +142,26 @@ export function PersonalBroadcastModal({
   );
   const [selectedDay, setSelectedDay] = useState<number>(new Date().getDay());
   const [reschedulingItem, setReschedulingItem] = useState<MissedBroadcastItem | null>(null);
+  const [isAdmin, setIsAdmin] = useState(isAdminProp ?? false);
+
+  useEffect(() => {
+    if (isAdminProp !== undefined) {
+      setIsAdmin(isAdminProp);
+      return;
+    }
+    let cancelled = false;
+    fetch("/api/auth/me")
+      .then((res) => res.json())
+      .then((data: { role?: string | null }) => {
+        if (!cancelled && data?.role === "admin") {
+          setIsAdmin(true);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [isAdminProp]);
 
   const {
     isSupported: isPushSupported,
@@ -303,7 +325,7 @@ export function PersonalBroadcastModal({
                     <span className="sm:hidden">{isSubscribed ? "On" : "Alerts"}</span>
                   </button>
 
-                  {isSubscribed && (
+                  {isSubscribed && isAdmin && (
                     <button
                       type="button"
                       onClick={async () => {
@@ -320,7 +342,7 @@ export function PersonalBroadcastModal({
                       }}
                       disabled={isTestingAlert}
                       className="flex items-center gap-1 rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-[11px] font-semibold text-amber-300 hover:bg-amber-500/20 transition-all cursor-pointer active:scale-95 disabled:opacity-50"
-                      title="Send an immediate push alert to test your device"
+                      title="Admin only: Send an immediate push alert to test your device"
                     >
                       <span>{isTestingAlert ? "Testing..." : "Test Alert"}</span>
                     </button>

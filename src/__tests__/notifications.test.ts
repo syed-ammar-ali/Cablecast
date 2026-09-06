@@ -96,7 +96,7 @@ describe("Notification Dispatcher Suite", () => {
       expect(spySend).toHaveBeenCalledWith(
         expect.objectContaining({ endpoint: "https://push.service.com/sub-1" }),
         expect.objectContaining({
-          title: "Starting Soon on Cablecast",
+          title: "📺 Showtime in 10 Minutes",
           data: expect.objectContaining({ url: "/?view=home#schedule" }),
         }),
       );
@@ -175,7 +175,7 @@ describe("Notification Dispatcher Suite", () => {
       expect(spySend).toHaveBeenCalledWith(
         expect.anything(),
         expect.objectContaining({
-          title: "Missed Broadcast",
+          title: "📼 Missed Broadcast",
           data: expect.objectContaining({
             url: "/broadcast?tab=missed&item=missed-1",
             type: "MISSED_BROADCAST",

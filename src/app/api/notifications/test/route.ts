@@ -13,6 +13,13 @@ export const dynamic = "force-dynamic";
 export async function POST(request: NextRequest) {
   try {
     const session = await getSession();
+    if (!session || session.role !== "admin") {
+      return NextResponse.json(
+        { success: false, error: "Only administrators can send test notifications." },
+        { status: 403 },
+      );
+    }
+
     const userId = getPersistentUserId(session);
 
     const userKeys = Array.from(
@@ -39,29 +46,35 @@ export async function POST(request: NextRequest) {
       orderBy: { updatedAt: "desc" },
     });
 
-    let title = "🔔 Cablecast Alert Test";
-    let body = "Push notifications are active! You'll receive alerts with show artwork 10 minutes before broadcasts.";
-    let icon = "/icon-192.png";
+    let title = "📺 Showtime in 10 Minutes";
+    let body = "Scheduled broadcast is about to air on your channel. Tap to tune in live!";
+    let image: string | undefined = undefined;
 
     if (scheduledShow) {
-      const epDetails = scheduledShow.mediaType === "tv" ? ` (S${scheduledShow.currentSeason}:E${scheduledShow.currentEpisode})` : "";
-      body = `Alerts active! "${scheduledShow.title}"${epDetails} is programmed on your TV lineup.`;
+      const showTitle = scheduledShow.title;
+      if (scheduledShow.mediaType === "tv" && scheduledShow.currentSeason && scheduledShow.currentEpisode) {
+        body = `"${showTitle}" · Season ${scheduledShow.currentSeason}, Ep ${scheduledShow.currentEpisode}\nScheduled broadcast is about to start. Tune in live!`;
+      } else {
+        body = `"${showTitle}"\nScheduled broadcast is about to start on your channel. Tune in live!`;
+      }
+
       if (scheduledShow.posterPath) {
         const clean = scheduledShow.posterPath.startsWith("/") ? scheduledShow.posterPath : `/${scheduledShow.posterPath}`;
-        icon = scheduledShow.posterPath.startsWith("http") ? scheduledShow.posterPath : `https://image.tmdb.org/t/p/w500${clean}`;
+        image = scheduledShow.posterPath.startsWith("http") ? scheduledShow.posterPath : `https://image.tmdb.org/t/p/w780${clean}`;
       }
     }
 
     const payload: PushNotificationPayload = {
       title,
       body,
-      icon,
-      badge: "/icon-maskable-192.png",
+      image,
+      icon: "/badge-96.png",
+      badge: "/badge-96.png",
       tag: "cablecast-test-alert",
       renotify: true,
       requireInteraction: true,
       actions: [
-        { action: "tune-in", title: "📺 Open Guide" },
+        { action: "tune-in", title: "▶ Tune In" },
         { action: "dismiss", title: "Dismiss" },
       ],
       data: {
