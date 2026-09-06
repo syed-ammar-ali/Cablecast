@@ -20,15 +20,29 @@ try {
   console.error("[webpush] Failed to set VAPID details:", err);
 }
 
+export interface PushNotificationAction {
+  action: string;
+  title: string;
+  icon?: string;
+}
+
 export interface PushNotificationPayload {
   title: string;
   body: string;
   icon?: string;
+  image?: string;
   badge?: string;
   tag?: string;
+  renotify?: boolean;
+  requireInteraction?: boolean;
+  silent?: boolean;
+  timestamp?: number;
+  vibrate?: number[];
+  actions?: PushNotificationAction[];
   data: {
     url: string;
     type?: "STARTING_SOON" | "MISSED_BROADCAST" | "TAPE_EXPIRING";
+    actionUrls?: Record<string, string>;
     [key: string]: unknown;
   };
 }

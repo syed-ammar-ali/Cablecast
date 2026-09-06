@@ -1,5 +1,5 @@
 // Cablecast Progressive Web App Service Worker
-const CACHE_NAME = "cablecast-v3";
+const CACHE_NAME = "cablecast-v4";
 const STATIC_ASSETS = [
   "/",
   "/manifest.json",
@@ -104,28 +104,49 @@ self.addEventListener("push", (event) => {
   try {
     payload = event.data.json();
   } catch (e) {
-    payload = { title: "Cablecast", body: event.data.text(), data: { url: "/" } };
+    payload = { title: "Cablecast Alert", body: event.data.text(), data: { url: "/" } };
   }
 
   const title = payload.title || "Cablecast Alert";
   const options = {
     body: payload.body || "New update in your TV lineup.",
     icon: payload.icon || "/icon-192.png",
-    badge: payload.badge || "/icon-192.png",
+    badge: payload.badge || "/icon-maskable-192.png",
     tag: payload.tag || "cablecast-alert",
+    renotify: payload.renotify !== undefined ? payload.renotify : true,
+    requireInteraction: payload.requireInteraction !== undefined ? payload.requireInteraction : true,
+    timestamp: payload.timestamp || Date.now(),
+    vibrate: payload.vibrate || [120, 80, 120, 80, 240],
     data: payload.data || { url: "/" },
-    vibrate: [100, 50, 100],
-    requireInteraction: true,
   };
+
+  // Large cinematic banner image (Chrome, Edge, Windows, Android)
+  if (payload.image) {
+    options.image = payload.image;
+  }
+
+  // Interactive action buttons (Tune in, Reschedule, Watch, Dismiss)
+  if (payload.actions && Array.isArray(payload.actions) && payload.actions.length > 0) {
+    options.actions = payload.actions;
+  }
 
   event.waitUntil(self.registration.showNotification(title, options));
 });
 
-// Notification click event — deep-link to target page
+// Notification click event — deep-link to target page or handle action buttons
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
 
-  const targetUrl = event.notification.data?.url || "/";
+  // If the user clicked "dismiss", close the notification and do not open or focus any window
+  if (event.action === "dismiss") {
+    return;
+  }
+
+  // Resolve target url based on specific action or default payload url
+  let targetUrl = event.notification.data?.url || "/";
+  if (event.action && event.notification.data?.actionUrls?.[event.action]) {
+    targetUrl = event.notification.data.actionUrls[event.action];
+  }
 
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {

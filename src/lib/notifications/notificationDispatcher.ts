@@ -119,6 +119,46 @@ export function isSlotStartingSoon(
 }
 
 /**
+ * Resolves crisp, high-DPI image URLs for push notifications.
+ * - icon: 500px wide poster for sharp display on modern mobile/desktop trays (fallback to /icon-192.png)
+ * - image: 780px wide backdrop banner for rich, widescreen preview cards on Android/Windows
+ */
+export function getNotificationImages(
+  posterPath?: string | null,
+  backdropUrl?: string | null,
+): { icon: string; image?: string } {
+  let icon = "/icon-192.png";
+  let image: string | undefined = undefined;
+
+  if (posterPath) {
+    if (posterPath.startsWith("http://") || posterPath.startsWith("https://")) {
+      icon = posterPath;
+    } else {
+      const clean = posterPath.startsWith("/") ? posterPath : `/${posterPath}`;
+      icon = `https://image.tmdb.org/t/p/w500${clean}`;
+    }
+  }
+
+  if (backdropUrl) {
+    if (backdropUrl.startsWith("http://") || backdropUrl.startsWith("https://")) {
+      image = backdropUrl;
+    } else {
+      const clean = backdropUrl.startsWith("/") ? backdropUrl : `/${backdropUrl}`;
+      image = `https://image.tmdb.org/t/p/w780${clean}`;
+    }
+  } else if (posterPath) {
+    if (posterPath.startsWith("http://") || posterPath.startsWith("https://")) {
+      image = posterPath;
+    } else {
+      const clean = posterPath.startsWith("/") ? posterPath : `/${posterPath}`;
+      image = `https://image.tmdb.org/t/p/w780${clean}`;
+    }
+  }
+
+  return { icon, image };
+}
+
+/**
  * Dispatches "Starting Soon" alerts (10 minutes before broadcast).
  * Lookahead window: slots starting between now + 5 mins and now + 15 mins in the user's local timezone.
  */
@@ -183,11 +223,21 @@ export async function dispatchStartingSoonAlerts(now: Date = new Date()): Promis
 
     // 3. Dispatch push notification
     const epDetails = slot.mediaType === "tv" ? ` (S${slot.currentSeason}:E${slot.currentEpisode})` : "";
+    const { icon, image } = getNotificationImages(slot.posterPath, slot.backdropUrl);
+
     const payload: PushNotificationPayload = {
       title: "Starting Soon on Cablecast",
-      body: `${slot.title}${epDetails} starts in 10 minutes on your channel!`,
-      icon: slot.posterPath ? `https://image.tmdb.org/t/p/w185${slot.posterPath}` : "/icon-192.png",
+      body: `"${slot.title}"${epDetails} starts in 10 minutes on your channel!`,
+      icon,
+      image,
+      badge: "/icon-maskable-192.png",
       tag: `starting-soon-${slot.id}`,
+      renotify: true,
+      requireInteraction: true,
+      actions: [
+        { action: "tune-in", title: "▶ Tune In" },
+        { action: "dismiss", title: "Dismiss" },
+      ],
       data: {
         url: "/?view=home#schedule",
         type: "STARTING_SOON",
@@ -252,11 +302,21 @@ export async function dispatchMissedBroadcastAlerts(): Promise<{ count: number; 
 
     // 2. Dispatch push notification
     const epDetails = item.season && item.episode ? ` (S${item.season}:E${item.episode})` : "";
+    const { icon, image } = getNotificationImages(item.posterPath, item.backdropUrl);
+
     const payload: PushNotificationPayload = {
       title: "Missed Broadcast",
-      body: `You missed ${item.title}${epDetails}. Tap to reschedule a one-off rerun.`,
-      icon: item.posterPath ? `https://image.tmdb.org/t/p/w185${item.posterPath}` : "/icon-192.png",
+      body: `You missed "${item.title}"${epDetails}. Tap to reschedule a one-off rerun.`,
+      icon,
+      image,
+      badge: "/icon-maskable-192.png",
       tag: `missed-${item.id}`,
+      renotify: true,
+      requireInteraction: true,
+      actions: [
+        { action: "reschedule", title: "🔄 Reschedule Rerun" },
+        { action: "dismiss", title: "Dismiss" },
+      ],
       data: {
         url: `/broadcast?tab=missed&item=${item.id}`,
         type: "MISSED_BROADCAST",
@@ -344,12 +404,21 @@ export async function dispatchTapeExpiringAlerts(now: Date = new Date()): Promis
     const bodyText = scheduled
       ? `Your rental for "${title}" expires in 2 hours! Scheduled broadcasts will be disabled unless renewed.`
       : `Your rental pass for "${title}" expires in 2 hours. Watch now or extend your rental.`;
+    const { icon, image } = getNotificationImages(rental.posterPath, rental.backdropUrl);
 
     const payload: PushNotificationPayload = {
       title: "⏳ VHS Rental Expiring Soon",
       body: bodyText,
-      icon: rental.posterPath ? `https://image.tmdb.org/t/p/w185${rental.posterPath}` : "/icon-192.png",
+      icon,
+      image,
+      badge: "/icon-maskable-192.png",
       tag: `rental-expiring-${rental.id}`,
+      renotify: true,
+      requireInteraction: true,
+      actions: [
+        { action: "watch", title: "▶ Watch Now" },
+        { action: "dismiss", title: "Dismiss" },
+      ],
       data: {
         url: `/library?tab=rented&tapeId=${rental.id}`,
         type: "TAPE_EXPIRING",
