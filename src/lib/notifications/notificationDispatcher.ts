@@ -119,16 +119,13 @@ export function isSlotStartingSoon(
 }
 
 /**
- * Resolves crisp, high-DPI image URLs for push notifications.
- * - icon: 500px wide poster for sharp display on modern mobile/desktop trays (fallback to /icon-192.png)
- * - image: 780px wide backdrop banner for rich, widescreen preview cards on Android/Windows
+ * Resolves crisp, high-DPI icon URLs for push notifications.
+ * Uses 500px wide poster for sharp display on modern mobile/desktop trays (fallback to /icon-192.png)
  */
 export function getNotificationImages(
   posterPath?: string | null,
-  backdropUrl?: string | null,
-): { icon: string; image?: string } {
+): { icon: string } {
   let icon = "/icon-192.png";
-  let image: string | undefined = undefined;
 
   if (posterPath) {
     if (posterPath.startsWith("http://") || posterPath.startsWith("https://")) {
@@ -139,23 +136,7 @@ export function getNotificationImages(
     }
   }
 
-  if (backdropUrl) {
-    if (backdropUrl.startsWith("http://") || backdropUrl.startsWith("https://")) {
-      image = backdropUrl;
-    } else {
-      const clean = backdropUrl.startsWith("/") ? backdropUrl : `/${backdropUrl}`;
-      image = `https://image.tmdb.org/t/p/w780${clean}`;
-    }
-  } else if (posterPath) {
-    if (posterPath.startsWith("http://") || posterPath.startsWith("https://")) {
-      image = posterPath;
-    } else {
-      const clean = posterPath.startsWith("/") ? posterPath : `/${posterPath}`;
-      image = `https://image.tmdb.org/t/p/w780${clean}`;
-    }
-  }
-
-  return { icon, image };
+  return { icon };
 }
 
 /**
@@ -223,13 +204,12 @@ export async function dispatchStartingSoonAlerts(now: Date = new Date()): Promis
 
     // 3. Dispatch push notification
     const epDetails = slot.mediaType === "tv" ? ` (S${slot.currentSeason}:E${slot.currentEpisode})` : "";
-    const { icon, image } = getNotificationImages(slot.posterPath, slot.backdropUrl);
+    const { icon } = getNotificationImages(slot.posterPath);
 
     const payload: PushNotificationPayload = {
       title: "Starting Soon on Cablecast",
       body: `"${slot.title}"${epDetails} starts in 10 minutes on your channel!`,
       icon,
-      image,
       badge: "/icon-maskable-192.png",
       tag: `starting-soon-${slot.id}`,
       renotify: true,
@@ -302,13 +282,12 @@ export async function dispatchMissedBroadcastAlerts(): Promise<{ count: number; 
 
     // 2. Dispatch push notification
     const epDetails = item.season && item.episode ? ` (S${item.season}:E${item.episode})` : "";
-    const { icon, image } = getNotificationImages(item.posterPath, item.backdropUrl);
+    const { icon } = getNotificationImages(item.posterPath);
 
     const payload: PushNotificationPayload = {
       title: "Missed Broadcast",
       body: `You missed "${item.title}"${epDetails}. Tap to reschedule a one-off rerun.`,
       icon,
-      image,
       badge: "/icon-maskable-192.png",
       tag: `missed-${item.id}`,
       renotify: true,
@@ -404,13 +383,12 @@ export async function dispatchTapeExpiringAlerts(now: Date = new Date()): Promis
     const bodyText = scheduled
       ? `Your rental for "${title}" expires in 2 hours! Scheduled broadcasts will be disabled unless renewed.`
       : `Your rental pass for "${title}" expires in 2 hours. Watch now or extend your rental.`;
-    const { icon, image } = getNotificationImages(rental.posterPath, rental.backdropUrl);
+    const { icon } = getNotificationImages(rental.posterPath);
 
     const payload: PushNotificationPayload = {
       title: "⏳ VHS Rental Expiring Soon",
       body: bodyText,
       icon,
-      image,
       badge: "/icon-maskable-192.png",
       tag: `rental-expiring-${rental.id}`,
       renotify: true,

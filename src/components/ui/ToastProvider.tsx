@@ -1,9 +1,14 @@
 "use client";
 
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
-import { AlertCircle, AlertTriangle, CheckCircle2, Info, X } from "lucide-react";
+import { AlertCircle, AlertTriangle, CheckCircle2, Info, Radio, X } from "lucide-react";
 
-export type ToastType = "success" | "error" | "warning" | "info";
+export type ToastType = "success" | "error" | "warning" | "info" | "broadcast";
+
+export interface ToastAction {
+  label: string;
+  onClick: () => void;
+}
 
 export interface ToastItem {
   id: string;
@@ -11,6 +16,19 @@ export interface ToastItem {
   title?: string;
   message: string;
   duration?: number;
+  posterUrl?: string;
+  badgeText?: string;
+  action?: ToastAction;
+}
+
+export interface BroadcastToastOptions {
+  message: string;
+  title?: string;
+  posterUrl?: string;
+  badgeText?: string;
+  duration?: number;
+  actionLabel?: string;
+  onAction?: () => void;
 }
 
 export interface ConfirmOptions {
@@ -28,6 +46,7 @@ interface ToastContextValue {
     error: (message: string, title?: string) => void;
     warning: (message: string, title?: string) => void;
     info: (message: string, title?: string) => void;
+    broadcast: (options: BroadcastToastOptions | string, title?: string) => void;
   };
   confirm: (options: ConfirmOptions) => Promise<boolean>;
 }
@@ -90,9 +109,10 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const showToast = useCallback(
-    ({ type, title, message, duration = 4500 }: Omit<ToastItem, "id">) => {
+    (item: Omit<ToastItem, "id">) => {
       const id = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-      setToasts((current) => [...current, { id, type, title, message, duration }]);
+      const duration = item.duration ?? 4500;
+      setToasts((current) => [...current, { ...item, id, duration }]);
 
       if (duration > 0) {
         setTimeout(() => {
@@ -108,6 +128,32 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     error: (message: string, title?: string) => showToast({ type: "error", title, message }),
     warning: (message: string, title?: string) => showToast({ type: "warning", title, message }),
     info: (message: string, title?: string) => showToast({ type: "info", title, message }),
+    broadcast: (options: BroadcastToastOptions | string, title?: string) => {
+      if (typeof options === "string") {
+        showToast({
+          type: "broadcast",
+          title: title || "Live Broadcast",
+          message: options,
+          duration: 7000,
+        });
+      } else {
+        showToast({
+          type: "broadcast",
+          title: options.title || "Live Broadcast",
+          message: options.message,
+          posterUrl: options.posterUrl,
+          badgeText: options.badgeText,
+          duration: options.duration ?? 7000,
+          action:
+            options.actionLabel && options.onAction
+              ? {
+                  label: options.actionLabel,
+                  onClick: options.onAction,
+                }
+              : undefined,
+        });
+      }
+    },
   };
 
   const confirm = useCallback((options: ConfirmOptions): Promise<boolean> => {
@@ -146,33 +192,119 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     <ToastContext.Provider value={{ showToast, toast, confirm }}>
       {children}
 
-      {/* ── Toast Container ────────────────────────────────────────────── */}
+      {/* ── Toast Container (Responsive positioning: bottom-20 on mobile to clear BottomNav, bottom-5 on desktop) ── */}
       <div
         aria-live="polite"
-        className="pointer-events-none fixed bottom-4 right-4 z-[9990] flex flex-col gap-2.5 max-w-sm w-full px-4 sm:px-0"
+        className="pointer-events-none fixed bottom-20 sm:bottom-5 right-3 sm:right-5 z-[9990] flex flex-col gap-2.5 max-w-sm sm:max-w-md w-full px-3 sm:px-0"
       >
         {toasts.map((item) => {
+          const isBroadcast = item.type === "broadcast";
           const isSuccess = item.type === "success";
           const isError = item.type === "error";
           const isWarning = item.type === "warning";
           const isDismissing = dismissingIds.has(item.id);
 
+          if (isBroadcast) {
+            return (
+              <div
+                key={item.id}
+                role="alert"
+                className={`pointer-events-auto relative overflow-hidden rounded-2xl border border-amber-500/40 bg-neutral-950/95 p-3.5 sm:p-4 shadow-2xl shadow-black/90 backdrop-blur-2xl transition-all duration-200 ${
+                  isDismissing
+                    ? "animate-out fade-out slide-out-to-bottom-3 pointer-events-none"
+                    : "animate-in fade-in slide-in-from-bottom-4"
+                }`}
+              >
+                {/* Subtle top amber glow accent line */}
+                <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-amber-500 to-transparent opacity-80" />
+
+                <div className="flex items-start gap-3">
+                  {/* Poster Thumbnail or Pulsing Broadcast Radio Icon */}
+                  {item.posterUrl ? (
+                    <div className="relative h-14 w-10 shrink-0 overflow-hidden rounded-md border border-neutral-800 bg-neutral-900 shadow-md">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={item.posterUrl}
+                        alt="Broadcast poster"
+                        className="h-full w-full object-cover"
+                      />
+                    </div>
+                  ) : (
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-400">
+                      <Radio className="h-5 w-5 animate-pulse" />
+                    </div>
+                  )}
+
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <span className="inline-flex items-center gap-1 rounded-full bg-red-500/20 border border-red-500/30 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-red-400">
+                        <span className="h-1.5 w-1.5 rounded-full bg-red-500 animate-ping" />
+                        {item.badgeText || "Live Alert"}
+                      </span>
+                      {item.title && (
+                        <p className="truncate text-xs font-bold text-neutral-200">
+                          {item.title}
+                        </p>
+                      )}
+                    </div>
+
+                    <p className="text-xs text-neutral-300 leading-snug">
+                      {item.message}
+                    </p>
+
+                    {item.action && (
+                      <div className="mt-2.5 flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            item.action?.onClick();
+                            dismissToast(item.id);
+                          }}
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500 px-3 py-1 text-xs font-bold text-black transition-all hover:bg-amber-400 active:scale-95 shadow-md shadow-amber-500/20 cursor-pointer"
+                        >
+                          {item.action.label}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => dismissToast(item.id)}
+                          className="rounded-lg border border-neutral-800 bg-neutral-900/60 px-2.5 py-1 text-xs font-medium text-neutral-400 hover:text-white transition-colors cursor-pointer"
+                        >
+                          Dismiss
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => dismissToast(item.id)}
+                    className="shrink-0 text-neutral-500 hover:text-white transition-colors p-1 rounded active:scale-95 cursor-pointer"
+                    aria-label="Close notification"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            );
+          }
+
           return (
             <div
               key={item.id}
               role="status"
-              className={`pointer-events-auto flex items-start gap-3 rounded-xl p-4 shadow-2xl backdrop-blur-xl border transition-all ${
+              className={`pointer-events-auto flex items-start gap-3 rounded-xl p-3.5 sm:p-4 shadow-2xl backdrop-blur-xl border transition-all ${
                 isDismissing
                   ? "animate-out fade-out slide-out-to-bottom-3 pointer-events-none"
                   : "animate-in fade-in slide-in-from-bottom-3"
-              } ${isSuccess
+              } ${
+                isSuccess
                   ? "bg-neutral-950/95 border-emerald-800/60 text-neutral-200 shadow-emerald-950/30"
                   : isError
                     ? "bg-neutral-950/95 border-rose-800/60 text-neutral-200 shadow-rose-950/30"
                     : isWarning
                       ? "bg-neutral-950/95 border-amber-800/60 text-neutral-200 shadow-amber-950/30"
                       : "bg-neutral-950/95 border-cyan-800/60 text-neutral-200 shadow-cyan-950/30"
-                }`}
+              }`}
             >
               <div className="mt-0.5 shrink-0">
                 {isSuccess && <CheckCircle2 className="h-5 w-5 text-emerald-400" />}
@@ -184,25 +316,28 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
               <div className="flex-1 min-w-0">
                 {item.title && (
                   <p
-                    className={`text-xs font-bold uppercase tracking-wider ${isSuccess
+                    className={`text-xs font-bold uppercase tracking-wider ${
+                      isSuccess
                         ? "text-emerald-400"
                         : isError
                           ? "text-rose-400"
                           : isWarning
                             ? "text-amber-400"
                             : "text-cyan-400"
-                      }`}
+                    }`}
                   >
                     {item.title}
                   </p>
                 )}
-                <p className="text-xs leading-relaxed text-neutral-300 break-words mt-0.5">{item.message}</p>
+                <p className="text-xs leading-relaxed text-neutral-300 break-words mt-0.5">
+                  {renderFormattedMessage(item.message, isError)}
+                </p>
               </div>
 
               <button
                 type="button"
                 onClick={() => dismissToast(item.id)}
-                className="shrink-0 text-neutral-500 hover:text-white transition-colors p-0.5 rounded active:scale-95"
+                className="shrink-0 text-neutral-500 hover:text-white transition-colors p-0.5 rounded active:scale-95 cursor-pointer"
                 aria-label="Close notification"
               >
                 <X className="h-4 w-4" />

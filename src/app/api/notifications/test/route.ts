@@ -40,9 +40,8 @@ export async function POST(request: NextRequest) {
     });
 
     let title = "🔔 Cablecast Alert Test";
-    let body = "Push notifications are active! You'll receive rich alerts with show artwork 10 minutes before broadcasts.";
+    let body = "Push notifications are active! You'll receive alerts with show artwork 10 minutes before broadcasts.";
     let icon = "/icon-192.png";
-    let image: string | undefined = undefined;
 
     if (scheduledShow) {
       const epDetails = scheduledShow.mediaType === "tv" ? ` (S${scheduledShow.currentSeason}:E${scheduledShow.currentEpisode})` : "";
@@ -51,21 +50,12 @@ export async function POST(request: NextRequest) {
         const clean = scheduledShow.posterPath.startsWith("/") ? scheduledShow.posterPath : `/${scheduledShow.posterPath}`;
         icon = scheduledShow.posterPath.startsWith("http") ? scheduledShow.posterPath : `https://image.tmdb.org/t/p/w500${clean}`;
       }
-      if (scheduledShow.backdropUrl) {
-        image = scheduledShow.backdropUrl.startsWith("http") ? scheduledShow.backdropUrl : `https://image.tmdb.org/t/p/w780${scheduledShow.backdropUrl.startsWith("/") ? scheduledShow.backdropUrl : `/${scheduledShow.backdropUrl}`}`;
-      } else if (scheduledShow.posterPath) {
-        image = icon;
-      }
-    } else {
-      // Cinematic living-room TV backdrop preview if user hasn't scheduled a show yet
-      image = "https://images.unsplash.com/photo-1593784991095-a205069470b6?auto=format&fit=crop&w=1200&q=80";
     }
 
     const payload: PushNotificationPayload = {
       title,
       body,
       icon,
-      image,
       badge: "/icon-maskable-192.png",
       tag: "cablecast-test-alert",
       renotify: true,

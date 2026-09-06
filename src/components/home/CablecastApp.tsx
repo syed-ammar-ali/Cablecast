@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import dynamic from "next/dynamic";
 import { MediaCard } from "@/components/search/MediaCard";
 import { MobileSearchOverlay } from "@/components/search/MobileSearchOverlay";
@@ -217,6 +217,88 @@ export function CablecastApp({ initialView = "home" }: CablecastAppProps) {
 
     parseDeepLinks();
   }, []);
+
+  // Listen for push notifications received while app is open in foreground
+  useEffect(() => {
+    if (typeof window === "undefined" || !("serviceWorker" in navigator)) return;
+
+    const handleSwMessage = (event: MessageEvent) => {
+      if (event.data?.type === "CABLECAST_PUSH_RECEIVED") {
+        const p = event.data.payload;
+        if (!p) return;
+        const targetUrl = p.data?.url || "/";
+        const poster =
+          p.icon && !p.icon.includes("icon-192") && !p.icon.includes("icon-maskable")
+            ? p.icon
+            : undefined;
+
+        toast.broadcast({
+          title: p.title || "Live Broadcast Alert",
+          message: p.body,
+          posterUrl: poster,
+          badgeText: "Live Alert",
+          actionLabel: "▶ Tune In",
+          onAction: () => {
+            if (targetUrl.includes("broadcast") || targetUrl.includes("#schedule")) {
+              setIsBroadcastStudioOpen(true);
+            } else if (targetUrl.includes("library")) {
+              setIsLibraryOpen(true);
+            }
+          },
+          duration: 8000,
+        });
+      }
+    };
+
+    navigator.serviceWorker.addEventListener("message", handleSwMessage);
+    return () => {
+      navigator.serviceWorker.removeEventListener("message", handleSwMessage);
+    };
+  }, [toast]);
+
+  // In-app 10-minute lookahead broadcast alert for active viewers
+  const alertedSlotIdsRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!personalBroadcast.schedule || personalBroadcast.schedule.length === 0) return;
+
+    const currentMinutes = now.getHours() * 60 + now.getMinutes();
+    const currentDay = now.getDay();
+    const todayIsoDate = now.toISOString().slice(0, 10);
+
+    for (const slot of personalBroadcast.schedule) {
+      const isToday = slot.dayOfWeek === currentDay;
+      const isStartingSoon =
+        isToday &&
+        slot.blockStartMinutes >= currentMinutes + 5 &&
+        slot.blockStartMinutes <= currentMinutes + 15;
+
+      if (isStartingSoon) {
+        const alertKey = `${slot.id}_${todayIsoDate}`;
+        if (!alertedSlotIdsRef.current.has(alertKey)) {
+          alertedSlotIdsRef.current.add(alertKey);
+          const epDetails = slot.mediaType === "tv" ? ` (S${slot.currentSeason}:E${slot.currentEpisode})` : "";
+          const posterUrl = slot.posterPath
+            ? slot.posterPath.startsWith("http")
+              ? slot.posterPath
+              : `https://image.tmdb.org/t/p/w500${slot.posterPath.startsWith("/") ? slot.posterPath : `/${slot.posterPath}`}`
+            : undefined;
+
+          toast.broadcast({
+            title: "Starting Soon on Cablecast",
+            message: `"${slot.title}"${epDetails} starts in 10 minutes on your channel!`,
+            posterUrl,
+            badgeText: "Starting Soon",
+            actionLabel: "▶ View Lineup",
+            onAction: () => {
+              setIsBroadcastStudioOpen(true);
+            },
+            duration: 8500,
+          });
+        }
+      }
+    }
+  }, [personalBroadcast.schedule, now, toast]);
 
   const liveNow = useMemo(
     () => schedule.find((item) => isBroadcastLiveNow(item, now)) ?? null,
