@@ -1,7 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { sendPushNotification } from "./webpush";
 import type { PushNotificationPayload } from "./webpush";
-import { getBroadcastSlotStatus } from "@/lib/mediaOwnership";
 
 export interface DispatchSummary {
   startingSoon: number;
@@ -21,8 +20,24 @@ async function sendToUserSubscriptions(
 ): Promise<{ sent: number; failed: number; cleaned: number }> {
   let subscriptions: any[] = [];
   try {
+    const userKeys = [userId];
+    let session: any = null;
+    try {
+      session = await prisma.session?.findFirst({
+        where: {
+          OR: [{ id: userId }, { accessCodeId: userId }],
+        },
+      });
+    } catch {
+      session = null;
+    }
+    if (session) {
+      if (session.id && !userKeys.includes(session.id)) userKeys.push(session.id);
+      if (session.accessCodeId && !userKeys.includes(session.accessCodeId)) userKeys.push(session.accessCodeId);
+    }
+
     subscriptions = (await prisma.pushSubscription.findMany({
-      where: { userId },
+      where: { userId: { in: userKeys } },
     })) || [];
   } catch {
     subscriptions = [];
@@ -88,8 +103,8 @@ export function isSlotStartingSoon(
     const currentMinutes = now.getHours() * 60 + now.getMinutes();
     const isStarting =
       slot.dayOfWeek === currentDay &&
-      slot.blockStartMinutes >= currentMinutes + 5 &&
-      slot.blockStartMinutes <= currentMinutes + 15;
+      slot.blockStartMinutes >= currentMinutes - 2 &&
+      slot.blockStartMinutes <= currentMinutes + 20;
 
     return { isStartingSoon: isStarting, localIsoDate: now.toISOString().slice(0, 10) };
   }
@@ -109,8 +124,8 @@ export function isSlotStartingSoon(
     return { isStartingSoon: false, localIsoDate };
   }
 
-  const targetMinStart = localMinutes + 5;
-  const targetMinEnd = localMinutes + 15;
+  const targetMinStart = localMinutes - 2;
+  const targetMinEnd = localMinutes + 20;
 
   const isStartingSoon =
     slot.blockStartMinutes >= targetMinStart && slot.blockStartMinutes <= targetMinEnd;
@@ -141,13 +156,13 @@ export function getNotificationImages(
 
 /**
  * Dispatches "Starting Soon" alerts (10 minutes before broadcast).
- * Lookahead window: slots starting between now + 5 mins and now + 15 mins in the user's local timezone.
+ * Lookahead window: slots starting between now - 2 mins and now + 20 mins in the user's local timezone.
  */
 export async function dispatchStartingSoonAlerts(now: Date = new Date()): Promise<{ count: number; failed: number; cleaned: number }> {
   const currentMinutes = now.getHours() * 60 + now.getMinutes();
   const currentDay = now.getDay();
-  const targetMinStart = currentMinutes + 5;
-  const targetMinEnd = currentMinutes + 15;
+  const targetMinStart = currentMinutes - 2;
+  const targetMinEnd = currentMinutes + 20;
 
   // Find upcoming slots. The query matches slots starting soon according to server time OR timezone-aware slots.
   const upcomingSlots =
@@ -190,17 +205,31 @@ export async function dispatchStartingSoonAlerts(now: Date = new Date()): Promis
     });
     if (alreadyLogged) continue;
 
-    // 2. Rental expiration check
+    // 2. Rental expiration check: only skip if user held a rental for this item that explicitly expired
     const slotAirDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     slotAirDate.setHours(Math.floor(slot.blockStartMinutes / 60), slot.blockStartMinutes % 60, 0, 0);
 
-    const slotStatus = await getBroadcastSlotStatus(
-      slot.sessionId,
-      slot.tmdbId,
-      slot.mediaType === "tv" ? slot.currentSeason : 0,
-      slotAirDate,
-    );
-    if (slotStatus === "RETURNED_EXPIRED") continue;
+    const latestRental = await prisma.rental.findFirst({
+      where: {
+        userId: slot.sessionId,
+        mediaId: slot.tmdbId,
+        ...(slot.mediaType === "tv" && slot.currentSeason ? { seasonNumber: slot.currentSeason } : {}),
+      },
+      orderBy: { expiresAt: "desc" },
+    });
+
+    if (latestRental && slotAirDate.getTime() > latestRental.expiresAt.getTime()) {
+      const owned = await prisma.libraryItem.findFirst({
+        where: {
+          userId: slot.sessionId,
+          mediaId: slot.tmdbId,
+          ...(slot.mediaType === "tv" && slot.currentSeason ? { seasonNumber: slot.currentSeason } : {}),
+        },
+      });
+      if (!owned) {
+        continue; // Rental expired and not owned
+      }
+    }
 
     // 3. Dispatch push notification
     const epDetails = slot.mediaType === "tv" ? ` (S${slot.currentSeason}:E${slot.currentEpisode})` : "";

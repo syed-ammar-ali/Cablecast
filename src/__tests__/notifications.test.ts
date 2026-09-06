@@ -15,6 +15,9 @@ vi.mock("@/lib/prisma", () => ({
       findMany: vi.fn(),
       delete: vi.fn(),
     },
+    session: {
+      findFirst: vi.fn(),
+    },
     userPersonalSchedule: {
       findMany: vi.fn(),
       findFirst: vi.fn(),
@@ -24,6 +27,7 @@ vi.mock("@/lib/prisma", () => ({
     },
     rental: {
       findMany: vi.fn(),
+      findFirst: vi.fn(),
     },
     libraryItem: {
       findFirst: vi.fn(),
@@ -42,6 +46,8 @@ vi.mock("@/lib/mediaOwnership", () => ({
 describe("Notification Dispatcher Suite", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(prisma.session.findFirst).mockResolvedValue(null);
+    vi.mocked(prisma.rental.findFirst).mockResolvedValue(null);
   });
 
   describe("dispatchStartingSoonAlerts", () => {

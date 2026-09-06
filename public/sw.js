@@ -1,5 +1,5 @@
 // Cablecast Progressive Web App Service Worker
-const CACHE_NAME = "cablecast-v5";
+const CACHE_NAME = "cablecast-v6";
 const STATIC_ASSETS = [
   "/",
   "/manifest.json",
@@ -125,29 +125,8 @@ self.addEventListener("push", (event) => {
     options.actions = payload.actions;
   }
 
-  // 1. Broadcast to any open in-app clients so the active app can display a rich TV alert banner
-  const broadcastPromise = self.clients
-    .matchAll({ type: "window", includeUncontrolled: true })
-    .then((clients) => {
-      for (const client of clients) {
-        client.postMessage({
-          type: "CABLECAST_PUSH_RECEIVED",
-          payload: {
-            title,
-            body: options.body,
-            icon: options.icon,
-            data: options.data,
-            tag: options.tag,
-          },
-        });
-      }
-    })
-    .catch(() => {});
-
-  // 2. Display the sleek system push notification
-  const notificationPromise = self.registration.showNotification(title, options);
-
-  event.waitUntil(Promise.all([broadcastPromise, notificationPromise]));
+  // Display the sleek system push notification
+  event.waitUntil(self.registration.showNotification(title, options));
 });
 
 // Notification click event — deep-link to target page or handle action buttons
