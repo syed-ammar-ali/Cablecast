@@ -63,14 +63,24 @@ const INITIAL_FILTERS: FilterState = {
   language: null,
 };
 
-export function ExploreView() {
+export interface ExploreViewProps {
+  isOpen?: boolean;
+  onClose?: () => void;
+  initialQuery?: string;
+}
+
+export function ExploreView({
+  isOpen = true,
+  onClose,
+  initialQuery = "",
+}: ExploreViewProps = {}) {
   const router = useRouter();
   const library = useLibrary();
   const personalBroadcast = usePersonalBroadcast();
 
   // Search & Filter state
-  const [query, setQuery] = useState("");
-  const [debouncedQuery, setDebouncedQuery] = useState("");
+  const [query, setQuery] = useState(initialQuery);
+  const [debouncedQuery, setDebouncedQuery] = useState(initialQuery);
   const [filters, setFilters] = useState<FilterState>(INITIAL_FILTERS);
   const [isMoreFiltersOpen, setIsMoreFiltersOpen] = useState(false);
   const [layoutMode, setLayoutMode] = useState<"shelf" | "grid">("shelf");
@@ -110,6 +120,19 @@ export function ExploreView() {
     season?: number;
     episode?: number;
   } | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onClose ? onClose() : router.push("/home");
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, onClose, router]);
+
+  if (!isOpen) return null;
 
   // Debounce search input
   useEffect(() => {
@@ -341,18 +364,35 @@ export function ExploreView() {
   const activeGenreLabel = GENRE_OPTIONS.find((g) => g.id === filters.genreId)?.name;
 
   return (
-    <main className="min-h-screen bg-black text-neutral-100 pb-20 sm:pb-12">
+    <main
+      className={
+        onClose
+          ? "fixed inset-0 z-50 overflow-y-auto bg-black text-neutral-100 pb-20 sm:pb-12 animate-in fade-in"
+          : "min-h-screen bg-black text-neutral-100 pb-20 sm:pb-12"
+      }
+    >
       {/* ── Top Fixed Navigation & Search Bar ──────────────────────────────── */}
       <header className="sticky top-0 z-40 border-b border-neutral-900 bg-neutral-950/90 backdrop-blur-xl px-4 py-3 sm:px-6">
         <div className="mx-auto flex max-w-7xl items-center gap-3">
-          {/* Back to Home */}
-          <Link
-            href="/home"
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-neutral-800 bg-neutral-900/80 text-neutral-400 hover:border-neutral-700 hover:text-white transition-all active:scale-95"
-            title="Back to Broadcast TV"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </Link>
+          {/* Back to Home / Dismiss */}
+          {onClose ? (
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-neutral-800 bg-neutral-900/80 text-neutral-400 hover:border-neutral-700 hover:text-white transition-all active:scale-95 cursor-pointer"
+              title="Back to Broadcast TV"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </button>
+          ) : (
+            <Link
+              href="/home"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-neutral-800 bg-neutral-900/80 text-neutral-400 hover:border-neutral-700 hover:text-white transition-all active:scale-95"
+              title="Back to Broadcast TV"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Link>
+          )}
 
           {/* Search Input */}
           <div className="relative flex-1">

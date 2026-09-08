@@ -244,10 +244,48 @@ export async function GET() {
       orderBy: { createdAt: "desc" },
     });
 
-    const liveNow = schedule.find((item) => item.isLiveNow) ?? null;
+    // Fetch any date-specific calendar entries scheduled for today
+    const calendarEntries = await prisma.calendarEntry.findMany({
+      where: {
+        sessionId: { in: userKeys },
+        scheduledDate: todayIsoDate,
+      },
+    });
+
+    const calendarItems: PersonalScheduleItem[] = calendarEntries.map((c) => {
+      const liveState = computeLiveState(todayDayOfWeek, c.blockStartMinutes, c.blockCount, now);
+      return {
+        id: `cal-${c.id}`,
+        sessionId: c.sessionId,
+        tmdbId: c.tmdbId,
+        mediaType: c.mediaType as MediaType,
+        title: `${c.title} (Special Screening)`,
+        posterPath: c.posterPath,
+        backdropUrl: c.backdropUrl,
+        runtimeMinutes: c.runtimeMinutes,
+        dayOfWeek: todayDayOfWeek,
+        dayName: DAYS_OF_WEEK.find((d) => d.day === todayDayOfWeek)?.name || "Today",
+        blockStartMinutes: c.blockStartMinutes,
+        blockCount: c.blockCount,
+        timeLabel: formatBlockTime(c.blockStartMinutes),
+        currentSeason: c.startSeason ?? 1,
+        currentEpisode: c.startEpisode ?? 1,
+        totalEpisodes: 1,
+        wasWatched: false,
+        isRerun: false,
+        isLiveNow: liveState.isLiveNow,
+        liveOffsetSeconds: liveState.liveOffsetSeconds,
+        slotStatus: undefined,
+        createdAt: c.createdAt.toISOString(),
+        updatedAt: (c.updatedAt ?? c.createdAt).toISOString(),
+      };
+    });
+
+    const combinedSchedule = [...schedule, ...calendarItems];
+    const liveNow = combinedSchedule.find((item) => item.isLiveNow) ?? null;
 
     return NextResponse.json({
-      schedule,
+      schedule: combinedSchedule,
       missed: missed.map((m) => ({
         ...m,
         mediaType: m.mediaType as MediaType,

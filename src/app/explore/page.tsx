@@ -1,5 +1,5 @@
 import { Metadata } from "next";
-import { ExploreView } from "@/components/explore/ExploreView";
+import { CablecastApp } from "@/components/home/CablecastApp";
 
 export const metadata: Metadata = {
   title: "Explore & Discover Catalog | Cablecast Retro TV",
@@ -8,5 +8,5 @@ export const metadata: Metadata = {
 };
 
 export default function ExplorePage() {
-  return <ExploreView />;
+  return <CablecastApp initialView="explore" />;
 }

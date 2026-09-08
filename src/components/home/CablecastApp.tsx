@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { MediaCard } from "@/components/search/MediaCard";
-import { MobileSearchOverlay } from "@/components/search/MobileSearchOverlay";
 import { AppHeader } from "@/components/home/AppHeader";
 import { HeroBanner } from "@/components/home/HeroBanner";
 import type { EpisodeSelection } from "@/components/media/MediaDetailsModal";
@@ -49,6 +48,10 @@ const ScheduleBroadcastModal = dynamic(
 );
 const ChannelRemote = dynamic(
   () => import("@/components/remote/ChannelRemote").then((mod) => mod.ChannelRemote),
+  { ssr: false }
+);
+const ExploreView = dynamic(
+  () => import("@/components/explore/ExploreView").then((mod) => mod.ExploreView),
   { ssr: false }
 );
 
@@ -104,7 +107,7 @@ export function CablecastApp({ initialView = "home" }: CablecastAppProps) {
   // Search / Explore states
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
-  const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(initialView === "explore");
+  const [isExploreOpen, setIsExploreOpen] = useState(initialView === "explore");
   const [results, setResults] = useState<MediaSearchResult[]>([]);
   const [isSearchLoading, setIsSearchLoading] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
@@ -131,11 +134,6 @@ export function CablecastApp({ initialView = "home" }: CablecastAppProps) {
   // URL Navigation & View State Manager
   const navigateTo = useCallback(
     (view: AppView, push = true) => {
-      if (view === "explore") {
-        router.push("/explore");
-        return;
-      }
-
       const targetPath = `/${view}`;
       if (push && typeof window !== "undefined" && window.location.pathname !== targetPath) {
         window.history.pushState({ view }, "", targetPath);
@@ -143,17 +141,21 @@ export function CablecastApp({ initialView = "home" }: CablecastAppProps) {
 
       if (view === "broadcast") {
         setIsBroadcastStudioOpen(true);
-        setIsMobileSearchOpen(false);
+        setIsExploreOpen(false);
         setIsLibraryOpen(false);
       } else if (view === "library") {
         setIsLibraryOpen(true);
         setIsBroadcastStudioOpen(false);
-        setIsMobileSearchOpen(false);
+        setIsExploreOpen(false);
+      } else if (view === "explore") {
+        setIsExploreOpen(true);
+        setIsBroadcastStudioOpen(false);
+        setIsLibraryOpen(false);
       } else {
         // "home"
         setIsBroadcastStudioOpen(false);
         setIsLibraryOpen(false);
-        setIsMobileSearchOpen(false);
+        setIsExploreOpen(false);
         setQuery("");
         setDebouncedQuery("");
         setResults([]);
@@ -247,9 +249,6 @@ export function CablecastApp({ initialView = "home" }: CablecastAppProps) {
     const timer = setTimeout(() => {
       const trimmed = query.trim();
       setDebouncedQuery(trimmed);
-      if (trimmed && typeof window !== "undefined" && window.location.pathname === "/home") {
-        window.history.pushState({ view: "explore" }, "", "/explore");
-      }
     }, SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(timer);
   }, [query]);
@@ -298,7 +297,7 @@ export function CablecastApp({ initialView = "home" }: CablecastAppProps) {
   const handleSearchCardClick = (media: MediaSearchResult) => {
     setIsLibraryOpen(false);
     setIsBroadcastStudioOpen(false);
-    setIsMobileSearchOpen(false);
+    setIsExploreOpen(false);
     setDetailsTarget(null);
     setSchedulingTarget(null);
     setSelectedMedia({
@@ -312,7 +311,7 @@ export function CablecastApp({ initialView = "home" }: CablecastAppProps) {
   const handleHeroRent = useCallback((media: MediaSearchResult) => {
     setIsLibraryOpen(false);
     setIsBroadcastStudioOpen(false);
-    setIsMobileSearchOpen(false);
+    setIsExploreOpen(false);
     setDetailsTarget(null);
     setSchedulingTarget(null);
     setSelectedMedia({
@@ -328,7 +327,7 @@ export function CablecastApp({ initialView = "home" }: CablecastAppProps) {
     async (media: MediaSearchResult) => {
       setIsLibraryOpen(false);
       setIsBroadcastStudioOpen(false);
-      setIsMobileSearchOpen(false);
+      setIsExploreOpen(false);
       setDetailsTarget(null);
       setSchedulingTarget(null);
       // If already owned, open VHS sleeve to view owned tape
@@ -411,7 +410,7 @@ export function CablecastApp({ initialView = "home" }: CablecastAppProps) {
           onOpenLibrary={() => navigateTo("library")}
           onOpenBroadcastStudio={() => navigateTo("broadcast")}
           missedBroadcastCount={personalBroadcast.missed.length}
-          isMobileSearchOpen={isMobileSearchOpen}
+          isMobileSearchOpen={isExploreOpen}
           onCloseMobileSearch={() => navigateTo("home")}
           onHomeClick={handleHomeClick}
           onAuthLoaded={(role) => setIsAdmin(role === "admin")}
@@ -603,23 +602,14 @@ export function CablecastApp({ initialView = "home" }: CablecastAppProps) {
         />
       )}
 
-      {/* Dedicated Full-Screen Mobile Search Overlay */}
-      <MobileSearchOverlay
-        isOpen={isMobileSearchOpen}
-        query={query}
-        onQueryChange={setQuery}
-        debouncedQuery={debouncedQuery}
-        results={results}
-        isLoading={isSearchLoading}
-        error={searchError}
-        onClose={() => navigateTo("home")}
-        onSelectMedia={(media) => {
-          navigateTo("home");
-          handleSearchCardClick(media);
-        }}
-        isFavorite={library.isFavorite}
-        onToggleFavorite={library.toggleFavorite}
-      />
+      {/* Dedicated Rich Explore & Discover Catalog Overlay */}
+      {isExploreOpen && (
+        <ExploreView
+          isOpen={isExploreOpen}
+          onClose={() => navigateTo("home")}
+          initialQuery={query}
+        />
+      )}
 
       {/* 3D VHS Inspection Modal */}
       {selectedMedia && (
@@ -643,7 +633,7 @@ export function CablecastApp({ initialView = "home" }: CablecastAppProps) {
         !isModalOpen &&
         !isLibraryOpen &&
         !isBroadcastStudioOpen &&
-        !isMobileSearchOpen &&
+        !isExploreOpen &&
         !schedulingTarget && (
           <ChannelRemote
             onTuneIn={(media, startOffsetSeconds) =>
@@ -662,7 +652,7 @@ export function CablecastApp({ initialView = "home" }: CablecastAppProps) {
         onOpenBroadcastStudio={() => navigateTo("broadcast")}
         onOpenLibrary={() => navigateTo("library")}
         onToggleSearch={() => {
-          if (isMobileSearchOpen) {
+          if (isExploreOpen) {
             navigateTo("home");
           } else {
             navigateTo("explore");
@@ -671,7 +661,7 @@ export function CablecastApp({ initialView = "home" }: CablecastAppProps) {
         missedBroadcastCount={personalBroadcast.missed.length}
         isBroadcastStudioOpen={isBroadcastStudioOpen}
         isLibraryOpen={isLibraryOpen}
-        isSearchActive={isMobileSearchOpen}
+        isSearchActive={isExploreOpen}
       />
 
       {/* First-time visitor push notification prompt */}

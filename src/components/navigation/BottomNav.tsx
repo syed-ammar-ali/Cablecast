@@ -119,10 +119,11 @@ export function BottomNav({
         </button>
 
         {/* 4. Explore */}
-        <Link
-          href="/explore"
+        <button
+          type="button"
+          onClick={onToggleSearch}
           className={`group flex flex-col items-center justify-center py-1 transition-all duration-150 active:scale-95 ${
-            pathname === "/explore" || isSearchActive
+            isSearchActive
               ? "text-cyan-400 font-semibold"
               : "text-neutral-400 hover:text-cyan-400"
           }`}
@@ -134,7 +135,7 @@ export function BottomNav({
           <span className="mt-1 text-[10px] font-medium uppercase tracking-wider">
             Explore
           </span>
-        </Link>
+        </button>
       </div>
     </nav>
   );
