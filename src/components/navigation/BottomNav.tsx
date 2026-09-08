@@ -118,24 +118,23 @@ export function BottomNav({
           </span>
         </button>
 
-        {/* 4. Search */}
-        <button
-          type="button"
-          onClick={onToggleSearch}
+        {/* 4. Explore */}
+        <Link
+          href="/explore"
           className={`group flex flex-col items-center justify-center py-1 transition-all duration-150 active:scale-95 ${
-            isSearchActive
+            pathname === "/explore" || isSearchActive
               ? "text-cyan-400 font-semibold"
               : "text-neutral-400 hover:text-cyan-400"
           }`}
-          title="Search Movies & TV Shows"
+          title="Explore Movies, TV Shows & Specials"
         >
           <div className="relative flex items-center justify-center">
             <Search className="h-5 w-5 transition-transform group-hover:scale-110 group-active:scale-95" />
           </div>
           <span className="mt-1 text-[10px] font-medium uppercase tracking-wider">
-            Search
+            Explore
           </span>
-        </button>
+        </Link>
       </div>
     </nav>
   );

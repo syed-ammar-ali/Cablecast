@@ -5,11 +5,14 @@ import {
   AlertTriangle,
   ArrowLeft,
   Calendar,
+  CalendarDays,
   Check,
   CheckCircle2,
   Clock,
   Edit2,
+  Film,
   Layers,
+  Loader2,
   Moon,
   Play,
   Radio,
@@ -20,11 +23,14 @@ import {
   Bell,
   BellOff,
   Tv,
+  Share2,
   X,
 } from "lucide-react";
+import { ChannelShareModal } from "@/components/social/ChannelShareHub";
 import { BroadcastSlotCard } from "./BroadcastSlotCard";
 import { usePushNotifications } from "@/lib/usePushNotifications";
 import type {
+  CalendarEntry,
   MissedBroadcastItem,
   PersonalScheduleItem,
   SeasonCompletedAlertItem,
@@ -44,7 +50,7 @@ interface PersonalBroadcastModalProps {
   missed: MissedBroadcastItem[];
   seasonAlerts?: SeasonCompletedAlertItem[];
   channelName?: string;
-  initialTab?: "grid" | "lineup" | "missed";
+  initialTab?: "grid" | "lineup" | "missed" | "calendar";
   targetMissedId?: string | null;
   onUpdateChannelName?: (name: string) => void;
   onDismissSeasonAlert?: (alertId: string) => void;
@@ -68,7 +74,7 @@ interface PersonalBroadcastModalProps {
   }) => void;
 }
 
-type TabKey = "grid" | "lineup" | "missed";
+type TabKey = "grid" | "lineup" | "missed" | "calendar";
 
 const HALF_DAY_SLOTS = [
   { hour12: 12, minute: 0, label: "12:00" },
@@ -174,11 +180,46 @@ export function PersonalBroadcastModal({
   } = usePushNotifications();
 
   const [isTestingAlert, setIsTestingAlert] = useState(false);
+  const [calendarEntries, setCalendarEntries] = useState<CalendarEntry[]>([]);
+  const [isCalendarLoading, setIsCalendarLoading] = useState(false);
+
+  const fetchCalendarEntries = useCallback(async () => {
+    setIsCalendarLoading(true);
+    try {
+      const res = await fetch("/api/calendar");
+      if (res.ok) {
+        const data = await res.json();
+        setCalendarEntries(data.entries || []);
+      }
+    } catch {
+      // ignore
+    } finally {
+      setIsCalendarLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchCalendarEntries();
+    }
+  }, [isOpen, fetchCalendarEntries]);
+
+  const handleDeleteCalendarEntry = async (id: string) => {
+    try {
+      const res = await fetch(`/api/calendar?id=${id}`, { method: "DELETE" });
+      if (res.ok) {
+        setCalendarEntries((prev) => prev.filter((e) => e.id !== id));
+      }
+    } catch {
+      // ignore
+    }
+  };
   const [alertFeedback, setAlertFeedback] = useState<string | null>(null);
 
   // Channel name inline editing
   const [isEditingName, setIsEditingName] = useState(false);
   const [tempName, setTempName] = useState(channelName);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
 
   useEffect(() => {
     if (initialTab) {
@@ -395,6 +436,16 @@ export function PersonalBroadcastModal({
                   <Edit2 className="h-3 w-3 text-neutral-500 group-hover:text-purple-400 shrink-0" />
                 </button>
               )}
+
+              <button
+                type="button"
+                onClick={() => setIsShareModalOpen(true)}
+                className="flex items-center gap-1.5 rounded-md border border-neutral-800 bg-neutral-900/60 px-2.5 py-1 text-[11px] sm:text-xs font-semibold text-cyan-300 hover:border-cyan-500/50 hover:bg-cyan-950/20 hover:text-white transition-all cursor-pointer shadow-sm shrink-0"
+                title="Share your channel lineup via link"
+              >
+                <Share2 className="h-3 w-3" />
+                <span className="hidden sm:inline">Share</span>
+              </button>
             </div>
           </div>
         </header>
@@ -545,6 +596,25 @@ export function PersonalBroadcastModal({
               {missed.length > 0 && (
                 <span className="inline-flex items-center rounded-full border border-red-700/50 bg-red-950/40 px-1.5 py-0.2 font-mono text-[10px] font-bold text-red-400">
                   {missed.length}
+                </span>
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab("calendar")}
+              className={`flex flex-1 sm:flex-initial justify-center items-center gap-1.5 sm:gap-2 whitespace-nowrap rounded-lg px-2.5 sm:px-4 py-2 text-[11px] sm:text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                activeTab === "calendar"
+                  ? "bg-neutral-800 text-white shadow-md ring-1 ring-neutral-700"
+                  : "text-neutral-400 hover:text-neutral-200"
+              }`}
+            >
+              <CalendarDays className={`h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0 ${activeTab === "calendar" ? "text-fuchsia-400" : "text-neutral-500"}`} />
+              <span className="hidden sm:inline">Calendar Planner</span>
+              <span className="sm:hidden">Calendar</span>
+              {calendarEntries.length > 0 && (
+                <span className="rounded-md border border-neutral-800 bg-neutral-900 px-1.5 py-0.2 font-mono text-[9px] sm:text-[10px] font-bold text-fuchsia-300">
+                  {calendarEntries.length}
                 </span>
               )}
             </button>
@@ -902,6 +972,137 @@ export function PersonalBroadcastModal({
               )}
             </div>
           )}
+
+          {/* Tab 4: Calendar Planner */}
+          {activeTab === "calendar" && (
+            <div key="calendar" className="space-y-6 animate-in fade-in duration-150">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-neutral-900 pb-3">
+                <div>
+                  <h3 className="text-sm font-bold uppercase tracking-wider text-white">
+                    Date-Specific Screenings
+                  </h3>
+                  <p className="text-xs text-neutral-400">
+                    One-time appointments scheduled for a specific calendar date, with automatic broadcast override.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={fetchCalendarEntries}
+                  className="self-start sm:self-auto rounded-lg border border-neutral-800 bg-neutral-900/60 px-2.5 py-1 text-xs text-neutral-400 hover:text-white hover:border-neutral-700 cursor-pointer"
+                >
+                  Refresh
+                </button>
+              </div>
+
+              {isCalendarLoading ? (
+                <div className="flex items-center justify-center py-16 text-neutral-500 gap-2">
+                  <Loader2 className="h-5 w-5 animate-spin text-fuchsia-400" />
+                  <span className="text-xs">Loading calendar entries...</span>
+                </div>
+              ) : calendarEntries.length === 0 ? (
+                <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-neutral-800/80 bg-neutral-950/40 p-8 sm:p-12 text-center text-neutral-600 min-h-[220px]">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-neutral-800 bg-neutral-900 text-fuchsia-400 mb-3 shadow">
+                    <CalendarDays className="h-6 w-6" />
+                  </div>
+                  <p className="text-sm font-bold text-neutral-300">
+                    No Date-Specific Screenings Scheduled
+                  </p>
+                  <p className="mt-1.5 max-w-sm text-xs text-neutral-500 leading-relaxed">
+                    Pick any movie, seasonal episode, or holiday special from Explore and schedule it to an exact calendar date.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {calendarEntries.map((entry) => {
+                    const poster = getSafePosterUrl(entry.posterPath, entry.backdropUrl);
+                    const timeRange = formatBlockTimeRange(entry.blockStartMinutes, entry.blockCount);
+
+                    return (
+                      <div
+                        key={entry.id}
+                        className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-xl border border-neutral-800/80 bg-neutral-900/40 p-3.5 transition-colors hover:border-neutral-700"
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="relative h-14 w-10 shrink-0 overflow-hidden rounded-md bg-neutral-800 border border-neutral-700/60">
+                            {poster ? (
+                              /* eslint-disable-next-line @next/next/no-img-element */
+                              <img src={poster} alt={entry.title} className="h-full w-full object-cover" />
+                            ) : (
+                              <div className="flex h-full w-full items-center justify-center">
+                                <Film className="h-4 w-4 text-neutral-600" />
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="space-y-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h4 className="text-sm font-bold text-white truncate">{entry.title}</h4>
+                              <span className="rounded bg-neutral-800 px-1.5 py-0.2 font-mono text-[9px] font-bold uppercase text-neutral-300">
+                                {entry.mediaType === "tv"
+                                  ? `S${entry.startSeason ?? 1}:E${entry.startEpisode ?? 1}`
+                                  : "Movie"}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center gap-2 font-mono text-xs text-neutral-400">
+                              <span className="text-fuchsia-300 font-bold">{entry.scheduledDate}</span>
+                              <span>·</span>
+                              <span>{timeRange}</span>
+                              <span>({entry.blockCount * 30}m)</span>
+                            </div>
+
+                            {entry.conflictWarning && (
+                              <div className="flex items-center gap-1.5 text-[11px] text-amber-300">
+                                <AlertTriangle className="h-3 w-3 shrink-0 text-amber-400" />
+                                <span className="truncate">{entry.conflictWarning}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              onPlay({
+                                media: {
+                                  tmdbId: entry.tmdbId,
+                                  mediaType: entry.mediaType,
+                                  title: entry.title,
+                                  releaseYear: entry.scheduledDate.slice(0, 4),
+                                  posterPath: entry.posterPath ?? null,
+                                  posterUrl: poster,
+                                  backdropUrl: entry.backdropUrl ?? null,
+                                  overview: "",
+                                  voteAverage: 0,
+                                },
+                                season: entry.startSeason ?? undefined,
+                                episode: entry.startEpisode ?? undefined,
+                              });
+                              onClose();
+                            }}
+                            className="flex items-center gap-1.5 rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-1.5 text-xs font-semibold text-neutral-200 hover:border-neutral-500 hover:text-white transition-colors cursor-pointer"
+                          >
+                            <Play className="h-3.5 w-3.5 fill-current" />
+                            <span>Watch</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteCalendarEntry(entry.id)}
+                            className="flex items-center gap-1 rounded-lg border border-neutral-800 p-2 text-neutral-500 hover:border-red-500/50 hover:text-red-400 transition-colors cursor-pointer"
+                            title="Remove from calendar"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Reschedule Rerun Modal */}
@@ -913,6 +1114,14 @@ export function PersonalBroadcastModal({
             onReschedule={onRescheduleMissed}
           />
         )}
+
+        {/* Channel Share Modal */}
+        <ChannelShareModal
+          isOpen={isShareModalOpen}
+          onClose={() => setIsShareModalOpen(false)}
+          channelName={channelName}
+          itemCount={schedule.length}
+        />
 
       </div>
     </div>

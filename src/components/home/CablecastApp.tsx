@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { MediaCard } from "@/components/search/MediaCard";
 import { MobileSearchOverlay } from "@/components/search/MobileSearchOverlay";
@@ -84,7 +85,7 @@ export function CablecastApp({ initialView = "home" }: CablecastAppProps) {
   // Personalized Broadcast Schedule state
   const personalBroadcast = usePersonalBroadcast();
   const [isBroadcastStudioOpen, setIsBroadcastStudioOpen] = useState(initialView === "broadcast");
-  const [broadcastInitialTab, setBroadcastInitialTab] = useState<"grid" | "lineup" | "missed" | undefined>(undefined);
+  const [broadcastInitialTab, setBroadcastInitialTab] = useState<"grid" | "lineup" | "missed" | "calendar" | undefined>(undefined);
   const [broadcastTargetMissedId, setBroadcastTargetMissedId] = useState<string | null>(null);
   const [schedulingTarget, setSchedulingTarget] = useState<{
     media: MediaSearchResult;
@@ -125,19 +126,22 @@ export function CablecastApp({ initialView = "home" }: CablecastAppProps) {
     onSelectDirectBroadcast: setDirectBroadcastTarget,
   });
 
+  const router = useRouter();
+
   // URL Navigation & View State Manager
   const navigateTo = useCallback(
     (view: AppView, push = true) => {
+      if (view === "explore") {
+        router.push("/explore");
+        return;
+      }
+
       const targetPath = `/${view}`;
       if (push && typeof window !== "undefined" && window.location.pathname !== targetPath) {
         window.history.pushState({ view }, "", targetPath);
       }
 
-      if (view === "explore") {
-        setIsMobileSearchOpen(true);
-        setIsBroadcastStudioOpen(false);
-        setIsLibraryOpen(false);
-      } else if (view === "broadcast") {
+      if (view === "broadcast") {
         setIsBroadcastStudioOpen(true);
         setIsMobileSearchOpen(false);
         setIsLibraryOpen(false);
@@ -194,10 +198,10 @@ export function CablecastApp({ initialView = "home" }: CablecastAppProps) {
       const itemParam = url.searchParams.get("item") || url.searchParams.get("missedId");
       const focusParam = url.searchParams.get("focus");
 
-      if (url.pathname.includes("broadcast") || tabParam === "missed") {
+      if (url.pathname.includes("broadcast") || tabParam === "missed" || tabParam === "calendar") {
         setIsBroadcastStudioOpen(true);
-        if (tabParam === "missed" || tabParam === "lineup" || tabParam === "grid") {
-          setBroadcastInitialTab(tabParam as "grid" | "lineup" | "missed");
+        if (tabParam === "missed" || tabParam === "lineup" || tabParam === "grid" || tabParam === "calendar") {
+          setBroadcastInitialTab(tabParam as "grid" | "lineup" | "missed" | "calendar");
         }
         if (itemParam) {
           setBroadcastTargetMissedId(itemParam);

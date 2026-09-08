@@ -382,3 +382,38 @@ model NotificationLog {
   @@unique([userId, type, referenceId])
   @@index([userId, type])
 }
+
+/// Stores date-specific personal broadcast calendar entries that override regular weekly appointments
+model CalendarEntry {
+  id                String   @id @default(cuid())
+  sessionId         String
+  tmdbId            Int
+  mediaType         String   // "movie" | "tv"
+  title             String
+  posterPath        String?
+  backdropUrl       String?
+  runtimeMinutes    Int?
+  scheduledDate     String   // "YYYY-MM-DD" — the specific calendar date
+  blockStartMinutes Int      // time slot (same 30-min grid: 0 to 1410)
+  blockCount        Int      @default(1)
+  startSeason       Int?     // TV only
+  startEpisode      Int?     // TV only
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([sessionId, scheduledDate])
+}
+
+/// Stores shareable snapshot links for personal channel lineups
+model ChannelShareLink {
+  id              String    @id @default(cuid())
+  token           String    @unique
+  ownerSessionId  String
+  channelSnapshot Json      // snapshot of channel list at time of sharing
+  expiresAt       DateTime
+  usedAt          DateTime?
+  createdAt       DateTime  @default(now())
+
+  @@index([token])
+  @@index([ownerSessionId])
+}

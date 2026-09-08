@@ -124,3 +124,36 @@ export function personalScheduleToMediaSearchResult(
     voteAverage: 0,
   };
 }
+
+export interface CalendarEntry {
+  id: string;
+  sessionId: string;
+  tmdbId: number;
+  mediaType: MediaType;
+  title: string;
+  posterPath?: string | null;
+  backdropUrl?: string | null;
+  runtimeMinutes?: number | null;
+  scheduledDate: string; // "YYYY-MM-DD"
+  blockStartMinutes: number; // 0 - 1410
+  blockCount: number;
+  startSeason?: number | null;
+  startEpisode?: number | null;
+  createdAt: string;
+  updatedAt?: string;
+  conflictWarning?: string | null;
+}
+
+export interface CreateCalendarEntryInput {
+  tmdbId: number;
+  mediaType: MediaType;
+  title: string;
+  posterPath?: string | null;
+  backdropUrl?: string | null;
+  runtimeMinutes?: number | null;
+  scheduledDate: string; // "YYYY-MM-DD"
+  blockStartMinutes: number; // 0 - 1410
+  startSeason?: number;
+  startEpisode?: number;
+}
+

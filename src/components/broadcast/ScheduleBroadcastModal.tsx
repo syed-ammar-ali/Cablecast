@@ -189,6 +189,12 @@ export function ScheduleBroadcastModal({
   const [selectedDays, setSelectedDays] = useState<number[]>([now.getDay()]);
   const [meridiem, setMeridiem] = useState<"AM" | "PM">("PM");
   const [selectedSlotIndex, setSelectedSlotIndex] = useState<number>(18);
+  const [startSeason, setStartSeason] = useState<number>(initialSeason || 1);
+  const [startEpisode, setStartEpisode] = useState<number>(1);
+
+  useEffect(() => {
+    if (initialSeason) setStartSeason(initialSeason);
+  }, [initialSeason]);
 
   const { isSupported: isPushSupported, isSubscribed, needsHomeScreenInstall, subscribe } =
     usePushNotifications();
@@ -534,8 +540,8 @@ export function ScheduleBroadcastModal({
       daysOfWeek: selectedDays,
       blockStartMinutes,
       timezoneOffset: new Date().getTimezoneOffset(),
-      startSeason: isTv ? initialSeason : undefined,
-      startEpisode: 1,
+      startSeason: isTv ? startSeason : undefined,
+      startEpisode: isTv ? startEpisode : undefined,
     });
 
     setIsSubmitting(false);
@@ -652,7 +658,7 @@ export function ScheduleBroadcastModal({
 
               <p className="text-xs text-neutral-400">
                 {isTv
-                  ? `Starting at Season ${initialSeason}, Episode 1`
+                  ? `Starting at Season ${startSeason}, Episode ${startEpisode}`
                   : `Feature Presentation · ${defaultRuntime} minutes (Single Screening)`}
               </p>
             </div>
@@ -876,6 +882,44 @@ export function ScheduleBroadcastModal({
                 </span>
               </div>
             </div>
+
+            {/* 3. Start From Episode Picker (TV series only) */}
+            {isTv && (
+              <div className="space-y-2 rounded-xl border border-neutral-800 bg-neutral-900/40 p-3.5">
+                <div className="flex items-center justify-between">
+                  <label className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-neutral-300 font-mono">
+                    <span>3. Start From</span>
+                  </label>
+                  <span className="font-mono text-xs font-bold text-cyan-300">
+                    Season {startSeason} · Episode {startEpisode}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-2.5 pt-1">
+                  <div className="flex items-center justify-between rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2">
+                    <span className="text-xs text-neutral-400 font-medium">Season</span>
+                    <input
+                      type="number"
+                      min="1"
+                      max="50"
+                      value={startSeason}
+                      onChange={(e) => setStartSeason(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                      className="w-16 bg-transparent text-right font-mono text-sm font-bold text-white focus:outline-none"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2">
+                    <span className="text-xs text-neutral-400 font-medium">Episode</span>
+                    <input
+                      type="number"
+                      min="1"
+                      max="100"
+                      value={startEpisode}
+                      onChange={(e) => setStartEpisode(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                      className="w-16 bg-transparent text-right font-mono text-sm font-bold text-white focus:outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Rental Duration Guardrail Alert (Only for rented items) */}
             {!isOwned && rentalExpirationConflict && (
