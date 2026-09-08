@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import type { Prisma } from "@prisma/client";
 import { getSession, getPersistentUserId } from "@/lib/auth/server";
 
 export async function GET(
@@ -70,9 +71,6 @@ export async function POST(
     }
 
     const userId = getPersistentUserId(session);
-    const userKeys = Array.from(new Set([userId, session.id, session.accessCodeId])).filter(
-      Boolean,
-    ) as string[];
 
     const { token } = await context.params;
     if (!token) {
@@ -97,8 +95,11 @@ export async function POST(
       );
     }
 
-    const snapshot = shareLink.channelSnapshot as any;
-    const channelName = (snapshot?.channelName as string)?.trim() || "Shared Lineup";
+    const snapshot = shareLink.channelSnapshot as {
+      channelName?: string;
+      items?: unknown[];
+    } | null;
+    const channelName = snapshot?.channelName?.trim() || "Shared Lineup";
     const items = snapshot?.items;
 
     if (!Array.isArray(items) || items.length === 0) {
@@ -121,11 +122,11 @@ export async function POST(
         channelName,
         shareToken: token,
         ownerSessionId: shareLink.ownerSessionId,
-        scheduleSnapshot: items,
+        scheduleSnapshot: items as unknown as Prisma.InputJsonValue,
       },
       update: {
         shareToken: token,
-        scheduleSnapshot: items,
+        scheduleSnapshot: items as unknown as Prisma.InputJsonValue,
         updatedAt: new Date(),
       },
     });

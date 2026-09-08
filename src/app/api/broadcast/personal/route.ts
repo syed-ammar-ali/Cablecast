@@ -288,18 +288,43 @@ export async function GET() {
       orderBy: { createdAt: "asc" },
     });
 
+    interface SnapshotScheduleItem {
+      tmdbId: number;
+      mediaType: string;
+      title: string;
+      posterPath?: string | null;
+      backdropUrl?: string | null;
+      runtimeMinutes?: number | null;
+      dayOfWeek: number;
+      blockStartMinutes: number;
+      blockCount?: number;
+      currentSeason?: number;
+      currentEpisode?: number;
+      totalEpisodes?: number | null;
+    }
+
     const subscribedChannels = subscribedChannelsData.map((subChan) => {
-      const rawItems = (subChan.scheduleSnapshot as any[]) || [];
-      const items: PersonalScheduleItem[] = rawItems.map((item: any, idx: number) => {
-        const liveState = computeLiveState(
-          Number(item.dayOfWeek),
-          Number(item.blockStartMinutes),
-          Number(item.blockCount || 1),
-          now,
-        );
+      let rawItems: SnapshotScheduleItem[] = [];
+      if (Array.isArray(subChan.scheduleSnapshot)) {
+        rawItems = subChan.scheduleSnapshot as unknown as SnapshotScheduleItem[];
+      } else if (
+        subChan.scheduleSnapshot &&
+        typeof subChan.scheduleSnapshot === "object" &&
+        "items" in subChan.scheduleSnapshot &&
+        Array.isArray((subChan.scheduleSnapshot as unknown as { items?: unknown }).items)
+      ) {
+        rawItems = (subChan.scheduleSnapshot as unknown as { items: SnapshotScheduleItem[] }).items;
+      }
+
+      const items: PersonalScheduleItem[] = rawItems.map((item, idx: number) => {
+        const dayOfWeek = Number(item.dayOfWeek);
+        const blockStartMinutes = Number(item.blockStartMinutes);
+        const blockCount = Number(item.blockCount || 1);
+        const liveState = computeLiveState(dayOfWeek, blockStartMinutes, blockCount, now);
         const dayName =
-          DAYS_OF_WEEK.find((d) => d.day === Number(item.dayOfWeek))?.name ??
-          `Day ${item.dayOfWeek}`;
+          DAYS_OF_WEEK.find((d) => d.day === dayOfWeek)?.name ??
+          `Day ${dayOfWeek}`;
+
         return {
           id: `sub-${subChan.id}-${idx}`,
           sessionId: subChan.subscriberSessionId,
@@ -309,11 +334,11 @@ export async function GET() {
           posterPath: item.posterPath || null,
           backdropUrl: item.backdropUrl || null,
           runtimeMinutes: item.runtimeMinutes ? Number(item.runtimeMinutes) : null,
-          dayOfWeek: Number(item.dayOfWeek),
+          dayOfWeek,
           dayName,
-          blockStartMinutes: Number(item.blockStartMinutes),
-          blockCount: Number(item.blockCount || 1),
-          timeLabel: formatBlockTime(Number(item.blockStartMinutes)),
+          blockStartMinutes,
+          blockCount,
+          timeLabel: formatBlockTime(blockStartMinutes),
           currentSeason: Number(item.currentSeason || 1),
           currentEpisode: Number(item.currentEpisode || 1),
           totalEpisodes: item.totalEpisodes ? Number(item.totalEpisodes) : null,
@@ -331,7 +356,7 @@ export async function GET() {
         subscriberSessionId: subChan.subscriberSessionId,
         channelName: subChan.channelName,
         channelColor: subChan.channelColor || "#06b6d4",
-        shareToken: subChan.shareToken,
+        shareToken: subChan.shareToken ?? undefined,
         items,
         createdAt: subChan.createdAt.toISOString(),
         updatedAt: subChan.updatedAt.toISOString(),

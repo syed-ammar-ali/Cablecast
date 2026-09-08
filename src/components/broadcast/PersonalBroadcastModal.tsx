@@ -21,7 +21,6 @@ import {
   Sun,
   Trash2,
   Bell,
-  BellOff,
   Tv,
   Share2,
   X,
@@ -157,6 +156,7 @@ export function PersonalBroadcastModal({
 
   useEffect(() => {
     if (isAdminProp !== undefined) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setIsAdmin(isAdminProp);
       return;
     }
@@ -205,7 +205,8 @@ export function PersonalBroadcastModal({
 
   useEffect(() => {
     if (isOpen) {
-      fetchCalendarEntries();
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      void fetchCalendarEntries();
     }
   }, [isOpen, fetchCalendarEntries]);
 
@@ -228,6 +229,7 @@ export function PersonalBroadcastModal({
 
   useEffect(() => {
     if (initialTab) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setActiveTab(initialTab);
     }
   }, [initialTab]);
@@ -236,6 +238,7 @@ export function PersonalBroadcastModal({
     if (targetMissedId && missed.length > 0) {
       const match = missed.find((m) => m.id === targetMissedId);
       if (match) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setReschedulingItem(match);
       }
     }

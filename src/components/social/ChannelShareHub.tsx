@@ -9,7 +9,6 @@ import {
   Check,
   Radio,
   Tv,
-  Calendar,
   Clock,
   AlertCircle,
   Loader2,
@@ -191,7 +190,18 @@ export function ChannelResolveView({ token }: ChannelResolveViewProps) {
   const [snapshot, setSnapshot] = useState<{
     channelName: string;
     sharedAt: string;
-    items: any[];
+    items: Array<{
+      tmdbId: number;
+      mediaType: string;
+      title: string;
+      dayOfWeek: number;
+      blockStartMinutes: number;
+      blockCount: number;
+      currentSeason?: number;
+      currentEpisode?: number;
+      posterPath?: string | null;
+      backdropUrl?: string | null;
+    }>;
   } | null>(null);
 
   const [isImporting, setIsImporting] = useState(false);

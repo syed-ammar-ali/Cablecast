@@ -45,6 +45,16 @@ function getInitialChannelName(): string {
   }
 }
 
+function getInitialSubscribedChannels(): SubscribedChannel[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(LOCAL_SUBSCRIBED_CHANNELS_KEY);
+    return raw ? (JSON.parse(raw) as SubscribedChannel[]) : [];
+  } catch {
+    return [];
+  }
+}
+
 function safeSetStorage<T>(key: string, value: T): void {
   if (typeof window === "undefined") return;
   try {
@@ -55,10 +65,10 @@ function safeSetStorage<T>(key: string, value: T): void {
 }
 
 export function usePersonalBroadcast() {
-  const [schedule, setSchedule] = useState<PersonalScheduleItem[]>([]);
-  const [missed, setMissed] = useState<MissedBroadcastItem[]>([]);
-  const [channelName, setChannelName] = useState<string>("My Lineup");
-  const [subscribedChannels, setSubscribedChannels] = useState<SubscribedChannel[]>([]);
+  const [schedule, setSchedule] = useState<PersonalScheduleItem[]>(getInitialSchedule);
+  const [missed, setMissed] = useState<MissedBroadcastItem[]>(getInitialMissed);
+  const [channelName, setChannelName] = useState<string>(getInitialChannelName);
+  const [subscribedChannels, setSubscribedChannels] = useState<SubscribedChannel[]>(getInitialSubscribedChannels);
   const [seasonAlerts, setSeasonAlerts] = useState<SeasonCompletedAlertItem[]>([]);
   const [liveNow, setLiveNow] = useState<PersonalScheduleItem | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -101,19 +111,6 @@ export function usePersonalBroadcast() {
 
   // Fetch once on mount, and re-fetch ONLY on mutation events or tab focus
   useEffect(() => {
-    // Hydrate local cache on client mount (prevents SSR hydration mismatches)
-    try {
-      const cachedSchedule = localStorage.getItem(LOCAL_SCHEDULE_KEY);
-      if (cachedSchedule) setSchedule(JSON.parse(cachedSchedule));
-      const cachedMissed = localStorage.getItem(LOCAL_MISSED_KEY);
-      if (cachedMissed) setMissed(JSON.parse(cachedMissed));
-      const cachedName = localStorage.getItem(LOCAL_CHANNEL_NAME_KEY);
-      if (cachedName) setChannelName(JSON.parse(cachedName));
-      const cachedSubs = localStorage.getItem(LOCAL_SUBSCRIBED_CHANNELS_KEY);
-      if (cachedSubs) setSubscribedChannels(JSON.parse(cachedSubs));
-    } catch {
-      // ignore
-    }
 
     const controller = new AbortController();
     // eslint-disable-next-line react-hooks/set-state-in-effect
