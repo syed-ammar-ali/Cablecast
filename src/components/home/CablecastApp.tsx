@@ -468,6 +468,7 @@ export function CablecastApp({ initialView = "home" }: CablecastAppProps) {
                 now={now}
                 resolver={resolver}
                 personalSchedule={personalBroadcast.schedule}
+                subscribedChannels={personalBroadcast.subscribedChannels}
                 channelName={personalBroadcast.channelName}
                 onPlayPersonalBroadcast={({ media, season, episode, startOffsetSeconds }) =>
                   setPlayerTarget({
@@ -547,6 +548,7 @@ export function CablecastApp({ initialView = "home" }: CablecastAppProps) {
         missed={personalBroadcast.missed}
         seasonAlerts={personalBroadcast.seasonAlerts}
         channelName={personalBroadcast.channelName}
+        subscribedChannels={personalBroadcast.subscribedChannels}
         initialTab={broadcastInitialTab}
         targetMissedId={broadcastTargetMissedId}
         isAdmin={isAdmin}
@@ -559,6 +561,7 @@ export function CablecastApp({ initialView = "home" }: CablecastAppProps) {
         liveNow={personalBroadcast.liveNow}
         onRemoveSchedule={personalBroadcast.removeSchedule}
         onRemoveShowSchedule={personalBroadcast.removeShowSchedule}
+        onRemoveSubscribedChannel={personalBroadcast.removeSubscribedChannel}
         onRescheduleMissed={personalBroadcast.rescheduleMissed}
         onDismissMissed={personalBroadcast.dismissMissed}
         onPlay={({ media, season, episode, startOffsetSeconds }) => {

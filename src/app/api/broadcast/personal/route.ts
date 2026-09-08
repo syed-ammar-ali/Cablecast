@@ -56,6 +56,7 @@ export async function GET() {
         missed: [],
         seasonAlerts: [],
         channelName: "My Lineup",
+        subscribedChannels: [],
         liveNow: null,
       });
     }
@@ -281,6 +282,62 @@ export async function GET() {
       };
     });
 
+    // Fetch subscribed channels
+    const subscribedChannelsData = await prisma.subscribedChannel.findMany({
+      where: { subscriberSessionId: { in: userKeys } },
+      orderBy: { createdAt: "asc" },
+    });
+
+    const subscribedChannels = subscribedChannelsData.map((subChan) => {
+      const rawItems = (subChan.scheduleSnapshot as any[]) || [];
+      const items: PersonalScheduleItem[] = rawItems.map((item: any, idx: number) => {
+        const liveState = computeLiveState(
+          Number(item.dayOfWeek),
+          Number(item.blockStartMinutes),
+          Number(item.blockCount || 1),
+          now,
+        );
+        const dayName =
+          DAYS_OF_WEEK.find((d) => d.day === Number(item.dayOfWeek))?.name ??
+          `Day ${item.dayOfWeek}`;
+        return {
+          id: `sub-${subChan.id}-${idx}`,
+          sessionId: subChan.subscriberSessionId,
+          tmdbId: Number(item.tmdbId),
+          mediaType: item.mediaType as MediaType,
+          title: item.title,
+          posterPath: item.posterPath || null,
+          backdropUrl: item.backdropUrl || null,
+          runtimeMinutes: item.runtimeMinutes ? Number(item.runtimeMinutes) : null,
+          dayOfWeek: Number(item.dayOfWeek),
+          dayName,
+          blockStartMinutes: Number(item.blockStartMinutes),
+          blockCount: Number(item.blockCount || 1),
+          timeLabel: formatBlockTime(Number(item.blockStartMinutes)),
+          currentSeason: Number(item.currentSeason || 1),
+          currentEpisode: Number(item.currentEpisode || 1),
+          totalEpisodes: item.totalEpisodes ? Number(item.totalEpisodes) : null,
+          wasWatched: false,
+          isRerun: false,
+          isLiveNow: liveState.isLiveNow,
+          liveOffsetSeconds: liveState.liveOffsetSeconds,
+          createdAt: subChan.createdAt.toISOString(),
+          updatedAt: subChan.updatedAt.toISOString(),
+        };
+      });
+
+      return {
+        id: subChan.id,
+        subscriberSessionId: subChan.subscriberSessionId,
+        channelName: subChan.channelName,
+        channelColor: subChan.channelColor || "#06b6d4",
+        shareToken: subChan.shareToken,
+        items,
+        createdAt: subChan.createdAt.toISOString(),
+        updatedAt: subChan.updatedAt.toISOString(),
+      };
+    });
+
     const combinedSchedule = [...schedule, ...calendarItems];
     const liveNow = combinedSchedule.find((item) => item.isLiveNow) ?? null;
 
@@ -298,6 +355,7 @@ export async function GET() {
         createdAt: a.createdAt.toISOString(),
       })),
       channelName: channelSettings.channelName,
+      subscribedChannels,
       liveNow,
     });
   } catch (error) {

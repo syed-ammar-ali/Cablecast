@@ -12,7 +12,7 @@ import { getNetworkLogo } from "@/config/networkLogos";
 import type { useBroadcastResolver } from "@/lib/useBroadcastResolver";
 
 import type { MediaSearchResult } from "@/types/media";
-import type { PersonalScheduleItem } from "@/types/broadcast";
+import type { PersonalScheduleItem, SubscribedChannel } from "@/types/broadcast";
 import { personalScheduleToMediaSearchResult } from "@/types/broadcast";
 
 export type { BroadcastSelection } from "@/types/broadcastSelection";
@@ -54,6 +54,7 @@ interface TvGridProps {
   /** Shared with the hero's "Live Now" panel, via `useBroadcastResolver` — see that module. */
   resolver: BroadcastResolver;
   personalSchedule?: PersonalScheduleItem[];
+  subscribedChannels?: SubscribedChannel[];
   channelName?: string;
   onPlayPersonalBroadcast?: (target: {
     media: MediaSearchResult;
@@ -71,6 +72,7 @@ export function TvGrid({
   now,
   resolver,
   personalSchedule = [],
+  subscribedChannels = [],
   channelName = "My Lineup",
   onPlayPersonalBroadcast,
 }: TvGridProps) {
@@ -244,9 +246,27 @@ export function TvGrid({
             <PersonalChannelRow
               items={dayPersonalSchedule}
               channelName={channelName}
+              accentColor="purple"
+              isOwner={true}
               now={now}
               onPlay={(target) => onPlayPersonalBroadcast?.(target)}
             />
+
+            {/* Subscribed / Imported Channels (e.g. "ammartv") as standalone channels */}
+            {subscribedChannels.map((subChan) => {
+              const daySubItems = subChan.items.filter((item) => item.dayOfWeek === selectedDayOfWeek);
+              return (
+                <PersonalChannelRow
+                  key={subChan.id}
+                  items={daySubItems}
+                  channelName={subChan.channelName}
+                  accentColor="cyan"
+                  isOwner={false}
+                  now={now}
+                  onPlay={(target) => onPlayPersonalBroadcast?.(target)}
+                />
+              );
+            })}
 
             {groupedByNetwork.map(([network, items]) => (
               <NetworkRow
@@ -296,11 +316,15 @@ function LiveSweepLine() {
 function PersonalChannelRow({
   items,
   channelName,
+  accentColor = "purple",
+  isOwner = true,
   now,
   onPlay,
 }: {
   items: PersonalScheduleItem[];
   channelName: string;
+  accentColor?: "purple" | "cyan";
+  isOwner?: boolean;
   now: Date;
   onPlay: (target: {
     media: MediaSearchResult;
@@ -309,19 +333,34 @@ function PersonalChannelRow({
     startOffsetSeconds?: number;
   }) => void;
 }) {
+  const isCyan = accentColor === "cyan";
+
   return (
     <div className="flex border-b border-neutral-900 bg-neutral-950/40">
       <div
-        className="sticky left-0 z-30 flex shrink-0 items-center gap-2 border-r border-neutral-800 bg-black px-2 md:px-3 text-base font-semibold text-neutral-100 shadow-[2px_0_6px_-2px_rgba(0,0,0,0.8)] w-24 md:w-52"
+        className="sticky left-0 z-30 flex shrink-0 items-center justify-between border-r border-neutral-800 bg-black px-2 md:px-3 text-base font-semibold text-neutral-100 shadow-[2px_0_6px_-2px_rgba(0,0,0,0.8)] w-24 md:w-52"
         style={{ height: ROW_HEIGHT_PX }}
       >
-        <Radio className="hidden md:block h-4 w-4 shrink-0 text-purple-400 animate-pulse" />
-        <span
-          className="truncate text-[11px] md:text-xs font-bold uppercase text-neutral-200 md:text-neutral-100 tracking-wider"
-          title={channelName}
-        >
-          {channelName}
-        </span>
+        <div className="flex items-center gap-1.5 min-w-0">
+          <Radio
+            className={`hidden md:block h-3.5 w-3.5 shrink-0 animate-pulse ${
+              isCyan ? "text-cyan-400" : "text-purple-400"
+            }`}
+          />
+          <div className="flex flex-col min-w-0">
+            <span
+              className="truncate text-[11px] md:text-xs font-bold uppercase text-neutral-200 md:text-neutral-100 tracking-wider"
+              title={channelName}
+            >
+              {channelName}
+            </span>
+            {!isOwner && (
+              <span className="hidden md:inline text-[9px] font-mono uppercase tracking-widest text-cyan-400/80 -mt-0.5">
+                Subscribed
+              </span>
+            )}
+          </div>
+        </div>
       </div>
 
       <div
@@ -333,7 +372,9 @@ function PersonalChannelRow({
             className="absolute inset-y-1 left-2 right-2 flex items-center justify-center rounded border border-dashed border-neutral-800/80 bg-neutral-950/40 text-center"
           >
             <span className="text-[10px] md:text-[11px] font-mono uppercase tracking-wider text-neutral-400 truncate px-2">
-              No scheduled broadcasts today · Program in Broadcast Studio
+              {isOwner
+                ? "No scheduled broadcasts today · Program in Broadcast Studio"
+                : `No broadcasts scheduled on ${channelName} today`}
             </span>
           </div>
         ) : (

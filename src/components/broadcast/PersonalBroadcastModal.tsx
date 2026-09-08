@@ -34,6 +34,7 @@ import type {
   MissedBroadcastItem,
   PersonalScheduleItem,
   SeasonCompletedAlertItem,
+  SubscribedChannel,
 } from "@/types/broadcast";
 import {
   DAYS_OF_WEEK,
@@ -50,6 +51,7 @@ interface PersonalBroadcastModalProps {
   missed: MissedBroadcastItem[];
   seasonAlerts?: SeasonCompletedAlertItem[];
   channelName?: string;
+  subscribedChannels?: SubscribedChannel[];
   initialTab?: "grid" | "lineup" | "missed" | "calendar";
   targetMissedId?: string | null;
   onUpdateChannelName?: (name: string) => void;
@@ -58,6 +60,7 @@ interface PersonalBroadcastModalProps {
   liveNow: PersonalScheduleItem | null;
   onRemoveSchedule: (id: string) => void;
   onRemoveShowSchedule: (tmdbId: number) => void;
+  onRemoveSubscribedChannel?: (channelId: string) => void;
   onRescheduleMissed: (
     missedId: string,
     targetDayOfWeek: number,
@@ -130,6 +133,7 @@ export function PersonalBroadcastModal({
   missed,
   seasonAlerts = [],
   channelName = "My Lineup",
+  subscribedChannels = [],
   initialTab,
   targetMissedId,
   onUpdateChannelName,
@@ -138,6 +142,7 @@ export function PersonalBroadcastModal({
   liveNow,
   onRemoveSchedule,
   onRemoveShowSchedule,
+  onRemoveSubscribedChannel,
   onRescheduleMissed,
   onDismissMissed,
   isAdmin: isAdminProp,
@@ -843,6 +848,56 @@ export function PersonalBroadcastModal({
                         </div>
                       );
                     })}
+                  </div>
+                </div>
+              )}
+
+              {/* Subscribed / Followed User Channels */}
+              {subscribedChannels.length > 0 && (
+                <div className="pt-4 border-t border-neutral-900 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-cyan-400 flex items-center gap-2">
+                        <Radio className="h-3.5 w-3.5" />
+                        Subscribed Standalone Channels ({subscribedChannels.length})
+                      </h4>
+                      <p className="text-[11px] text-neutral-500">
+                        Shared community and friend channels active as independent rows on your TV Guide
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-2.5">
+                    {subscribedChannels.map((subChan) => (
+                      <div
+                        key={subChan.id}
+                        className="flex items-center justify-between gap-3 rounded-xl border border-cyan-900/40 bg-cyan-950/10 p-3"
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-cyan-800/40 bg-neutral-900 text-cyan-400">
+                            <Radio className="h-4 w-4" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-xs font-bold text-white truncate">{subChan.channelName}</p>
+                            <p className="text-[11px] text-neutral-400">
+                              {subChan.items.length} broadcast appointment{subChan.items.length === 1 ? "" : "s"} scheduled
+                            </p>
+                          </div>
+                        </div>
+
+                        {onRemoveSubscribedChannel && (
+                          <button
+                            type="button"
+                            onClick={() => onRemoveSubscribedChannel(subChan.id)}
+                            className="flex items-center gap-1 rounded-md border border-neutral-800 px-2.5 py-1 text-xs text-neutral-400 hover:border-red-800/60 hover:bg-red-950/20 hover:text-red-400 cursor-pointer shrink-0 transition-colors"
+                            title="Unsubscribe from this channel"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                            <span>Unsubscribe</span>
+                          </button>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 </div>
               )}

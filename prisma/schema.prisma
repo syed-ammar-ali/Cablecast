@@ -417,3 +417,20 @@ model ChannelShareLink {
   @@index([token])
   @@index([ownerSessionId])
 }
+
+/// Stores a user's subscribed / imported custom channels (e.g. "ammartv") shared via link
+model SubscribedChannel {
+  id                  String   @id @default(cuid())
+  subscriberSessionId String
+  channelName         String
+  channelColor        String?  @default("#06b6d4") // retro cyan accent
+  shareToken          String?  // source token if applicable
+  ownerSessionId      String?
+  scheduleSnapshot    Json     // Array of scheduled broadcast appointments
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@unique([subscriberSessionId, channelName])
+  @@index([subscriberSessionId])
+}
+

@@ -98,6 +98,7 @@ export async function POST(
     }
 
     const snapshot = shareLink.channelSnapshot as any;
+    const channelName = (snapshot?.channelName as string)?.trim() || "Shared Lineup";
     const items = snapshot?.items;
 
     if (!Array.isArray(items) || items.length === 0) {
@@ -107,38 +108,27 @@ export async function POST(
       );
     }
 
-    let importedCount = 0;
-
-    for (const item of items) {
-      // Check if user already has an appointment in this exact slot
-      const existing = await prisma.userPersonalSchedule.findFirst({
-        where: {
-          sessionId: { in: userKeys },
-          dayOfWeek: item.dayOfWeek,
-          blockStartMinutes: item.blockStartMinutes,
+    // Upsert SubscribedChannel for the recipient as an independent channel
+    const subscribedChannel = await prisma.subscribedChannel.upsert({
+      where: {
+        subscriberSessionId_channelName: {
+          subscriberSessionId: userId,
+          channelName,
         },
-      });
-
-      if (!existing) {
-        await prisma.userPersonalSchedule.create({
-          data: {
-            sessionId: userId,
-            tmdbId: Number(item.tmdbId),
-            mediaType: item.mediaType,
-            title: item.title,
-            posterPath: item.posterPath || null,
-            backdropUrl: item.backdropUrl || null,
-            runtimeMinutes: item.runtimeMinutes ? Number(item.runtimeMinutes) : null,
-            dayOfWeek: Number(item.dayOfWeek),
-            blockStartMinutes: Number(item.blockStartMinutes),
-            blockCount: Number(item.blockCount || 1),
-            currentSeason: Number(item.currentSeason || 1),
-            currentEpisode: Number(item.currentEpisode || 1),
-          },
-        });
-        importedCount++;
-      }
-    }
+      },
+      create: {
+        subscriberSessionId: userId,
+        channelName,
+        shareToken: token,
+        ownerSessionId: shareLink.ownerSessionId,
+        scheduleSnapshot: items,
+      },
+      update: {
+        shareToken: token,
+        scheduleSnapshot: items,
+        updatedAt: new Date(),
+      },
+    });
 
     // Mark as used
     await prisma.channelShareLink.update({
@@ -148,7 +138,9 @@ export async function POST(
 
     return NextResponse.json({
       success: true,
-      importedCount,
+      channelId: subscribedChannel.id,
+      channelName: subscribedChannel.channelName,
+      importedCount: items.length,
       totalOffered: items.length,
     });
   } catch (error) {
@@ -159,3 +151,4 @@ export async function POST(
     );
   }
 }
+

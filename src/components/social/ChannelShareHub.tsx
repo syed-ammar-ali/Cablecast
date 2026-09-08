@@ -234,11 +234,11 @@ export function ChannelResolveView({ token }: ChannelResolveViewProps) {
         totalOffered: data.totalOffered,
       });
       toast.success(
-        `Imported ${data.importedCount} scheduled broadcast slots!`,
-        "Lineup Added to Your TV",
+        `Added "${data.channelName || snapshot?.channelName}" as a new channel on your TV Guide!`,
+        "Channel Added",
       );
     } catch (err) {
-      toast.error((err as Error).message || "Import failed", "Import Error");
+      toast.error((err as Error).message || "Import failed", "Channel Error");
     } finally {
       setIsImporting(false);
     }
@@ -290,21 +290,21 @@ export function ChannelResolveView({ token }: ChannelResolveViewProps) {
 
         {/* Success / Imported View */}
         {importResult && (
-          <div className="rounded-2xl border border-emerald-500/50 bg-emerald-950/20 p-6 text-center space-y-4 animate-in fade-in">
-            <Check className="h-12 w-12 mx-auto text-emerald-400" />
+          <div className="rounded-2xl border border-cyan-500/50 bg-cyan-950/20 p-6 text-center space-y-4 animate-in fade-in">
+            <Check className="h-12 w-12 mx-auto text-cyan-400" />
             <div className="space-y-1">
-              <h3 className="text-lg font-bold text-white">Lineup Successfully Imported!</h3>
+              <h3 className="text-lg font-bold text-white">Channel Added to Your TV Guide!</h3>
               <p className="text-xs text-neutral-300">
-                Added {importResult.importedCount} shows and movie screenings directly to your personal broadcast schedule.
+                &ldquo;{snapshot?.channelName}&rdquo; is now active as a standalone channel with {importResult.importedCount} scheduled broadcasts. Your personal lineup remains untouched.
               </p>
             </div>
             <div className="pt-2">
               <button
                 type="button"
-                onClick={() => router.push("/home?tab=grid")}
-                className="inline-flex items-center gap-2 rounded-xl bg-emerald-400 px-6 py-3 text-xs font-bold uppercase tracking-wider text-black shadow-lg shadow-emerald-500/20 hover:bg-emerald-300 transition-colors cursor-pointer"
+                onClick={() => router.push("/home")}
+                className="inline-flex items-center gap-2 rounded-xl bg-cyan-400 px-6 py-3 text-xs font-bold uppercase tracking-wider text-black shadow-lg shadow-cyan-500/20 hover:bg-cyan-300 transition-colors cursor-pointer"
               >
-                <span>Open Broadcast Studio</span>
+                <span>Watch on TV Guide</span>
                 <ArrowRight className="h-4 w-4" />
               </button>
             </div>
@@ -316,12 +316,12 @@ export function ChannelResolveView({ token }: ChannelResolveViewProps) {
           <div className="rounded-2xl border border-neutral-800 bg-neutral-950 p-6 shadow-2xl space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-neutral-900 pb-4">
               <div>
-                <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-purple-400">
-                  Shared Lineup Package
+                <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-cyan-400">
+                  Shared Standalone Channel
                 </span>
                 <h2 className="text-xl font-black text-white">{snapshot.channelName}</h2>
                 <p className="text-xs text-neutral-400">
-                  {snapshot.items.length} Curated Broadcast Appointments
+                  {snapshot.items.length} Curated Broadcast Appointments · Adds as a new channel
                 </p>
               </div>
 
@@ -329,17 +329,17 @@ export function ChannelResolveView({ token }: ChannelResolveViewProps) {
                 type="button"
                 onClick={handleImport}
                 disabled={isImporting}
-                className="flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-500 to-indigo-600 px-6 py-3 text-xs font-bold uppercase tracking-wider text-white shadow-lg shadow-purple-500/25 hover:from-purple-400 hover:to-indigo-500 transition-all disabled:opacity-50 cursor-pointer"
+                className="flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 px-6 py-3 text-xs font-bold uppercase tracking-wider text-black font-semibold shadow-lg shadow-cyan-500/25 hover:from-cyan-400 hover:to-blue-500 transition-all disabled:opacity-50 cursor-pointer"
               >
                 {isImporting ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    <span>Importing Lineup...</span>
+                    <span>Adding Channel...</span>
                   </>
                 ) : (
                   <>
                     <Sparkles className="h-4 w-4" />
-                    <span>Add to My Broadcast</span>
+                    <span>Add {snapshot.channelName} as Channel</span>
                   </>
                 )}
               </button>

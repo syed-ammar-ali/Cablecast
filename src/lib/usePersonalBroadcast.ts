@@ -6,12 +6,14 @@ import type {
   MissedBroadcastItem,
   PersonalScheduleItem,
   SeasonCompletedAlertItem,
+  SubscribedChannel,
 } from "@/types/broadcast";
 import { CABLECAST_BROADCAST_MUTATION, notifyBroadcastMutation } from "./syncEvents";
 
 const LOCAL_SCHEDULE_KEY = "cablecast_personal_schedule_cache";
 const LOCAL_MISSED_KEY = "cablecast_personal_missed_cache";
 const LOCAL_CHANNEL_NAME_KEY = "cablecast_personal_channel_name_cache";
+const LOCAL_SUBSCRIBED_CHANNELS_KEY = "cablecast_subscribed_channels_cache";
 
 function getInitialSchedule(): PersonalScheduleItem[] {
   if (typeof window === "undefined") return [];
@@ -56,6 +58,7 @@ export function usePersonalBroadcast() {
   const [schedule, setSchedule] = useState<PersonalScheduleItem[]>([]);
   const [missed, setMissed] = useState<MissedBroadcastItem[]>([]);
   const [channelName, setChannelName] = useState<string>("My Lineup");
+  const [subscribedChannels, setSubscribedChannels] = useState<SubscribedChannel[]>([]);
   const [seasonAlerts, setSeasonAlerts] = useState<SeasonCompletedAlertItem[]>([]);
   const [liveNow, setLiveNow] = useState<PersonalScheduleItem | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -82,6 +85,10 @@ export function usePersonalBroadcast() {
           setChannelName(data.channelName);
           safeSetStorage(LOCAL_CHANNEL_NAME_KEY, data.channelName);
         }
+        if (Array.isArray(data.subscribedChannels)) {
+          setSubscribedChannels(data.subscribedChannels);
+          safeSetStorage(LOCAL_SUBSCRIBED_CHANNELS_KEY, data.subscribedChannels);
+        }
         setLiveNow(data.liveNow ?? null);
       }
     } catch (e: unknown) {
@@ -102,6 +109,8 @@ export function usePersonalBroadcast() {
       if (cachedMissed) setMissed(JSON.parse(cachedMissed));
       const cachedName = localStorage.getItem(LOCAL_CHANNEL_NAME_KEY);
       if (cachedName) setChannelName(JSON.parse(cachedName));
+      const cachedSubs = localStorage.getItem(LOCAL_SUBSCRIBED_CHANNELS_KEY);
+      if (cachedSubs) setSubscribedChannels(JSON.parse(cachedSubs));
     } catch {
       // ignore
     }
@@ -297,17 +306,36 @@ export function usePersonalBroadcast() {
     [schedule],
   );
 
+  const removeSubscribedChannel = useCallback(
+    async (channelId: string) => {
+      setSubscribedChannels((prev) => prev.filter((c) => c.id !== channelId));
+      notifyBroadcastMutation();
+
+      try {
+        await fetch(`/api/channels/subscribed?id=${encodeURIComponent(channelId)}`, {
+          method: "DELETE",
+        });
+        void syncFromServer();
+      } catch (e) {
+        console.error("Failed to delete subscribed channel:", e);
+      }
+    },
+    [syncFromServer],
+  );
+
   return {
     schedule,
     missed,
     seasonAlerts,
     channelName,
+    subscribedChannels,
     liveNow,
     isLoading,
     error,
     addSchedule,
     removeSchedule,
     removeShowSchedule,
+    removeSubscribedChannel,
     rescheduleMissed,
     dismissMissed,
     dismissSeasonAlert,
@@ -317,3 +345,4 @@ export function usePersonalBroadcast() {
     refresh: syncFromServer,
   };
 }
+

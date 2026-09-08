@@ -157,3 +157,14 @@ export interface CreateCalendarEntryInput {
   startEpisode?: number;
 }
 
+export interface SubscribedChannel {
+  id: string;
+  subscriberSessionId: string;
+  channelName: string;
+  channelColor?: string;
+  shareToken?: string;
+  items: PersonalScheduleItem[];
+  createdAt: string;
+  updatedAt: string;
+}
+
