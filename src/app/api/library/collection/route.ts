@@ -4,7 +4,7 @@ import { getSession, getPersistentUserId } from "@/lib/auth/server";
 import { getMovieDetails, getShowDetails } from "@/lib/tmdb";
 import type { LibraryMediaItem } from "@/types/library";
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const session = await getSession();
     if (!session) {

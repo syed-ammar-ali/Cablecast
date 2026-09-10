@@ -3,7 +3,7 @@ import crypto from "crypto";
 import { prisma } from "@/lib/prisma";
 import { getSession, getPersistentUserId } from "@/lib/auth/server";
 
-export async function POST(request: NextRequest) {
+export async function POST() {
   try {
     const session = await getSession();
     if (!session) {

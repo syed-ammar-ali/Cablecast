@@ -12,11 +12,11 @@ import {
   Layers,
   Calendar,
   ArrowLeft,
-  X,
 } from "lucide-react";
 import type { VhsMetadata } from "@/types/vhs";
 import { useToast } from "@/components/ui/ToastProvider";
 import { notifyLibraryMutation, notifyBroadcastMutation } from "@/lib/syncEvents";
+import { triggerHaptic } from "@/lib/haptics";
 
 interface VhsModalProps {
   isOpen: boolean;
@@ -114,7 +114,6 @@ export function VhsModal({
   const [seasonCache, setSeasonCache] = useState<Record<number, VhsMetadata>>({});
   const seasonCacheRef = useRef<Record<number, VhsMetadata>>({});
   seasonCacheRef.current = seasonCache;
-  const [isLoading, setIsLoading] = useState(false);
   const [ownershipStatus, setOwnershipStatus] = useState<"OWNED" | "RENTED" | "EXPIRED" | "NONE">("NONE");
   const [expiresAt, setExpiresAt] = useState<string | null>(null);
   const [isMutating, setIsMutating] = useState(false);
@@ -176,6 +175,23 @@ export function VhsModal({
     setActiveSeasonIndex(Math.max(0, (initialSeason || 1) - 1));
     setIsFlipped(false);
   }, [initialSeason, isOpen]);
+
+  // Touch swipe to flip tape on mobile
+  const touchStartXRef = useRef<number | null>(null);
+
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    touchStartXRef.current = e.touches[0].clientX;
+  }, []);
+
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    if (touchStartXRef.current === null) return;
+    const diff = e.changedTouches[0].clientX - touchStartXRef.current;
+    if (Math.abs(diff) > 45) {
+      triggerHaptic(12);
+      setIsFlipped((prev) => !prev);
+    }
+    touchStartXRef.current = null;
+  }, []);
 
   // Smoothly scroll active card into center without layout thrashing
   const scrollToActiveCard = useCallback((index: number) => {
@@ -240,7 +256,6 @@ export function VhsModal({
       return;
     }
 
-    setIsLoading(true);
     try {
       const url = new URL(
         `/api/vhs/${normalizedType.toLowerCase()}/${mediaId}`,
@@ -262,8 +277,6 @@ export function VhsModal({
     } catch (err) {
       console.error("[VhsModal] Metadata fetch error:", err);
       toast.error("Could not fetch sleeve metadata from vault", "Archive Lookup Error");
-    } finally {
-      setIsLoading(false);
     }
   }, [isOpen, mediaId, normalizedType, selectedSeason, toast]);
 
@@ -697,7 +710,10 @@ export function VhsModal({
         {/* Floating Flip Button attached tightly above active card */}
         <button
           type="button"
-          onClick={() => setIsFlipped((prev) => !prev)}
+          onClick={() => {
+            triggerHaptic(12);
+            setIsFlipped((prev) => !prev);
+          }}
           className="mb-2 sm:mb-3 bg-neutral-900/95 hover:bg-neutral-800 text-neutral-200 hover:text-amber-300 border border-neutral-700/80 hover:border-amber-500/50 px-3.5 py-1 sm:px-4 sm:py-1.5 rounded-full text-[11px] sm:text-xs font-semibold shadow-lg backdrop-blur-md flex items-center gap-1.5 cursor-pointer transition-all duration-200 hover:scale-105 active:scale-95 whitespace-nowrap z-40"
         >
           <RotateCw
@@ -712,7 +728,9 @@ export function VhsModal({
           // ── SINGLE CARD (Movie or Single Season TV) ──
           <div
             data-interactive="true"
-            className="w-[86vw] max-w-[320px] sm:w-[370px] aspect-[2/3] max-h-[76vh] sm:max-h-[82vh] relative [perspective:1400px] mx-auto"
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
+            className="w-[86vw] max-w-[320px] sm:w-[370px] aspect-[2/3] max-h-[76vh] sm:max-h-[82vh] relative [perspective:1400px] mx-auto cursor-grab active:cursor-grabbing"
           >
             <div
               className={`h-full w-full transition-transform duration-500 ease-[cubic-bezier(0.2,0.8,0.2,1)] [transform-style:preserve-3d] relative ${isFlipped ? "[transform:rotateY(180deg)]" : ""
@@ -874,10 +892,12 @@ export function VhsModal({
                   <div
                     key={seasonNum}
                     data-interactive="true"
+                    onTouchStart={handleTouchStart}
+                    onTouchEnd={handleTouchEnd}
                     ref={(el) => {
                       cardRefs.current[seasonIndex] = el;
                     }}
-                    className="shrink-0 snap-center w-[86vw] max-w-[320px] sm:w-[360px] aspect-[2/3] max-h-[76vh] sm:max-h-[82vh] relative [perspective:1400px] transition-transform transition-opacity duration-300 transform-gpu will-change-transform z-30 scale-100 opacity-100 outline-none focus:outline-none focus-visible:outline-none [-webkit-tap-highlight-color:transparent]"
+                    className="shrink-0 snap-center w-[86vw] max-w-[320px] sm:w-[360px] aspect-[2/3] max-h-[76vh] sm:max-h-[82vh] relative [perspective:1400px] transition-transform transition-opacity duration-300 transform-gpu will-change-transform z-30 scale-100 opacity-100 outline-none focus:outline-none focus-visible:outline-none [-webkit-tap-highlight-color:transparent] cursor-grab active:cursor-grabbing"
                   >
                     <div
                       className={`h-full w-full transition-transform duration-500 ease-[cubic-bezier(0.2,0.8,0.2,1)] [transform-style:preserve-3d] relative ${isFlipped ? "[transform:rotateY(180deg)]" : ""

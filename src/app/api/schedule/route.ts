@@ -143,7 +143,6 @@ export async function POST(request: NextRequest) {
   }
 
   const userId = getPersistentUserId(session);
-  const userKeys = Array.from(new Set([userId, session.id, session.accessCodeId])).filter(Boolean) as string[];
 
   try {
     const appointment = await prisma.scheduledAppointment.create({

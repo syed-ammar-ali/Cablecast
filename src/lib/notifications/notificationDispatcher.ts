@@ -165,31 +165,30 @@ export async function dispatchStartingSoonAlerts(now: Date = new Date()): Promis
   const targetMinStart = currentMinutes - 2;
   const targetMinEnd = currentMinutes + 20;
 
-  // Find upcoming slots. The query matches slots starting soon according to server time OR timezone-aware slots.
-  const upcomingSlots =
-    (await prisma.userPersonalSchedule.findMany({
-      where: {
-        OR: [
-          {
-            dayOfWeek: currentDay,
-            blockStartMinutes: {
-              gte: targetMinStart,
-              lte: targetMinEnd,
-            },
-          },
-          {
-            timezoneOffset: { not: null },
-          },
-        ],
-      },
-    })) || [];
+  // Fetch active schedules and user subscriptions with timezones
+  const [upcomingSlots, subscriptions] = await Promise.all([
+    prisma.userPersonalSchedule.findMany() || [],
+    prisma.pushSubscription.findMany({ select: { userId: true, timezoneOffset: true } }) || [],
+  ]);
+
+  const userTimezoneMap = new Map<string, number>();
+  for (const sub of subscriptions) {
+    if (typeof sub.timezoneOffset === "number" && !userTimezoneMap.has(sub.userId)) {
+      userTimezoneMap.set(sub.userId, sub.timezoneOffset);
+    }
+  }
 
   let count = 0;
   let failed = 0;
   let cleaned = 0;
 
   for (const slot of upcomingSlots) {
-    const { isStartingSoon, localIsoDate } = isSlotStartingSoon(slot, slot.timezoneOffset, now);
+    const effectiveOffset =
+      typeof slot.timezoneOffset === "number"
+        ? slot.timezoneOffset
+        : userTimezoneMap.get(slot.sessionId);
+
+    const { isStartingSoon, localIsoDate } = isSlotStartingSoon(slot, effectiveOffset, now);
     if (!isStartingSoon) continue;
 
     const referenceId = `${slot.id}_${localIsoDate}`;

@@ -28,11 +28,15 @@ async function handleCron(request: NextRequest) {
     const url = new URL(request.url);
     const queryKey = url.searchParams.get("key") || url.searchParams.get("secret");
 
+    const userAgent = request.headers.get("user-agent") || "";
+    const isCronJobOrg = userAgent.toLowerCase().includes("cron-job.org");
+
     const session = await getSession();
 
-    // Flexible authorization: allow Vercel crons, Bearer tokens, custom headers, URL query keys (?key=...),
+    // Flexible authorization: allow cron-job.org pings, Bearer tokens, custom headers, URL query keys (?key=...),
     // authenticated sessions, development mode, OR standard external monitoring GET pings.
     const isExplicitlyAuthorized =
+      isCronJobOrg ||
       Boolean(session) ||
       Boolean(vercelCron) ||
       authHeader === `Bearer ${expectedSecret}` ||

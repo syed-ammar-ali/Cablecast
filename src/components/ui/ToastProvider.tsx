@@ -192,10 +192,10 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     <ToastContext.Provider value={{ showToast, toast, confirm }}>
       {children}
 
-      {/* ── Toast Container (Responsive positioning: bottom-20 on mobile to clear BottomNav, bottom-5 on desktop) ── */}
+      {/* ── Toast Container (Responsive positioning: top on mobile to clear remote, bottom-5 on desktop) ── */}
       <div
         aria-live="polite"
-        className="pointer-events-none fixed bottom-20 sm:bottom-5 right-3 sm:right-5 z-[9990] flex flex-col gap-2.5 max-w-sm sm:max-w-md w-full px-3 sm:px-0"
+        className="pointer-events-none fixed top-[max(0.75rem,env(safe-area-inset-top))] sm:top-auto sm:bottom-5 inset-x-3 sm:inset-x-auto sm:right-5 z-[9990] flex flex-col gap-2.5 max-w-sm sm:max-w-md mx-auto sm:mx-0 w-auto"
       >
         {toasts.map((item) => {
           const isBroadcast = item.type === "broadcast";
@@ -211,8 +211,8 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                 role="alert"
                 className={`pointer-events-auto relative overflow-hidden rounded-2xl border border-amber-500/40 bg-neutral-950/95 p-3.5 sm:p-4 shadow-2xl shadow-black/90 backdrop-blur-2xl transition-all duration-200 ${
                   isDismissing
-                    ? "animate-out fade-out slide-out-to-bottom-3 pointer-events-none"
-                    : "animate-in fade-in slide-in-from-bottom-4"
+                    ? "animate-out fade-out slide-out-to-top-3 sm:slide-out-to-bottom-3 pointer-events-none"
+                    : "animate-in fade-in slide-in-from-top-3 sm:slide-in-from-bottom-4"
                 }`}
               >
                 {/* Subtle top amber glow accent line */}
@@ -294,8 +294,8 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
               role="status"
               className={`pointer-events-auto flex items-start gap-3 rounded-xl p-3.5 sm:p-4 shadow-2xl backdrop-blur-xl border transition-all ${
                 isDismissing
-                  ? "animate-out fade-out slide-out-to-bottom-3 pointer-events-none"
-                  : "animate-in fade-in slide-in-from-bottom-3"
+                  ? "animate-out fade-out slide-out-to-top-3 sm:slide-out-to-bottom-3 pointer-events-none"
+                  : "animate-in fade-in slide-in-from-top-3 sm:slide-in-from-bottom-3"
               } ${
                 isSuccess
                   ? "bg-neutral-950/95 border-emerald-800/60 text-neutral-200 shadow-emerald-950/30"

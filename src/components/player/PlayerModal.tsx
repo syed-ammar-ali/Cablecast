@@ -69,6 +69,74 @@ export function PlayerModal({
     };
   }, []);
 
+  // ── Screen WakeLock API: keeps phone screen awake during streaming ──
+  useEffect(() => {
+    let sentinel: WakeLockSentinel | null = null;
+    let released = false;
+
+    async function requestLock() {
+      if (typeof navigator !== "undefined" && "wakeLock" in navigator && !released) {
+        try {
+          sentinel = await navigator.wakeLock.request("screen");
+        } catch {
+          // WakeLock may fail if low battery or permission denied; ignore safely
+        }
+      }
+    }
+
+    void requestLock();
+
+    function handleVisibilityChange() {
+      if (document.visibilityState === "visible" && !released) {
+        void requestLock();
+      }
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      released = true;
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      if (sentinel) {
+        sentinel.release().catch(() => {});
+      }
+    };
+  }, []);
+
+  // ── MediaSession API: populates lock screen & Bluetooth playback info ──
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !("mediaSession" in navigator)) return;
+
+    const displayTitle = directBroadcast?.title || media?.title || "Live Broadcast";
+    const displayArtist = isTv
+      ? `Season ${season}, Episode ${episode}`
+      : directBroadcast?.label || "Cablecast Retro TV";
+    const artworkUrl = media?.posterUrl || "/icon-512.png";
+
+    try {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: displayTitle,
+        artist: displayArtist,
+        album: "Cablecast",
+        artwork: [
+          { src: artworkUrl, sizes: "512x512", type: "image/png" },
+          { src: "/icon-192.png", sizes: "192x192", type: "image/png" },
+        ],
+      });
+      navigator.mediaSession.playbackState = "playing";
+    } catch {
+      // Ignore
+    }
+
+    return () => {
+      try {
+        navigator.mediaSession.playbackState = "none";
+      } catch {
+        // Ignore
+      }
+    };
+  }, [directBroadcast, media, isTv, season, episode]);
+
   // Only fetched to default `season` to the show's actual first season
   // (e.g. some shows start at 0 for specials) when the caller didn't pass
   // one explicitly — there's no in-player season/episode switcher anymore.

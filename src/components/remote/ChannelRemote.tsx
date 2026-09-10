@@ -1,10 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Tv, Delete, CornerDownLeft, Sparkles, Radio, Film, X } from "lucide-react";
+import { Tv, Delete, CornerDownLeft, Radio, Film, X } from "lucide-react";
 import type { MediaSearchResult } from "@/types/media";
 import type { MediaType } from "@/types/media";
 import { CHANNELS, getChannel } from "@/config/channels";
+import { triggerHaptic } from "@/lib/haptics";
 
 /* ─── Types ─────────────────────────────────────────────────────────────── */
 
@@ -64,6 +65,7 @@ interface ChannelRemoteProps {
   onTuneIn: (media: MediaSearchResult, startOffsetSeconds?: number) => void;
   /** Called when a show episode code is resolved to an air date */
   onNavigateDate: (isoDate: string) => void;
+  onLongPress?: () => void;
 }
 
 /* ─── Helpers ────────────────────────────────────────────────────────────── */
@@ -108,8 +110,10 @@ type NumKey = (typeof NUMPAD)[number][number];
 
 /* ─── Main Component ─────────────────────────────────────────────────────── */
 
-export function ChannelRemote({ onTuneIn, onNavigateDate }: ChannelRemoteProps) {
+export function ChannelRemote({ onTuneIn, onNavigateDate, onLongPress }: ChannelRemoteProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isLongPressTriggeredRef = useRef(false);
   const [activeTab, setActiveTab] = useState<"networks" | "shows">("networks");
   const [shows, setShows] = useState<RegisteredShowSummary[]>([]);
   const [selectedShow, setSelectedShow] = useState<RegisteredShowSummary | null>(null);
@@ -125,8 +129,9 @@ export function ChannelRemote({ onTuneIn, onNavigateDate }: ChannelRemoteProps) 
 
   const remoteRef = useRef<HTMLDivElement>(null);
 
-  // Trigger infrared indicator blink
+  // Trigger infrared indicator blink & tactile click
   const pulseIR = useCallback(() => {
+    triggerHaptic(12);
     setIsIRActive(true);
     setTimeout(() => setIsIRActive(false), 120);
   }, []);
@@ -436,12 +441,37 @@ export function ChannelRemote({ onTuneIn, onNavigateDate }: ChannelRemoteProps) 
       {!isOpen && (
         <button
           type="button"
+          onPointerDown={() => {
+            isLongPressTriggeredRef.current = false;
+            longPressTimerRef.current = setTimeout(() => {
+              isLongPressTriggeredRef.current = true;
+              triggerHaptic(25);
+              onLongPress?.();
+            }, 600);
+          }}
+          onPointerUp={() => {
+            if (longPressTimerRef.current) {
+              clearTimeout(longPressTimerRef.current);
+              longPressTimerRef.current = null;
+            }
+          }}
+          onPointerCancel={() => {
+            if (longPressTimerRef.current) {
+              clearTimeout(longPressTimerRef.current);
+              longPressTimerRef.current = null;
+            }
+          }}
           onClick={() => {
+            if (isLongPressTriggeredRef.current) {
+              isLongPressTriggeredRef.current = false;
+              return;
+            }
+            triggerHaptic(15);
             setIsOpen(true);
             reset();
           }}
-          className="fixed bottom-20 sm:bottom-6 right-4 sm:right-6 z-40 sm:z-50 flex h-12 w-12 sm:h-13 sm:w-13 items-center justify-center rounded-full border border-neutral-700 bg-neutral-900/90 text-neutral-200 shadow-2xl shadow-black/80 backdrop-blur-md transition-all hover:border-cyan-500/50 hover:bg-neutral-800 hover:text-white hover:scale-105 active:scale-95 group"
-          title="Open Remote Control"
+          className="fixed bottom-20 sm:bottom-6 right-4 sm:right-6 z-40 sm:z-50 flex h-12 w-12 sm:h-13 sm:w-13 items-center justify-center rounded-full border border-neutral-700 bg-neutral-900/90 text-neutral-200 shadow-2xl shadow-black/80 backdrop-blur-md transition-all hover:border-cyan-500/50 hover:bg-neutral-800 hover:text-white hover:scale-105 active:scale-95 group cursor-pointer select-none"
+          title="Open Remote Control (Long-press for surprise!)"
           aria-label="Open Channel Remote"
         >
           <Tv className="h-5 w-5 text-neutral-300 transition-colors group-hover:text-cyan-300" />

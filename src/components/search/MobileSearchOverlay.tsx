@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect } from "react";
 import { ArrowLeft, Clapperboard, Loader2, Search, X } from "lucide-react";
 import type { MediaSearchResult } from "@/types/media";
 import { VhsShelf } from "@/components/vhs/VhsShelf";
@@ -29,8 +29,8 @@ export function MobileSearchOverlay({
   error,
   onClose,
   onSelectMedia,
-  isFavorite,
-  onToggleFavorite,
+  isFavorite: _isFavorite,
+  onToggleFavorite: _onToggleFavorite,
 }: MobileSearchOverlayProps) {
   useEffect(() => {
     if (!isOpen) return;

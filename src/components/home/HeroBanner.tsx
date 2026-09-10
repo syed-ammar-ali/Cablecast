@@ -26,11 +26,11 @@ interface HeroBannerProps {
 
 export function HeroBanner({
   liveNow,
-  onSelectFeatured,
+  onSelectFeatured: _onSelectFeatured,
   onSelectLive,
   isLiveResolving,
-  isScheduled,
-  onOpenBroadcastStudio,
+  isScheduled: _isScheduled,
+  onOpenBroadcastStudio: _onOpenBroadcastStudio,
   onRent,
   onBuy,
   isOwned,

@@ -8,7 +8,7 @@ import { ShowsManager } from "@/components/admin/ShowsManager";
 import type { AdminAccessCode, AdminSession, AssignedShowSummary } from "@/types/admin";
 import { getChannel } from "@/config/channels";
 import { useToast } from "@/components/ui/ToastProvider";
-import { CABLECAST_ADMIN_MUTATION, notifyAdminMutation } from "@/lib/syncEvents";
+import { CABLECAST_ADMIN_MUTATION } from "@/lib/syncEvents";
 
 function formatDateTime(iso: string | null): string {
   if (!iso) return "—";

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
@@ -9,8 +9,6 @@ import {
   Search,
   X,
   Loader2,
-  SlidersHorizontal,
-  Sparkles,
   LayoutGrid,
   CassetteTape,
   AlertCircle,
@@ -125,14 +123,16 @@ export function ExploreView({
     if (!isOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        onClose ? onClose() : router.push("/home");
+        if (onClose) {
+          onClose();
+        } else {
+          router.push("/home");
+        }
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, onClose, router]);
-
-  if (!isOpen) return null;
 
   // Debounce search input
   useEffect(() => {
@@ -162,6 +162,7 @@ export function ExploreView({
     const controller = new AbortController();
 
     async function fetchExploreData() {
+      if (!isOpen) return;
       setIsLoading(true);
       setError(null);
 
@@ -363,16 +364,18 @@ export function ExploreView({
   const activeEraLabel = ERA_OPTIONS.find((e) => e.id === filters.era)?.label;
   const activeGenreLabel = GENRE_OPTIONS.find((g) => g.id === filters.genreId)?.name;
 
+  if (!isOpen) return null;
+
   return (
     <main
       className={
         onClose
-          ? "fixed inset-0 z-50 overflow-y-auto bg-black text-neutral-100 pb-20 sm:pb-12 animate-in fade-in"
-          : "min-h-screen bg-black text-neutral-100 pb-20 sm:pb-12"
+          ? "fixed inset-0 z-50 overflow-y-auto bg-black text-neutral-100 pb-[max(6rem,env(safe-area-inset-bottom)+5rem)] sm:pb-12 animate-in fade-in"
+          : "min-h-screen bg-black text-neutral-100 pb-[max(6rem,env(safe-area-inset-bottom)+5rem)] sm:pb-12"
       }
     >
       {/* ── Top Fixed Navigation & Search Bar ──────────────────────────────── */}
-      <header className="sticky top-0 z-40 border-b border-neutral-900 bg-neutral-950/90 backdrop-blur-xl px-4 py-3 sm:px-6">
+      <header className="sticky top-0 z-40 border-b border-neutral-900 bg-neutral-950/90 backdrop-blur-xl px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-3 sm:px-6">
         <div className="mx-auto flex max-w-7xl items-center gap-3">
           {/* Back to Home / Dismiss */}
           {onClose ? (

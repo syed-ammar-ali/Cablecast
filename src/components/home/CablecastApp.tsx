@@ -1,9 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
-import { MediaCard } from "@/components/search/MediaCard";
 import { AppHeader } from "@/components/home/AppHeader";
 import { HeroBanner } from "@/components/home/HeroBanner";
 import type { EpisodeSelection } from "@/components/media/MediaDetailsModal";
@@ -52,6 +50,10 @@ const ChannelRemote = dynamic(
 );
 const ExploreView = dynamic(
   () => import("@/components/explore/ExploreView").then((mod) => mod.ExploreView),
+  { ssr: false }
+);
+const DontDeleteModal = dynamic(
+  () => import("@/components/pwa/DontDeleteModal").then((mod) => mod.DontDeleteModal),
   { ssr: false }
 );
 
@@ -115,6 +117,7 @@ export function CablecastApp({ initialView = "home" }: CablecastAppProps) {
   const [playerTarget, setPlayerTarget] = useState<PlayerTarget | null>(null);
   const [directBroadcastTarget, setDirectBroadcastTarget] = useState<DirectBroadcast | null>(null);
   const [detailsTarget, setDetailsTarget] = useState<MediaSearchResult | null>(null);
+  const [isDontDeleteOpen, setIsDontDeleteOpen] = useState(false);
 
   const isScheduleEnabled = !isLibraryOpen && !isBroadcastStudioOpen;
   const { schedule, isLoading: isGuideLoading, error: guideError } = useBroadcastSchedule(
@@ -128,8 +131,6 @@ export function CablecastApp({ initialView = "home" }: CablecastAppProps) {
       setPlayerTarget({ media, initialSeason: season, initialEpisode: episode, startOffsetSeconds, startTime }),
     onSelectDirectBroadcast: setDirectBroadcastTarget,
   });
-
-  const router = useRouter();
 
   // URL Navigation & View State Manager
   const navigateTo = useCallback(
@@ -219,6 +220,11 @@ export function CablecastApp({ initialView = "home" }: CablecastAppProps) {
             el.scrollIntoView({ behavior: "smooth" });
           }
         }, 150);
+      }
+
+      const actionParam = url.searchParams.get("action");
+      if (actionParam === "dont-delete" || actionParam === "dont-uninstall") {
+        setIsDontDeleteOpen(true);
       }
     };
 
@@ -443,7 +449,7 @@ export function CablecastApp({ initialView = "home" }: CablecastAppProps) {
         </div>
       ) : (
         <div key="home-view" className="animate-in fade-in duration-150">
-          <div className="sticky top-14 sm:top-16 md:top-0 z-10 px-3 pt-2 sm:px-4 sm:pt-3">
+          <div className="relative md:sticky md:top-0 z-10 px-3 pt-2 sm:px-4 sm:pt-3">
             <HeroBanner
               liveNow={liveNow}
               onSelectLive={(item) => resolver.resolveBroadcast(item, now)}
@@ -465,6 +471,7 @@ export function CablecastApp({ initialView = "home" }: CablecastAppProps) {
                 isLoading={isGuideLoading}
                 error={guideError}
                 selectedDate={selectedDate}
+                onDateChange={setSelectedDate}
                 now={now}
                 resolver={resolver}
                 personalSchedule={personalBroadcast.schedule}
@@ -519,6 +526,15 @@ export function CablecastApp({ initialView = "home" }: CablecastAppProps) {
         collection={library.collection}
         owned={library.owned}
         rented={library.rented}
+        onPlay={(media, season) => {
+          setIsLibraryOpen(false);
+          setPlayerTarget({
+            media,
+            initialSeason: season || 1,
+            initialEpisode: 1,
+            startOffsetSeconds: 0,
+          });
+        }}
         onAddToBroadcast={(media, season) => {
           setIsLibraryOpen(false);
           setSchedulingTarget({ media, season });
@@ -646,12 +662,15 @@ export function CablecastApp({ initialView = "home" }: CablecastAppProps) {
               setSelectedDate(iso);
               window.scrollTo({ top: 0, behavior: "smooth" });
             }}
+            onLongPress={() => setIsDontDeleteOpen(true)}
           />
         )}
 
       {/* Mobile Bottom Navigation Bar */}
       <BottomNav
         isAdmin={isAdmin}
+        onGoHome={handleHomeClick}
+        isHomeActive={!isBroadcastStudioOpen && !isLibraryOpen && !isExploreOpen}
         onOpenBroadcastStudio={() => navigateTo("broadcast")}
         onOpenLibrary={() => navigateTo("library")}
         onToggleSearch={() => {
@@ -669,6 +688,12 @@ export function CablecastApp({ initialView = "home" }: CablecastAppProps) {
 
       {/* First-time visitor push notification prompt */}
       <NotificationPermissionPrompt />
+
+      {/* Easter Egg: Funny Don't Delete / Don't Uninstall Modal */}
+      <DontDeleteModal
+        isOpen={isDontDeleteOpen}
+        onClose={() => setIsDontDeleteOpen(false)}
+      />
     </main>
   );
 }

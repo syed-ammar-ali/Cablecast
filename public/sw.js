@@ -1,5 +1,5 @@
 // Cablecast Progressive Web App Service Worker
-const CACHE_NAME = "cablecast-v7";
+const CACHE_NAME = "cablecast-v8";
 const STATIC_ASSETS = [
   "/",
   "/manifest.json",
@@ -131,8 +131,29 @@ self.addEventListener("push", (event) => {
     options.actions = payload.actions;
   }
 
-  // Display the sleek system push notification
-  event.waitUntil(self.registration.showNotification(title, options));
+  // Display the sleek system push notification with robust WebKit/iOS fallback
+  event.waitUntil(
+    (async () => {
+      try {
+        await self.registration.showNotification(title, options);
+      } catch (err) {
+        console.warn("[SW] Rich notification error, trying universal safe fallback:", err);
+        // Fallback for Safari/iOS WebKit where vibrate, actions, or large images can reject
+        const safeOptions = {
+          body: payload.body || "New update in your TV lineup.",
+          icon: "/badge-96.png",
+          badge: "/badge-96.png",
+          tag: payload.tag || "cablecast-alert",
+          data: payload.data || { url: "/" },
+        };
+        try {
+          await self.registration.showNotification(title, safeOptions);
+        } catch (fatalErr) {
+          console.error("[SW] Fatal: Both primary and safe notification options failed:", fatalErr);
+        }
+      }
+    })()
+  );
 });
 
 // Notification click event — deep-link to target page or handle action buttons

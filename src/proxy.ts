@@ -78,7 +78,7 @@ function deny(request: NextRequest, status: 401 | 403, message: string): NextRes
   return response;
 }
 
-export async function proxy(request: NextRequest, event: NextFetchEvent) {
+export async function proxy(request: NextRequest, _event: NextFetchEvent) {
   try {
     const { pathname } = request.nextUrl;
 

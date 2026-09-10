@@ -26,7 +26,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
-  viewportFit: "auto",
+  viewportFit: "cover",
   themeColor: "#000000",
 };
 
@@ -38,7 +38,7 @@ export const metadata: Metadata = {
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
-    statusBarStyle: "black",
+    statusBarStyle: "black-translucent",
     title: "Cablecast",
   },
   icons: {

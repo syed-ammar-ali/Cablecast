@@ -63,7 +63,7 @@ export function NotificationPermissionPrompt() {
   return (
     <aside
       aria-label="Notification permission prompt"
-      className="fixed bottom-20 md:bottom-6 right-3 sm:right-6 z-50 max-w-sm w-[calc(100vw-1.5rem)] sm:w-96 rounded-2xl border border-amber-500/30 bg-neutral-950/95 p-4 sm:p-5 shadow-2xl shadow-black/80 backdrop-blur-xl animate-in fade-in slide-in-from-bottom-5 duration-300"
+      className="fixed top-[max(0.75rem,env(safe-area-inset-top))] md:top-auto md:bottom-6 right-3 sm:right-6 z-50 max-w-sm w-[calc(100vw-1.5rem)] sm:w-96 rounded-2xl border border-amber-500/30 bg-neutral-950/95 p-4 sm:p-5 shadow-2xl shadow-black/80 backdrop-blur-xl animate-in fade-in slide-in-from-top-4 md:slide-in-from-bottom-5 duration-300"
     >
       <button
         type="button"

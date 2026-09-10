@@ -13,22 +13,37 @@ export const dynamic = "force-dynamic";
 export async function POST(request: NextRequest) {
   try {
     const session = await getSession();
-    if (!session || session.role !== "admin") {
-      return NextResponse.json(
-        { success: false, error: "Only administrators can send test notifications." },
-        { status: 403 },
-      );
-    }
-
     const userId = getPersistentUserId(session);
+
+    let reqBody: { endpoint?: string } = {};
+    try {
+      reqBody = await request.json();
+    } catch {
+      reqBody = {};
+    }
 
     const userKeys = Array.from(
       new Set([userId, session?.id, session?.accessCodeId]),
     ).filter(Boolean) as string[];
 
-    const subscriptions = await prisma.pushSubscription.findMany({
-      where: { userId: { in: userKeys } },
-    });
+    let subscriptions: any[] = [];
+
+    // 1. If an explicit endpoint was sent from the client, target it directly
+    if (reqBody.endpoint) {
+      const explicitSub = await prisma.pushSubscription.findUnique({
+        where: { endpoint: reqBody.endpoint },
+      });
+      if (explicitSub) {
+        subscriptions = [explicitSub];
+      }
+    }
+
+    // 2. Otherwise query subscriptions by user session keys
+    if (subscriptions.length === 0 && userKeys.length > 0) {
+      subscriptions = await prisma.pushSubscription.findMany({
+        where: { userId: { in: userKeys } },
+      });
+    }
 
     if (subscriptions.length === 0) {
       return NextResponse.json(
@@ -46,7 +61,7 @@ export async function POST(request: NextRequest) {
       orderBy: { updatedAt: "desc" },
     });
 
-    let title = "📺 Showtime in 10 Minutes";
+    const title = "📺 Showtime in 10 Minutes";
     let body = "Scheduled broadcast is about to air on your channel. Tap to tune in live!";
     let image: string | undefined = undefined;
 

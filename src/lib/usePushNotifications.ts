@@ -50,18 +50,30 @@ export function usePushNotifications() {
 
     async function checkSubscription() {
       try {
-        const registration = await navigator.serviceWorker.ready;
-        const subscription = await registration.pushManager.getSubscription();
+        let registration = await navigator.serviceWorker.getRegistration();
+        if (!registration) {
+          registration = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
+        }
+        const readyReg = await Promise.race([
+          navigator.serviceWorker.ready,
+          new Promise<ServiceWorkerRegistration | null>((_, reject) =>
+            setTimeout(() => reject(new Error("ServiceWorker ready timeout")), 4000)
+          ),
+        ]).catch(() => null);
 
-        if (subscription) {
-          setIsSubscribed(true);
-        } else {
-          // Also verify with backend
-          const res = await fetch("/api/notifications/subscribe");
-          if (res.ok) {
-            const data = await res.json();
-            setIsSubscribed(Boolean(data.isSubscribed));
+        if (readyReg) {
+          const subscription = await readyReg.pushManager.getSubscription();
+          if (subscription) {
+            setIsSubscribed(true);
+            return;
           }
+        }
+
+        // Also check backend status
+        const res = await fetch("/api/notifications/subscribe");
+        if (res.ok) {
+          const data = await res.json();
+          setIsSubscribed(Boolean(data.isSubscribed));
         }
       } catch (err) {
         console.error("[usePushNotifications] Error checking subscription:", err);
@@ -113,12 +125,16 @@ export function usePushNotifications() {
         return { success: false, error: "VAPID public key is missing on the server." };
       }
 
-      // 3. Register with PushManager
-      const registration = await navigator.serviceWorker.ready;
-      let subscription = await registration.pushManager.getSubscription();
+      // 3. Register with PushManager (ensuring service worker is active)
+      let registration = await navigator.serviceWorker.getRegistration();
+      if (!registration) {
+        registration = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
+      }
+      const readyReg = await navigator.serviceWorker.ready;
+      let subscription = await readyReg.pushManager.getSubscription();
 
       if (!subscription) {
-        subscription = await registration.pushManager.subscribe({
+        subscription = await readyReg.pushManager.subscribe({
           userVisibleOnly: true,
           applicationServerKey: urlBase64ToUint8Array(publicKey) as unknown as BufferSource,
         });
@@ -193,7 +209,24 @@ export function usePushNotifications() {
     error?: string;
   }> => {
     try {
-      const res = await fetch("/api/notifications/test", { method: "POST" });
+      let endpoint: string | undefined = undefined;
+      if (typeof window !== "undefined" && "serviceWorker" in navigator) {
+        try {
+          const readyReg = await navigator.serviceWorker.ready;
+          const sub = await readyReg.pushManager.getSubscription();
+          if (sub?.endpoint) {
+            endpoint = sub.endpoint;
+          }
+        } catch {
+          // Continue without explicit endpoint
+        }
+      }
+
+      const res = await fetch("/api/notifications/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ endpoint }),
+      });
       const data = await res.json();
       if (!res.ok || !data.success) {
         return { success: false, error: data.error || "Failed to deliver test alert." };

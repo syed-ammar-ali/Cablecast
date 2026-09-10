@@ -8,7 +8,6 @@ import {
   SlidersHorizontal,
   RotateCcw,
   Star,
-  Calendar,
   Gift,
 } from "lucide-react";
 

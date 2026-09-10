@@ -11,6 +11,7 @@ import {
   Key,
   Loader2,
   Package,
+  Play,
   Radio,
   Search,
   Star,
@@ -24,6 +25,7 @@ import type { LibraryMediaItem, LibraryTabKey } from "@/types/library";
 import { toMediaSearchResult } from "@/types/library";
 import type { MediaSearchResult } from "@/types/media";
 import { useToast } from "@/components/ui/ToastProvider";
+import { triggerHaptic } from "@/lib/haptics";
 
 interface LibraryDrawerProps {
   isOpen: boolean;
@@ -31,6 +33,7 @@ interface LibraryDrawerProps {
   collection: LibraryMediaItem[];
   owned: LibraryMediaItem[];
   rented: LibraryMediaItem[];
+  onPlay?: (media: MediaSearchResult, season?: number) => void;
   onAddToBroadcast?: (media: MediaSearchResult, season?: number) => void;
   onRemoveItem?: (mediaId: number | string, seasonNumber?: number | null) => Promise<boolean>;
   isScheduled?: (tmdbId: number, seasonNumber?: number) => boolean;
@@ -52,6 +55,7 @@ export function LibraryDrawer({
   collection,
   owned,
   rented,
+  onPlay,
   onAddToBroadcast,
   onRemoveItem,
   isScheduled,
@@ -167,7 +171,7 @@ export function LibraryDrawer({
 
       <div className="relative z-10 flex h-full w-full max-w-full sm:max-w-xl flex-col border-0 sm:border-l border-neutral-800 bg-neutral-950 shadow-2xl animate-in slide-in-from-right">
         {/* Top Header - Unified Breadcrumb & Subtitle matching Cablecast Admin & Broadcast Studio */}
-        <header className="border-b border-neutral-900 bg-neutral-950/90 backdrop-blur-md px-4 sm:px-6 py-3 sm:py-4 shrink-0">
+        <header className="border-b border-neutral-900 bg-neutral-950/90 backdrop-blur-md px-4 sm:px-6 pt-[max(0.75rem,env(safe-area-inset-top))] pb-3 sm:py-4 shrink-0">
           <div className="flex items-center justify-between gap-3 mb-3">
             <div className="flex items-center gap-2 sm:gap-3 min-w-0">
               <button
@@ -288,7 +292,7 @@ export function LibraryDrawer({
         </div>
 
         {/* Content List Area */}
-        <div className="no-scrollbar flex-1 overflow-y-auto p-4 sm:p-6 space-y-3.5 flex flex-col">
+        <div className="no-scrollbar flex-1 overflow-y-auto p-4 sm:p-6 pb-[max(6rem,env(safe-area-inset-bottom)+5rem)] space-y-3.5 flex flex-col">
           {filteredItems.length === 0 ? (
             <EmptyState tabKey={activeTab} hasQuery={Boolean(filterQuery)} onExplore={onClose} />
           ) : (
@@ -392,8 +396,24 @@ export function LibraryDrawer({
                         </div>
                       </div>
 
-                      {/* Primary CTA: Add to Broadcast & Trash Action */}
+                      {/* Primary CTA: Watch, Add to Broadcast & Trash Action */}
                       <div className="flex items-center gap-1.5 shrink-0">
+                        {onPlay && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              triggerHaptic(15);
+                              onClose();
+                              onPlay(media, item.seasonNumber || 1);
+                            }}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-amber-500/50 bg-amber-500/20 hover:bg-amber-500/30 p-2 sm:px-3 sm:py-1.5 text-xs font-bold uppercase tracking-wider text-amber-300 shadow-sm transition-all hover:border-amber-400 hover:text-white cursor-pointer active:scale-95"
+                            title={`Watch Now${isTv && item.seasonNumber ? ` (Season ${item.seasonNumber})` : ""}`}
+                            aria-label={`Watch ${item.title}`}
+                          >
+                            <Play className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+                            <span className="hidden sm:inline">Watch</span>
+                          </button>
+                        )}
                         {isScheduled?.(item.tmdbId, item.seasonNumber || 1) ? (
                           <button
                             type="button"

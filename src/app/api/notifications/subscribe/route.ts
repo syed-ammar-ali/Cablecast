@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession, getPersistentUserId } from "@/lib/auth/server";
 
-import { VAPID_PUBLIC_KEY } from "@/lib/notifications/webpush";
+import { VAPID_PUBLIC_KEY, sendPushNotification, type PushNotificationPayload } from "@/lib/notifications/webpush";
+import { runAllNotificationDispatchers } from "@/lib/notifications/notificationDispatcher";
 
 export async function GET() {
   try {
@@ -72,7 +73,49 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return NextResponse.json({ success: true, message: "Subscription saved successfully." });
+    // Immediately dispatch an instant welcome push notification to this device
+    const welcomePayload: PushNotificationPayload = {
+      title: "🔔 Cablecast Alerts Active",
+      body: "Broadcast reminders are live on this device! You'll receive alerts 10 minutes before your scheduled shows air.",
+      icon: "/badge-96.png",
+      badge: "/badge-96.png",
+      tag: "cablecast-welcome-alert",
+      renotify: true,
+      data: {
+        url: "/?view=home#schedule",
+        type: "STARTING_SOON",
+      },
+    };
+
+    let pushSent = false;
+    let pushError: string | undefined;
+    try {
+      const res = await sendPushNotification(
+        {
+          endpoint,
+          p256dh: keys.p256dh,
+          auth: keys.auth,
+        },
+        welcomePayload,
+      );
+      pushSent = res.success;
+      pushError = res.error;
+    } catch (pushErr: any) {
+      pushError = pushErr?.message;
+      console.warn("[api/notifications/subscribe] Welcome alert delivery warning:", pushErr);
+    }
+
+    // Trigger dispatcher check in the background for any shows currently starting soon
+    void runAllNotificationDispatchers().catch((e) => {
+      console.warn("[api/notifications/subscribe] Background dispatcher check error:", e);
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: "Subscription saved successfully.",
+      notificationSent: pushSent,
+      notificationError: pushError,
+    });
   } catch (error) {
     console.error("[api/notifications/subscribe] POST error:", error);
     return NextResponse.json({ error: "Failed to register subscription." }, { status: 500 });

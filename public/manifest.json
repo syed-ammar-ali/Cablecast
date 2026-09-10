@@ -35,5 +35,42 @@
       "type": "image/png",
       "purpose": "maskable"
     }
+  ],
+  "shortcuts": [
+    {
+      "name": "Don't uninstall me! 🥺",
+      "short_name": "Don't delete! 🥺",
+      "description": "Please don't delete me, the tapes will get lonely!",
+      "url": "/?action=dont-delete",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Live TV Guide",
+      "short_name": "Live Guide",
+      "description": "Tune into live TV channels and EPG schedule",
+      "url": "/?focus=schedule",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Explore Catalog",
+      "short_name": "Explore",
+      "description": "Discover movies, TV series, and seasonal specials",
+      "url": "/explore",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Broadcast Studio",
+      "short_name": "Broadcast",
+      "description": "Schedule personal TV channels and reruns",
+      "url": "/broadcast",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "My VHS Vault",
+      "short_name": "Vault",
+      "description": "View owned tapes and active rentals",
+      "url": "/library",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    }
   ]
 }

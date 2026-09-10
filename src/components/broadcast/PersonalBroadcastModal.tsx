@@ -152,27 +152,6 @@ export function PersonalBroadcastModal({
   );
   const [selectedDay, setSelectedDay] = useState<number>(new Date().getDay());
   const [reschedulingItem, setReschedulingItem] = useState<MissedBroadcastItem | null>(null);
-  const [isAdmin, setIsAdmin] = useState(isAdminProp ?? false);
-
-  useEffect(() => {
-    if (isAdminProp !== undefined) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setIsAdmin(isAdminProp);
-      return;
-    }
-    let cancelled = false;
-    fetch("/api/auth/me")
-      .then((res) => res.json())
-      .then((data: { role?: string | null }) => {
-        if (!cancelled && data?.role === "admin") {
-          setIsAdmin(true);
-        }
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [isAdminProp]);
 
   const {
     isSupported: isPushSupported,
@@ -303,7 +282,7 @@ export function PersonalBroadcastModal({
         className="relative flex h-full sm:max-h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-none sm:rounded-2xl border-0 sm:border border-neutral-800 bg-neutral-950 shadow-2xl animate-in zoom-in-95"
       >
         {/* Top Header - Unified Breadcrumb navigation with Admin View */}
-        <header className="border-b border-neutral-900 bg-neutral-950/90 backdrop-blur-md px-4 sm:px-6 py-3 sm:py-4 shrink-0">
+        <header className="border-b border-neutral-900 bg-neutral-950/90 backdrop-blur-md px-4 sm:px-6 pt-[max(0.75rem,env(safe-area-inset-top))] pb-3 sm:py-4 shrink-0">
           <div className="flex items-center justify-between gap-3 mb-3">
             <div className="flex items-center gap-2 sm:gap-3 min-w-0">
               <button
@@ -374,7 +353,7 @@ export function PersonalBroadcastModal({
                     <span className="sm:hidden">{isSubscribed ? "On" : "Alerts"}</span>
                   </button>
 
-                  {isSubscribed && isAdmin && (
+                  {isSubscribed && (
                     <button
                       type="button"
                       onClick={async () => {
@@ -382,7 +361,7 @@ export function PersonalBroadcastModal({
                         setAlertFeedback(null);
                         const res = await sendTestNotification();
                         if (res.success) {
-                          setAlertFeedback("🔔 Alert sent! Check your phone.");
+                          setAlertFeedback("🔔 Alert sent! Check your device.");
                         } else {
                           setAlertFeedback(res.error || "Failed to send alert.");
                         }
@@ -391,10 +370,16 @@ export function PersonalBroadcastModal({
                       }}
                       disabled={isTestingAlert}
                       className="flex items-center gap-1 rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-[11px] font-semibold text-amber-300 hover:bg-amber-500/20 transition-all cursor-pointer active:scale-95 disabled:opacity-50"
-                      title="Admin only: Send an immediate push alert to test your device"
+                      title="Send an immediate push alert to test your device"
                     >
                       <span>{isTestingAlert ? "Testing..." : "Test Alert"}</span>
                     </button>
+                  )}
+
+                  {alertFeedback && (
+                    <span className="text-[11px] font-mono text-amber-300 bg-amber-950/60 border border-amber-500/30 rounded px-1.5 py-0.5 animate-in fade-in duration-200">
+                      {alertFeedback}
+                    </span>
                   )}
                 </div>
               )}

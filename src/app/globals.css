@@ -25,6 +25,25 @@ html,
 body {
   scrollbar-width: none !important;
   -ms-overflow-style: none !important;
+  overscroll-behavior-y: none;
+  touch-action: manipulation;
+  -webkit-touch-callout: none;
+}
+
+button,
+a,
+nav,
+header,
+footer {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+input,
+textarea {
+  -webkit-user-select: text;
+  user-select: text;
 }
 
 html::-webkit-scrollbar,

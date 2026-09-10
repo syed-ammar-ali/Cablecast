@@ -14,6 +14,7 @@ import type { useBroadcastResolver } from "@/lib/useBroadcastResolver";
 import type { MediaSearchResult } from "@/types/media";
 import type { PersonalScheduleItem, SubscribedChannel } from "@/types/broadcast";
 import { personalScheduleToMediaSearchResult } from "@/types/broadcast";
+import { triggerHaptic } from "@/lib/haptics";
 
 export type { BroadcastSelection } from "@/types/broadcastSelection";
 
@@ -50,6 +51,7 @@ interface TvGridProps {
   isLoading: boolean;
   error: string | null;
   selectedDate: string;
+  onDateChange?: (date: string) => void;
   now: Date;
   /** Shared with the hero's "Live Now" panel, via `useBroadcastResolver` — see that module. */
   resolver: BroadcastResolver;
@@ -69,6 +71,7 @@ export function TvGrid({
   isLoading,
   error,
   selectedDate,
+  onDateChange,
   now,
   resolver,
   personalSchedule = [],
@@ -82,6 +85,13 @@ export function TvGrid({
   // Current time in minutes from the provided `now` prop (ticks every 20s from root)
   const minutesNow = now.getHours() * 60 + now.getMinutes() + now.getSeconds() / 60;
   const currentBlockStart = Math.floor(minutesNow / BLOCK_MINUTES) * BLOCK_MINUTES;
+
+  const isToday = useMemo(() => {
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    return selectedDate === todayStr;
+  }, [selectedDate, now]);
+
+  const [isAwayFromLive, setIsAwayFromLive] = useState(false);
 
   // Clear unavailable cache whenever the date changes — a show unavailable on
   // one date may have a TMDB entry on another, and live slots need a clean slate.
@@ -118,6 +128,52 @@ export function TvGrid({
 
     return () => cancelAnimationFrame(rafId);
   }, [schedule.length, selectedDate]);
+
+  const checkLiveDistance = useCallback(() => {
+    if (!gridScrollRef.current) return;
+    if (!isToday) {
+      setIsAwayFromLive(true);
+      return;
+    }
+    const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
+    const pxPerMin = isMobile ? 4 : 6;
+    const d = new Date();
+    const currentMin = d.getHours() * 60 + d.getMinutes() + d.getSeconds() / 60;
+    const liveLineLeftPx = currentMin * pxPerMin;
+    const containerWidth = gridScrollRef.current.clientWidth || 800;
+    const targetScroll = Math.max(0, liveLineLeftPx - containerWidth * 0.3);
+    const scrollDiff = Math.abs(gridScrollRef.current.scrollLeft - targetScroll);
+    setIsAwayFromLive(scrollDiff > 350);
+  }, [isToday]);
+
+  useEffect(() => {
+    const el = gridScrollRef.current;
+    if (!el) return;
+    const handleScroll = () => {
+      checkLiveDistance();
+    };
+    el.addEventListener("scroll", handleScroll, { passive: true });
+    return () => el.removeEventListener("scroll", handleScroll);
+  }, [checkLiveDistance]);
+
+  const handleJumpToLive = useCallback(() => {
+    triggerHaptic(15);
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    if (selectedDate !== todayStr && onDateChange) {
+      lastSnappedDateRef.current = null;
+      onDateChange(todayStr);
+    }
+    if (!gridScrollRef.current) return;
+    const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
+    const pxPerMin = isMobile ? 4 : 6;
+    const d = new Date();
+    const currentMin = d.getHours() * 60 + d.getMinutes() + d.getSeconds() / 60;
+    const liveLineLeftPx = currentMin * pxPerMin;
+    const containerWidth = gridScrollRef.current.clientWidth || 800;
+    const targetScroll = Math.max(0, liveLineLeftPx - containerWidth * 0.3);
+    gridScrollRef.current.scrollTo({ left: targetScroll, behavior: "smooth" });
+    setIsAwayFromLive(false);
+  }, [now, selectedDate, onDateChange]);
 
   const handleSlotClick = useCallback(
     (item: BroadcastScheduleItem) => {
@@ -179,7 +235,23 @@ export function TvGrid({
   }
 
   return (
-    <div className="flex flex-col h-auto [--px-per-min:4px] md:[--px-per-min:6px]">
+    <div className="flex flex-col h-auto [--px-per-min:4px] md:[--px-per-min:6px] relative">
+      {/* Floating Jump to Live Pill */}
+      {isAwayFromLive && (
+        <button
+          type="button"
+          onClick={handleJumpToLive}
+          className="fixed bottom-20 md:bottom-8 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 rounded-full border border-red-500/60 bg-neutral-950/95 px-3.5 py-1.5 text-xs font-bold uppercase tracking-wider text-white shadow-2xl shadow-red-950/80 backdrop-blur-md transition-all hover:bg-red-950/70 hover:border-red-400 active:scale-95 animate-in fade-in slide-in-from-bottom-3 duration-200 cursor-pointer"
+          title="Jump to current live time on schedule"
+        >
+          <span className="relative flex h-2 w-2">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500" />
+          </span>
+          <span>Jump to Live</span>
+        </button>
+      )}
+
       {resolveMessage && (
         <div className="mb-3 flex items-center justify-between rounded-md border border-amber-500/40 bg-amber-950/30 px-4 py-2 text-xs text-amber-300">
           <div className="flex items-center gap-2">

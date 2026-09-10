@@ -11,16 +11,6 @@ import {
 
 const LOCAL_FAVORITES_KEY = "cablecast_user_favorites";
 
-function getInitialFavorites(): FavoriteItem[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = localStorage.getItem(LOCAL_FAVORITES_KEY);
-    return raw ? (JSON.parse(raw) as FavoriteItem[]) : [];
-  } catch {
-    return [];
-  }
-}
-
 function safeSetStorage<T>(key: string, value: T): void {
   if (typeof window === "undefined") return;
   try {

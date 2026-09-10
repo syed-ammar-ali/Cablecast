@@ -1,23 +1,18 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import Image from "next/image";
 import {
   Calendar as CalendarIcon,
-  Clock,
   AlertTriangle,
   Check,
   X,
   Loader2,
   Film,
-  Tv,
-  Sparkles,
-  ChevronLeft,
-  ChevronRight,
 } from "lucide-react";
 import type { MediaSearchResult } from "@/types/media";
 import { BLOCK_MINUTES, normalizeRuntime } from "@/lib/runtime";
-import { formatBlockTime, DAYS_OF_WEEK } from "@/types/broadcast";
+import { formatBlockTime } from "@/types/broadcast";
 import { notifyBroadcastMutation } from "@/lib/syncEvents";
 import { useToast } from "@/components/ui/ToastProvider";
 
