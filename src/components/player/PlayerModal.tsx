@@ -128,14 +128,49 @@ export function PlayerModal({
       // Ignore
     }
 
+    const actionHandlers: [MediaSessionAction, MediaSessionActionHandler | null][] = [
+      ["stop", () => onClose()],
+      [
+        "pause",
+        () => {
+          try {
+            navigator.mediaSession.playbackState = "paused";
+          } catch {}
+        },
+      ],
+      [
+        "play",
+        () => {
+          try {
+            navigator.mediaSession.playbackState = "playing";
+          } catch {}
+        },
+      ],
+    ];
+
+    for (const [action, handler] of actionHandlers) {
+      try {
+        navigator.mediaSession.setActionHandler(action, handler);
+      } catch {
+        // Ignore unsupported action types
+      }
+    }
+
     return () => {
       try {
         navigator.mediaSession.playbackState = "none";
       } catch {
         // Ignore
       }
+      for (const [action] of actionHandlers) {
+        try {
+          navigator.mediaSession.setActionHandler(action, null);
+        } catch {
+          // Ignore
+        }
+      }
     };
-  }, [directBroadcast, media, isTv, season, episode]);
+  }, [directBroadcast, media, isTv, season, episode, onClose]);
 
   // Only fetched to default `season` to the show's actual first season
   // (e.g. some shows start at 0 for specials) when the caller didn't pass

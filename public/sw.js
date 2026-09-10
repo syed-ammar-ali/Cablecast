@@ -1,7 +1,8 @@
 // Cablecast Progressive Web App Service Worker
-const CACHE_NAME = "cablecast-v8";
+const CACHE_NAME = "cablecast-v9";
 const STATIC_ASSETS = [
   "/",
+  "/offline.html",
   "/manifest.json",
   "/icon-192.png",
   "/icon-512.png",
@@ -91,8 +92,10 @@ self.addEventListener("fetch", (event) => {
       .catch(async () => {
         const cached = await caches.match(request);
         if (cached) return cached;
-        // Fallback to home/cached root if offline
-        return caches.match("/");
+        // Fallback to home/cached root if offline, or retro offline CRT screen
+        const cachedHome = await caches.match("/");
+        if (cachedHome) return cachedHome;
+        return caches.match("/offline.html");
       })
   );
 });

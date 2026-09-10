@@ -5,6 +5,8 @@ import { Analytics } from "@vercel/analytics/next";
 import { ToastProvider } from "@/components/ui/ToastProvider";
 import { AuthInterceptor } from "@/components/auth/AuthInterceptor";
 import { PwaRegister } from "@/components/pwa/PwaRegister";
+import { NetworkStatusToast } from "@/components/pwa/NetworkStatusToast";
+import { IosInstallPrompt } from "@/components/pwa/IosInstallPrompt";
 import "./globals.css";
 
 const geistSans = localFont({
@@ -67,6 +69,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       </head>
       <body className="min-h-full flex flex-col">
         <PwaRegister />
+        <NetworkStatusToast />
+        <IosInstallPrompt />
         <ToastProvider>
           <AuthInterceptor />
           {children}

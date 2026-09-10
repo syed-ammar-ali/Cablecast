@@ -1,4 +1,5 @@
 {
+  "id": "/",
   "name": "Cablecast",
   "short_name": "Cablecast",
   "description": "90s-inspired retro TV simulation with broadcast schedules and personal video tapes.",
@@ -7,6 +8,11 @@
   "display": "standalone",
   "display_override": ["standalone", "minimal-ui"],
   "orientation": "any",
+  "launch_handler": {
+    "client_mode": "focus-existing"
+  },
+  "handle_links": "preferred",
+  "prefer_related_applications": false,
   "background_color": "#06070a",
   "theme_color": "#000000",
   "categories": ["entertainment", "video", "tv"],
