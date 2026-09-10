@@ -61,12 +61,24 @@ export function MobileSearchOverlay({
           </button>
 
           {/* Auto-focused search input stretching across the center with in-field clear button */}
-          <div className="relative flex-1">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              (document.activeElement as HTMLElement)?.blur();
+            }}
+            className="relative flex-1"
+          >
             <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" />
             <input
-              type="text"
+              type="search"
+              enterKeyHint="search"
               value={query}
               onChange={(e) => onQueryChange(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.currentTarget.blur();
+                }
+              }}
               placeholder="Search movies & TV shows..."
               autoFocus
               className="w-full rounded-xl border border-neutral-800 bg-neutral-900/90 py-2.5 pl-10 pr-9 text-xs text-neutral-100 placeholder:text-neutral-500 transition-colors hover:border-neutral-700 focus:border-cyan-500/60 focus:bg-black focus:outline-none shadow-inner"
@@ -75,7 +87,7 @@ export function MobileSearchOverlay({
               <button
                 type="button"
                 onClick={() => onQueryChange("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1 text-neutral-400 hover:text-white"
+                className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1 text-neutral-400 hover:text-white cursor-pointer"
                 aria-label="Clear search query"
               >
                 <X className="h-3.5 w-3.5" />
@@ -83,7 +95,7 @@ export function MobileSearchOverlay({
             ) : isLoading ? (
               <Loader2 className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 animate-spin text-neutral-500" />
             ) : null}
-          </div>
+          </form>
         </div>
       </header>
 

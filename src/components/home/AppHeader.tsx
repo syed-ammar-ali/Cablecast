@@ -275,19 +275,31 @@ export function AppHeader({
             </button>
           )}
 
-          <div className="relative flex-1">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              (document.activeElement as HTMLElement)?.blur();
+            }}
+            className="relative flex-1"
+          >
             <Search className="pointer-events-none absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-neutral-500" />
             <input
-              type="text"
+              type="search"
+              enterKeyHint="search"
               value={searchQuery}
               onChange={(event) => onSearchQueryChange(event.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.currentTarget.blur();
+                }
+              }}
               placeholder="Search movies & TV shows..."
               className="w-full rounded-full border border-neutral-700 bg-transparent py-2.5 pl-10 pr-4 text-base text-neutral-200 placeholder:text-neutral-500 transition-colors hover:border-sky-500/40 focus:border-sky-500/60 focus:outline-none"
             />
             {isSearchLoading && (
               <Loader2 className="pointer-events-none absolute right-3.5 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-neutral-500" />
             )}
-          </div>
+          </form>
 
           {onOpenLibrary && (
             <button

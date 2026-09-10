@@ -13,6 +13,7 @@ import {
   CassetteTape,
   AlertCircle,
   Film,
+  Compass,
 } from "lucide-react";
 import type { MediaSearchResult } from "@/types/media";
 import type { SeasonalEpisodeItem } from "@/lib/seasonalEpisodes";
@@ -374,44 +375,113 @@ export function ExploreView({
           : "min-h-screen bg-black text-neutral-100 pb-[max(6rem,env(safe-area-inset-bottom)+5rem)] sm:pb-12"
       }
     >
-      {/* ── Top Fixed Navigation & Search Bar ──────────────────────────────── */}
-      <header className="sticky top-0 z-40 border-b border-neutral-900 bg-neutral-950/90 backdrop-blur-xl px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-3 sm:px-6">
-        <div className="mx-auto flex max-w-7xl items-center gap-3">
-          {/* Back to Home / Dismiss */}
-          {onClose ? (
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-neutral-800 bg-neutral-900/80 text-neutral-400 hover:border-neutral-700 hover:text-white transition-all active:scale-95 cursor-pointer"
-              title="Back to Broadcast TV"
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </button>
-          ) : (
-            <Link
-              href="/home"
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-neutral-800 bg-neutral-900/80 text-neutral-400 hover:border-neutral-700 hover:text-white transition-all active:scale-95"
-              title="Back to Broadcast TV"
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </Link>
-          )}
+      {/* ── Top Header - Unified Breadcrumb & Subtitle matching Cablecast Admin & Broadcast Studio ── */}
+      <header className="sticky top-0 z-40 border-b border-neutral-900 bg-neutral-950/90 backdrop-blur-xl px-4 sm:px-6 pt-[max(0.75rem,env(safe-area-inset-top))] pb-3 sm:py-4 shrink-0">
+        <div className="mx-auto max-w-7xl">
+          {/* Breadcrumb Navigation Row */}
+          <div className="flex items-center justify-between gap-3 mb-2.5">
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+              {onClose ? (
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="group inline-flex items-center gap-1.5 text-[11px] sm:text-xs uppercase tracking-widest text-neutral-400 transition-colors hover:text-white shrink-0 cursor-pointer"
+                >
+                  <ArrowLeft className="h-3.5 w-3.5 transition-transform group-hover:-translate-x-0.5" />
+                  <span>Back to Cablecast</span>
+                </button>
+              ) : (
+                <Link
+                  href="/home"
+                  className="group inline-flex items-center gap-1.5 text-[11px] sm:text-xs uppercase tracking-widest text-neutral-400 transition-colors hover:text-white shrink-0"
+                >
+                  <ArrowLeft className="h-3.5 w-3.5 transition-transform group-hover:-translate-x-0.5" />
+                  <span>Back to Cablecast</span>
+                </Link>
+              )}
+              <span className="text-neutral-700 leading-none select-none">/</span>
+              <span className="text-[11px] sm:text-xs uppercase tracking-widest font-bold text-neutral-300 truncate">
+                Explore Catalog
+              </span>
+            </div>
+          </div>
 
-          {/* Search Input */}
-          <div className="relative flex-1">
+          {/* Subtitle Row matching Broadcast Studio & VHS Vault */}
+          <div className="flex items-center justify-between gap-2 border-t border-neutral-900/60 pt-2.5 sm:border-t-0 sm:pt-0">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-neutral-800 bg-neutral-900 text-cyan-400 shadow">
+                <Compass className="h-3.5 w-3.5" />
+              </div>
+              <h1 className="text-xs sm:text-sm font-black uppercase tracking-wider text-white truncate">
+                Explore &amp; Discover
+              </h1>
+              {totalResults > 0 && (
+                <span className="hidden sm:inline-flex rounded-md border border-neutral-800 bg-neutral-900 px-2 py-0.5 font-mono text-[10px] font-bold text-neutral-400">
+                  {totalResults} Titles
+                </span>
+              )}
+            </div>
+
+            {/* Layout Mode (Shelf vs Grid) */}
+            {filters.type !== "episodes" && (
+              <div className="flex items-center rounded-lg border border-neutral-800 bg-neutral-900/80 p-0.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setLayoutMode("shelf")}
+                  className={`flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-all ${
+                    layoutMode === "shelf"
+                      ? "bg-amber-400/20 text-amber-300 border border-amber-400/40 shadow-sm"
+                      : "text-neutral-500 hover:text-neutral-300"
+                  }`}
+                  title="3D VHS Shelf View"
+                >
+                  <CassetteTape className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">VHS Shelf</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLayoutMode("grid")}
+                  className={`flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-all ${
+                    layoutMode === "grid"
+                      ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm"
+                      : "text-neutral-500 hover:text-neutral-300"
+                  }`}
+                  title="Poster Grid View"
+                >
+                  <LayoutGrid className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Grid</span>
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Search Input with Auto-Dismiss Keyboard on Enter */}
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              (document.activeElement as HTMLElement)?.blur();
+            }}
+            className="relative mt-2.5"
+          >
             <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-500" />
             <input
-              type="text"
+              type="search"
+              enterKeyHint="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search catalog by title, theme, episode name..."
-              className="w-full rounded-xl border border-neutral-800 bg-neutral-900/90 py-2.5 pl-10 pr-9 text-sm text-neutral-100 placeholder:text-neutral-500 transition-all hover:border-neutral-700 focus:border-cyan-500/60 focus:bg-black focus:outline-none shadow-inner"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.currentTarget.blur();
+                }
+              }}
+              placeholder="Search catalog by title, theme, era, or genre..."
+              className="w-full rounded-xl border border-neutral-800 bg-neutral-900/90 py-2.5 pl-10 pr-9 text-xs sm:text-sm text-neutral-100 placeholder:text-neutral-500 transition-all hover:border-neutral-700 focus:border-cyan-500/60 focus:bg-black focus:outline-none shadow-inner"
             />
             {query ? (
               <button
                 type="button"
                 onClick={() => setQuery("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1 text-neutral-400 hover:text-white"
+                className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1 text-neutral-400 hover:text-white cursor-pointer"
                 title="Clear search"
               >
                 <X className="h-3.5 w-3.5" />
@@ -419,39 +489,7 @@ export function ExploreView({
             ) : isLoading ? (
               <Loader2 className="pointer-events-none absolute right-3.5 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-neutral-500" />
             ) : null}
-          </div>
-
-          {/* Shelf vs Grid layout toggle (only for movies/shows) */}
-          {filters.type !== "episodes" && (
-            <div className="hidden sm:flex items-center rounded-xl border border-neutral-800 bg-neutral-950 p-1 shrink-0">
-              <button
-                type="button"
-                onClick={() => setLayoutMode("shelf")}
-                className={`flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-all ${
-                  layoutMode === "shelf"
-                    ? "bg-amber-400/20 text-amber-300 border border-amber-400/40"
-                    : "text-neutral-500 hover:text-neutral-300"
-                }`}
-                title="3D VHS Shelf View"
-              >
-                <CassetteTape className="h-3.5 w-3.5" />
-                <span>VHS Shelf</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setLayoutMode("grid")}
-                className={`flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-all ${
-                  layoutMode === "grid"
-                    ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40"
-                    : "text-neutral-500 hover:text-neutral-300"
-                }`}
-                title="Poster Grid View"
-              >
-                <LayoutGrid className="h-3.5 w-3.5" />
-                <span>Grid</span>
-              </button>
-            </div>
-          )}
+          </form>
         </div>
       </header>
 
