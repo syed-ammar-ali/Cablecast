@@ -3,8 +3,9 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Check, Copy, Loader2, Plus, RotateCcw, ShieldOff, Trash2, Tv, Settings2 } from "lucide-react";
+import { ArrowLeft, Bell, Check, Copy, Loader2, Plus, RotateCcw, ShieldOff, Trash2, Tv, Settings2 } from "lucide-react";
 import { ShowsManager } from "@/components/admin/ShowsManager";
+import { NotificationsManager } from "@/components/admin/NotificationsManager";
 import type { AdminAccessCode, AdminSession, AssignedShowSummary } from "@/types/admin";
 import { getChannel } from "@/config/channels";
 import { useToast } from "@/components/ui/ToastProvider";
@@ -60,7 +61,7 @@ function CopyButton({ value }: { value: string }) {
 export function AdminDashboard() {
   const router = useRouter();
   const { toast, confirm } = useToast();
-  const [activeTab, setActiveTab] = useState<"shows" | "access">("shows");
+  const [activeTab, setActiveTab] = useState<"shows" | "access" | "notifications">("shows");
 
   const [codes, setCodes] = useState<AdminAccessCode[]>([]);
   const [sessions, setSessions] = useState<AdminSession[]>([]);
@@ -382,6 +383,18 @@ export function AdminDashboard() {
             >
               <ShieldOff className="h-4 w-4 text-emerald-400" />
               Access Codes
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("notifications")}
+              className={`flex flex-1 md:flex-initial justify-center items-center gap-2 rounded-lg px-3 sm:px-4 py-2 text-xs font-bold uppercase tracking-wider transition-all ${
+                activeTab === "notifications"
+                  ? "bg-neutral-800 text-white shadow-md"
+                  : "text-neutral-400 hover:text-neutral-200"
+              }`}
+            >
+              <Bell className="h-4 w-4 text-amber-400" />
+              Push Alerts
             </button>
           </div>
         </div>
@@ -1054,6 +1067,9 @@ export function AdminDashboard() {
             )}
           </div>
         )}
+
+        {/* Tab 3: Push Notifications & Alerts */}
+        {activeTab === "notifications" && <NotificationsManager />}
       </main>
 
       {/* Edit Show Assignments Modal */}

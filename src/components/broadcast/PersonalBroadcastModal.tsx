@@ -144,7 +144,7 @@ export function PersonalBroadcastModal({
   onRemoveSubscribedChannel,
   onRescheduleMissed,
   onDismissMissed,
-  isAdmin: _isAdminProp,
+  isAdmin = false,
   onPlay,
 }: PersonalBroadcastModalProps) {
   const [activeTab, setActiveTab] = useState<TabKey>(
@@ -353,7 +353,7 @@ export function PersonalBroadcastModal({
                     <span className="sm:hidden">{isSubscribed ? "On" : "Alerts"}</span>
                   </button>
 
-                  {isSubscribed && (
+                  {isAdmin && isSubscribed && (
                     <button
                       type="button"
                       onClick={async () => {
@@ -370,7 +370,7 @@ export function PersonalBroadcastModal({
                       }}
                       disabled={isTestingAlert}
                       className="flex items-center gap-1 rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-[11px] font-semibold text-amber-300 hover:bg-amber-500/20 transition-all cursor-pointer active:scale-95 disabled:opacity-50"
-                      title="Send an immediate push alert to test your device"
+                      title="Admin: Send an immediate push alert to test your device"
                     >
                       <span>{isTestingAlert ? "Testing..." : "Test Alert"}</span>
                     </button>

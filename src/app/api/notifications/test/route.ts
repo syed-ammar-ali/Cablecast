@@ -1,35 +1,82 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getSession, getPersistentUserId } from "@/lib/auth/server";
+import { getSession } from "@/lib/auth/server";
 import { sendPushNotification } from "@/lib/notifications/webpush";
 import type { PushNotificationPayload } from "@/lib/notifications/webpush";
 
 export const dynamic = "force-dynamic";
 
+interface PushSubscriptionRecord {
+  id: string;
+  userId: string;
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+}
+
 /**
- * Sends an immediate test push notification to all active devices registered
- * to the current session / viewer.
+ * Sends an immediate test push notification.
+ * STRICTLY RESTRICTED TO ADMIN MODE.
  */
 export async function POST(request: NextRequest) {
   try {
     const session = await getSession();
-    const userId = getPersistentUserId(session);
+    if (!session || session.role !== "admin") {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Admin authentication required. Test notifications are strictly restricted to admin mode.",
+        },
+        { status: 403 },
+      );
+    }
 
-    let reqBody: { endpoint?: string } = {};
+    let reqBody: {
+      endpoint?: string;
+      subscription?: {
+        endpoint: string;
+        keys: { p256dh?: string; auth?: string };
+      };
+      broadcast?: boolean;
+    } = {};
+
     try {
       reqBody = await request.json();
     } catch {
       reqBody = {};
     }
 
-    const userKeys = Array.from(
-      new Set([userId, session?.id, session?.accessCodeId]),
-    ).filter(Boolean) as string[];
+    // Auto-heal: If the admin's browser sent valid subscription keys directly,
+    // ensure this admin device is registered in the database immediately.
+    if (
+      reqBody.subscription?.endpoint &&
+      reqBody.subscription.keys?.p256dh &&
+      reqBody.subscription.keys?.auth
+    ) {
+      await prisma.pushSubscription.upsert({
+        where: { endpoint: reqBody.subscription.endpoint },
+        update: {
+          userId: "admin",
+          p256dh: reqBody.subscription.keys.p256dh,
+          auth: reqBody.subscription.keys.auth,
+          updatedAt: new Date(),
+        },
+        create: {
+          userId: "admin",
+          endpoint: reqBody.subscription.endpoint,
+          p256dh: reqBody.subscription.keys.p256dh,
+          auth: reqBody.subscription.keys.auth,
+        },
+      });
+    }
 
-    let subscriptions: any[] = [];
+    let subscriptions: PushSubscriptionRecord[] = [];
 
-    // 1. If an explicit endpoint was sent from the client, target it directly
-    if (reqBody.endpoint) {
+    if (reqBody.broadcast) {
+      // Broadcast mode: target all active subscriber devices
+      subscriptions = await prisma.pushSubscription.findMany();
+    } else if (reqBody.endpoint) {
+      // Target specific endpoint
       const explicitSub = await prisma.pushSubscription.findUnique({
         where: { endpoint: reqBody.endpoint },
       });
@@ -38,44 +85,64 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 2. Otherwise query subscriptions by user session keys
-    if (subscriptions.length === 0 && userKeys.length > 0) {
+    // Fallback: target any active admin subscriptions
+    if (subscriptions.length === 0) {
       subscriptions = await prisma.pushSubscription.findMany({
-        where: { userId: { in: userKeys } },
+        where: {
+          OR: [{ userId: "admin" }, { userId: session.id }],
+        },
       });
+    }
+
+    // If still none, check if there's any subscription in the database at all
+    if (subscriptions.length === 0) {
+      const anySub = await prisma.pushSubscription.findFirst({
+        orderBy: { updatedAt: "desc" },
+      });
+      if (anySub) {
+        subscriptions = [anySub];
+      }
     }
 
     if (subscriptions.length === 0) {
       return NextResponse.json(
         {
           success: false,
-          error: "No active push subscriptions found on this device. Please tap 'Enable Alerts' first.",
+          error:
+            "No active push subscriptions found. Please click 'Enable Alerts' on this device first to generate a browser push token.",
         },
         { status: 404 },
       );
     }
 
-    // Look for an existing scheduled show to showcase real artwork on the test notification
+    // Look for a scheduled show to use real artwork
     const scheduledShow = await prisma.userPersonalSchedule.findFirst({
-      where: { sessionId: { in: userKeys } },
       orderBy: { updatedAt: "desc" },
     });
 
-    const title = "📺 Showtime in 10 Minutes";
-    let body = "Scheduled broadcast is about to air on your channel. Tap to tune in live!";
+    const title = "📺 Cablecast Showtime in 10 Minutes";
+    let body = "Broadcast is about to air on your station. Tap to tune in live!";
     let image: string | undefined = undefined;
 
     if (scheduledShow) {
       const showTitle = scheduledShow.title;
-      if (scheduledShow.mediaType === "tv" && scheduledShow.currentSeason && scheduledShow.currentEpisode) {
-        body = `"${showTitle}" · Season ${scheduledShow.currentSeason}, Ep ${scheduledShow.currentEpisode}\nScheduled broadcast is about to start. Tune in live!`;
+      if (
+        scheduledShow.mediaType === "tv" &&
+        scheduledShow.currentSeason &&
+        scheduledShow.currentEpisode
+      ) {
+        body = `"${showTitle}" · Season ${scheduledShow.currentSeason}, Ep ${scheduledShow.currentEpisode}\nLive broadcast starts in 10 minutes. Tune in live!`;
       } else {
-        body = `"${showTitle}"\nScheduled broadcast is about to start on your channel. Tune in live!`;
+        body = `"${showTitle}"\nScheduled broadcast starts in 10 minutes on your channel. Tune in live!`;
       }
 
       if (scheduledShow.posterPath) {
-        const clean = scheduledShow.posterPath.startsWith("/") ? scheduledShow.posterPath : `/${scheduledShow.posterPath}`;
-        image = scheduledShow.posterPath.startsWith("http") ? scheduledShow.posterPath : `https://image.tmdb.org/t/p/w780${clean}`;
+        const clean = scheduledShow.posterPath.startsWith("/")
+          ? scheduledShow.posterPath
+          : `/${scheduledShow.posterPath}`;
+        image = scheduledShow.posterPath.startsWith("http")
+          ? scheduledShow.posterPath
+          : `https://image.tmdb.org/t/p/w780${clean}`;
       }
     }
 
@@ -93,7 +160,7 @@ export async function POST(request: NextRequest) {
         { action: "dismiss", title: "Dismiss" },
       ],
       data: {
-        url: "/?view=home#schedule",
+        url: "/home",
         type: "STARTING_SOON",
       },
     };
@@ -127,11 +194,12 @@ export async function POST(request: NextRequest) {
       success: sent > 0,
       sent,
       failed,
+      totalTargets: subscriptions.length,
       errors: errors.length > 0 ? errors : undefined,
       message:
         sent > 0
           ? `Successfully delivered test alert to ${sent} device(s).`
-          : "Failed to deliver alert to registered devices.",
+          : `Failed to deliver test alert: ${errors[0] || "Unknown push error."}`,
     });
   } catch (error) {
     console.error("[api/notifications/test] Error sending test notification:", error);

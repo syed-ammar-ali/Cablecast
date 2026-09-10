@@ -1,16 +1,21 @@
 import webpush from "web-push";
 
+function sanitizeVapidKey(val?: string): string {
+  if (!val) return "";
+  return val.trim().replace(/^["']|["']$/g, "").trim();
+}
+
 export const DEFAULT_VAPID_PUBLIC_KEY =
   "BDkweSurB0QTH8HH9yMgH1_bEiQdEMqqTW7fwlefnuAbtexNrSXwlRLv1sclHaa1dvIfbaTf4mqevj7ZS9ibUwk";
 export const DEFAULT_VAPID_PRIVATE_KEY =
   "CviFIGj460TcI-jkvZZ1vLwapePJnmZrgK1VhoLpUos";
 
 export const VAPID_PUBLIC_KEY =
-  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || DEFAULT_VAPID_PUBLIC_KEY;
+  sanitizeVapidKey(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY) || DEFAULT_VAPID_PUBLIC_KEY;
 export const VAPID_PRIVATE_KEY =
-  process.env.VAPID_PRIVATE_KEY || DEFAULT_VAPID_PRIVATE_KEY;
+  sanitizeVapidKey(process.env.VAPID_PRIVATE_KEY) || DEFAULT_VAPID_PRIVATE_KEY;
 export const VAPID_SUBJECT =
-  process.env.VAPID_SUBJECT || "mailto:support@cablecast.tv";
+  sanitizeVapidKey(process.env.VAPID_SUBJECT) || "mailto:support@cablecast.tv";
 
 let isConfigured = false;
 try {
@@ -86,7 +91,7 @@ export async function sendPushNotification(
       success: false,
       statusCode,
       shouldRemove,
-      error: error?.message || "Failed to deliver push notification.",
+      error: error?.body ? `${error.message} (${error.body})` : (error?.message || "Failed to deliver push notification."),
     };
   }
 }

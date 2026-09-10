@@ -48,17 +48,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid subscription payload." }, { status: 400 });
     }
 
-    const { endpoint, keys } = body.subscription;
-    const timezone = typeof body.timezone === "string" ? body.timezone : null;
+    const endpoint = body.subscription.endpoint.trim();
+    const p256dh = body.subscription.keys.p256dh.trim();
+    const auth = body.subscription.keys.auth.trim();
+    const timezone = typeof body.timezone === "string" ? body.timezone.trim() : null;
     const timezoneOffset = typeof body.timezoneOffset === "number" ? body.timezoneOffset : null;
+
+    const existingSub = await prisma.pushSubscription.findUnique({
+      where: { endpoint },
+    });
 
     // Upsert subscription tied to this user with their client timezone
     await prisma.pushSubscription.upsert({
       where: { endpoint },
       update: {
         userId,
-        p256dh: keys.p256dh,
-        auth: keys.auth,
+        p256dh,
+        auth,
         timezone,
         timezoneOffset,
         updatedAt: new Date(),
@@ -66,43 +72,46 @@ export async function POST(request: NextRequest) {
       create: {
         userId,
         endpoint,
-        p256dh: keys.p256dh,
-        auth: keys.auth,
+        p256dh,
+        auth,
         timezone,
         timezoneOffset,
       },
     });
 
-    // Immediately dispatch an instant welcome push notification to this device
-    const welcomePayload: PushNotificationPayload = {
-      title: "🔔 Cablecast Alerts Active",
-      body: "Broadcast reminders are live on this device! You'll receive alerts 10 minutes before your scheduled shows air.",
-      icon: "/badge-96.png",
-      badge: "/badge-96.png",
-      tag: "cablecast-welcome-alert",
-      renotify: true,
-      data: {
-        url: "/?view=home#schedule",
-        type: "STARTING_SOON",
-      },
-    };
-
     let pushSent = false;
     let pushError: string | undefined;
-    try {
-      const res = await sendPushNotification(
-        {
-          endpoint,
-          p256dh: keys.p256dh,
-          auth: keys.auth,
+
+    // Only dispatch welcome push if this is a newly created subscription (prevents spamming on syncs)
+    if (!existingSub) {
+      const welcomePayload: PushNotificationPayload = {
+        title: "🔔 Cablecast Alerts Active",
+        body: "Broadcast reminders are live on this device! You'll receive alerts 10 minutes before your scheduled shows air.",
+        icon: "/badge-96.png",
+        badge: "/badge-96.png",
+        tag: "cablecast-welcome-alert",
+        renotify: true,
+        data: {
+          url: "/?view=home#schedule",
+          type: "STARTING_SOON",
         },
-        welcomePayload,
-      );
-      pushSent = res.success;
-      pushError = res.error;
-    } catch (pushErr: any) {
-      pushError = pushErr?.message;
-      console.warn("[api/notifications/subscribe] Welcome alert delivery warning:", pushErr);
+      };
+
+      try {
+        const res = await sendPushNotification(
+          {
+            endpoint,
+            p256dh,
+            auth,
+          },
+          welcomePayload,
+        );
+        pushSent = res.success;
+        pushError = res.error;
+      } catch (pushErr: unknown) {
+        pushError = pushErr instanceof Error ? pushErr.message : "Delivery failed";
+        console.warn("[api/notifications/subscribe] Welcome alert delivery warning:", pushErr);
+      }
     }
 
     // Trigger dispatcher check in the background for any shows currently starting soon

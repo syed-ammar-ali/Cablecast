@@ -1,5 +1,5 @@
 // Cablecast Progressive Web App Service Worker
-const CACHE_NAME = "cablecast-v9";
+const CACHE_NAME = "cablecast-v10";
 const STATIC_ASSETS = [
   "/",
   "/offline.html",
@@ -114,15 +114,19 @@ self.addEventListener("push", (event) => {
   const title = payload.title || "Cablecast Alert";
   const options = {
     body: payload.body || "New update in your TV lineup.",
-    icon: payload.icon || "/badge-96.png",
+    icon: payload.icon || "/icon-192.png",
     badge: payload.badge || "/badge-96.png",
     tag: payload.tag || "cablecast-alert",
     renotify: payload.renotify !== undefined ? payload.renotify : true,
-    requireInteraction: payload.requireInteraction !== undefined ? payload.requireInteraction : true,
-    timestamp: payload.timestamp || Date.now(),
-    vibrate: payload.vibrate || [120, 80, 120, 80, 240],
     data: payload.data || { url: "/" },
   };
+
+  if (payload.requireInteraction) {
+    options.requireInteraction = true;
+  }
+  if (Array.isArray(payload.vibrate)) {
+    options.vibrate = payload.vibrate;
+  }
 
   // Large cover hero image (movie/TV artwork)
   if (payload.image) {
@@ -144,7 +148,7 @@ self.addEventListener("push", (event) => {
         // Fallback for Safari/iOS WebKit where vibrate, actions, or large images can reject
         const safeOptions = {
           body: payload.body || "New update in your TV lineup.",
-          icon: "/badge-96.png",
+          icon: "/icon-192.png",
           badge: "/badge-96.png",
           tag: payload.tag || "cablecast-alert",
           data: payload.data || { url: "/" },
