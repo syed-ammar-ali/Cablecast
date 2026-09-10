@@ -1,14 +1,12 @@
 "use client";
 
 import React from "react";
-import { Sparkles, Moon, Laugh, Brain, Zap, Ghost, CassetteTape } from "lucide-react";
 import type { FilterState } from "./FilterBar";
 
 export interface MoodPreset {
   id: string;
   name: string;
   tagline: string;
-  icon: React.ElementType;
   gradient: string;
   borderHover: string;
   apply: (prev: FilterState) => FilterState;
@@ -19,8 +17,7 @@ export const MOOD_PRESETS: MoodPreset[] = [
   {
     id: "late-night",
     name: "Late Night Noir",
-    tagline: "Neon-lit thrillers & gritty crime mysteries",
-    icon: Moon,
+    tagline: "Gritty crime mysteries & neon-lit thrillers",
     gradient: "from-indigo-950/80 via-purple-950/50 to-neutral-950",
     borderHover: "hover:border-indigo-400/60 hover:shadow-[0_0_20px_rgba(99,102,241,0.25)]",
     apply: (prev) => ({
@@ -35,8 +32,7 @@ export const MOOD_PRESETS: MoodPreset[] = [
   {
     id: "feel-good",
     name: "Feel-Good 90s",
-    tagline: "Heartwarming comedies & family classics",
-    icon: Laugh,
+    tagline: "Heartwarming comedies & nostalgic family classics",
     gradient: "from-amber-950/80 via-orange-950/40 to-neutral-950",
     borderHover: "hover:border-amber-400/60 hover:shadow-[0_0_20px_rgba(251,191,36,0.25)]",
     apply: (prev) => ({
@@ -50,9 +46,8 @@ export const MOOD_PRESETS: MoodPreset[] = [
   },
   {
     id: "mind-bending",
-    name: "Mind-Bending",
-    tagline: "Sci-Fi enigmas & psychological mysteries",
-    icon: Brain,
+    name: "Mind-Bending Sci-Fi",
+    tagline: "Cosmic enigmas & psychological mysteries",
     gradient: "from-cyan-950/80 via-sky-950/40 to-neutral-950",
     borderHover: "hover:border-cyan-400/60 hover:shadow-[0_0_20px_rgba(34,211,238,0.25)]",
     apply: (prev) => ({
@@ -67,8 +62,7 @@ export const MOOD_PRESETS: MoodPreset[] = [
   {
     id: "high-adrenaline",
     name: "High Adrenaline",
-    tagline: "Explosive action & relentless set-pieces",
-    icon: Zap,
+    tagline: "Relentless set-pieces & explosive blockbusters",
     gradient: "from-rose-950/80 via-red-950/50 to-neutral-950",
     borderHover: "hover:border-rose-400/60 hover:shadow-[0_0_20px_rgba(244,63,94,0.25)]",
     apply: (prev) => ({
@@ -83,8 +77,7 @@ export const MOOD_PRESETS: MoodPreset[] = [
   {
     id: "spooky-autumn",
     name: "Spooky Autumn",
-    tagline: "Gothic chills, autumn wind & Halloween lore",
-    icon: Ghost,
+    tagline: "Gothic chills, autumn dread & Halloween lore",
     gradient: "from-orange-950/80 via-amber-950/60 to-neutral-950",
     borderHover: "hover:border-orange-500/60 hover:shadow-[0_0_20px_rgba(249,115,22,0.25)]",
     apply: (prev) => ({
@@ -92,24 +85,129 @@ export const MOOD_PRESETS: MoodPreset[] = [
       genreId: 27, // Horror
       season: "fall",
       era: null,
+      minRating: null,
     }),
     matches: (c) => c.genreId === 27 && c.season === "fall",
   },
   {
-    id: "90s-cult",
+    id: "vhs-golden-era",
     name: "VHS Golden Era",
-    tagline: "Top-tier 1990–1999 video store royalty",
-    icon: CassetteTape,
+    tagline: "80s rental royalty & analog cult tapes",
     gradient: "from-fuchsia-950/80 via-pink-950/40 to-neutral-950",
     borderHover: "hover:border-fuchsia-400/60 hover:shadow-[0_0_20px_rgba(217,70,239,0.25)]",
     apply: (prev) => ({
       ...prev,
-      era: "90s",
-      minRating: 8.0,
+      era: "80s",
+      minRating: 7.5,
       genreId: null,
       season: null,
     }),
-    matches: (c) => c.era === "90s" && c.minRating === 8.0,
+    matches: (c) => c.era === "80s" && c.minRating === 7.5,
+  },
+  {
+    id: "cyberpunk",
+    name: "Cyberpunk & Dystopia",
+    tagline: "High-tech synthscapes & futuristic underworlds",
+    gradient: "from-teal-950/80 via-cyan-950/50 to-neutral-950",
+    borderHover: "hover:border-teal-400/60 hover:shadow-[0_0_20px_rgba(45,212,191,0.25)]",
+    apply: (prev) => ({
+      ...prev,
+      genreId: 878,
+      era: "90s",
+      minRating: 7.0,
+      season: null,
+    }),
+    matches: (c) => c.genreId === 878 && c.era === "90s" && c.minRating === 7.0,
+  },
+  {
+    id: "cozy-winter",
+    name: "Cozy Holiday Specials",
+    tagline: "Warm fireplaces, festive snow & holiday comfort",
+    gradient: "from-blue-950/80 via-indigo-950/50 to-neutral-950",
+    borderHover: "hover:border-blue-400/60 hover:shadow-[0_0_20px_rgba(96,165,250,0.25)]",
+    apply: (prev) => ({
+      ...prev,
+      season: "winter",
+      genreId: 10751, // Family
+      era: null,
+      minRating: null,
+    }),
+    matches: (c) => c.season === "winter" && c.genreId === 10751,
+  },
+  {
+    id: "edge-of-seat-thrillers",
+    name: "Edge-of-Your-Seat Thrills",
+    tagline: "Twisting conspiracies & psychological suspense",
+    gradient: "from-red-950/80 via-zinc-950/60 to-neutral-950",
+    borderHover: "hover:border-red-400/60 hover:shadow-[0_0_20px_rgba(248,113,113,0.25)]",
+    apply: (prev) => ({
+      ...prev,
+      genreId: 53, // Thriller
+      minRating: 7.5,
+      season: null,
+      era: null,
+    }),
+    matches: (c) => c.genreId === 53 && c.minRating === 7.5,
+  },
+  {
+    id: "saturday-cartoons",
+    name: "Saturday Morning Nostalgia",
+    tagline: "Timeless animated gems & comfort classics",
+    gradient: "from-emerald-950/80 via-teal-950/40 to-neutral-950",
+    borderHover: "hover:border-emerald-400/60 hover:shadow-[0_0_20px_rgba(52,211,153,0.25)]",
+    apply: (prev) => ({
+      ...prev,
+      genreId: 16, // Animation
+      minRating: 7.0,
+      season: null,
+      era: null,
+    }),
+    matches: (c) => c.genreId === 16 && c.minRating === 7.0,
+  },
+  {
+    id: "classic-cinema",
+    name: "Classic 70s Cinema",
+    tagline: "Gritty auteur filmmaking & golden-age drama",
+    gradient: "from-stone-900/90 via-amber-950/40 to-neutral-950",
+    borderHover: "hover:border-amber-500/60 hover:shadow-[0_0_20px_rgba(245,158,11,0.25)]",
+    apply: (prev) => ({
+      ...prev,
+      era: "70s",
+      minRating: 7.5,
+      genreId: null,
+      season: null,
+    }),
+    matches: (c) => c.era === "70s" && c.minRating === 7.5,
+  },
+  {
+    id: "summer-road-trip",
+    name: "Summer Road Trip",
+    tagline: "Sun-soaked adventures & freewheeling comedy",
+    gradient: "from-yellow-950/80 via-amber-950/50 to-neutral-950",
+    borderHover: "hover:border-yellow-400/60 hover:shadow-[0_0_20px_rgba(250,204,21,0.25)]",
+    apply: (prev) => ({
+      ...prev,
+      season: "summer",
+      genreId: 35, // Comedy
+      era: null,
+      minRating: null,
+    }),
+    matches: (c) => c.season === "summer" && c.genreId === 35,
+  },
+  {
+    id: "monsoon-rain",
+    name: "Monsoon Rain & Chill",
+    tagline: "Rainy day solace, storm-swept drama & cozy cinema",
+    gradient: "from-sky-950/80 via-slate-900/60 to-neutral-950",
+    borderHover: "hover:border-sky-400/60 hover:shadow-[0_0_20px_rgba(56,189,248,0.25)]",
+    apply: (prev) => ({
+      ...prev,
+      season: "monsoon",
+      genreId: 18, // Drama
+      era: null,
+      minRating: null,
+    }),
+    matches: (c) => c.season === "monsoon" && c.genreId === 18,
   },
 ];
 
@@ -121,25 +219,40 @@ interface MoodPresetsProps {
 export function MoodPresets({ filters, onSelectMood }: MoodPresetsProps) {
   return (
     <div className="space-y-2">
-      <div className="flex items-center gap-2 px-1">
-        <Sparkles className="h-3.5 w-3.5 text-amber-400" />
+      <div className="flex items-center justify-between px-1">
         <span className="text-xs font-semibold uppercase tracking-wider text-neutral-400">
-          Tune Into a Vibe
+          Curated Mood Presets
+        </span>
+        <span className="text-[11px] font-mono text-neutral-500">
+          {MOOD_PRESETS.length} vibes
         </span>
       </div>
 
-      {/* Horizontal scrolling mood cards */}
+      {/* Horizontal scrolling mood cards without icons */}
       <div className="flex items-stretch gap-3 overflow-x-auto no-scrollbar pb-1 pt-0.5">
         {MOOD_PRESETS.map((mood) => {
-          const Icon = mood.icon;
           const isActive = mood.matches(filters);
 
           return (
             <button
               key={mood.id}
               type="button"
-              onClick={() => onSelectMood(mood.apply)}
-              className={`group relative flex w-60 shrink-0 flex-col justify-between rounded-xl border p-3.5 text-left transition-all duration-300 bg-gradient-to-br ${
+              onClick={() => {
+                if (isActive) {
+                  onSelectMood(() => ({
+                    type: "all",
+                    genreId: null,
+                    season: null,
+                    era: null,
+                    minRating: null,
+                    sortBy: "popularity.desc",
+                    language: null,
+                  }));
+                } else {
+                  onSelectMood(mood.apply);
+                }
+              }}
+              className={`group relative flex w-60 shrink-0 flex-col justify-between rounded-xl border p-3.5 text-left transition-all duration-300 bg-gradient-to-br cursor-pointer ${
                 mood.gradient
               } ${mood.borderHover} ${
                 isActive
@@ -148,25 +261,25 @@ export function MoodPresets({ filters, onSelectMood }: MoodPresetsProps) {
               }`}
             >
               <div className="flex items-center justify-between gap-2">
-                <div
-                  className={`flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-black/40 backdrop-blur-md transition-transform duration-300 group-hover:scale-110 ${
-                    isActive ? "text-cyan-300" : "text-white"
-                  }`}
-                >
-                  <Icon className="h-4 w-4" />
-                </div>
-                {isActive && (
-                  <span className="flex items-center gap-1 rounded-full bg-cyan-500/20 px-2 py-0.5 text-[10px] font-semibold text-cyan-300 border border-cyan-500/40">
+                <span className="text-[10px] font-mono uppercase tracking-widest text-neutral-400/80">
+                  Preset Vibe
+                </span>
+                {isActive ? (
+                  <span className="flex items-center gap-1 rounded-full bg-cyan-500/20 px-2 py-0.5 text-[10px] font-semibold text-cyan-300 border border-cyan-500/40 shadow-sm">
                     Active
+                  </span>
+                ) : (
+                  <span className="text-[10px] font-medium text-neutral-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                    Apply →
                   </span>
                 )}
               </div>
 
-              <div className="mt-3 space-y-0.5">
+              <div className="mt-3 space-y-1">
                 <h4 className="text-sm font-semibold tracking-tight text-white group-hover:text-cyan-200 transition-colors">
                   {mood.name}
                 </h4>
-                <p className="line-clamp-1 text-[11px] text-neutral-400">
+                <p className="line-clamp-2 text-[11px] text-neutral-400 leading-snug">
                   {mood.tagline}
                 </p>
               </div>

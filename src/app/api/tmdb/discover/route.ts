@@ -38,6 +38,9 @@ function computeDateBounds(
         return { dateFrom: `${startYear}-03-01`, dateTo: `${endYear}-05-31` };
       case "summer":
         return { dateFrom: `${startYear}-06-01`, dateTo: `${endYear}-08-31` };
+      case "monsoon":
+      case "rainy":
+        return { dateFrom: `${startYear}-06-15`, dateTo: `${endYear}-09-30` };
     }
   }
 
@@ -58,6 +61,9 @@ function computeDateBounds(
         return { dateFrom: `${year}-03-01`, dateTo: `${currentYear}-05-31` };
       case "summer":
         return { dateFrom: `${year}-06-01`, dateTo: `${currentYear}-08-31` };
+      case "monsoon":
+      case "rainy":
+        return { dateFrom: `${year}-06-15`, dateTo: `${currentYear}-09-30` };
     }
   }
 

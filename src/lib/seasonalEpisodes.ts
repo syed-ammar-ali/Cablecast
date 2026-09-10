@@ -7,7 +7,7 @@ export interface SeasonalEpisodeItem {
   overview: string;
   stillUrl: string | null;
   airDate: string; // YYYY-MM-DD
-  theme: "fall" | "winter" | "spring" | "summer" | "halloween" | "thanksgiving" | "christmas";
+  theme: "fall" | "winter" | "spring" | "summer" | "monsoon" | "halloween" | "thanksgiving" | "christmas";
   themeBadge: string;
   voteAverage: number;
   posterUrl: string | null;
@@ -315,6 +315,35 @@ export const CURATED_SEASONAL_EPISODES: SeasonalEpisodeItem[] = [
     voteAverage: 8.9,
     posterUrl: "https://image.tmdb.org/t/p/w342/dDuzipflXjNux59IP6Fj6857ZLM.jpg",
   },
+  // ── MONSOON / RAIN DAYS ─────────────────────────────────────
+  {
+    showId: 1668,
+    showTitle: "Friends",
+    seasonNumber: 2,
+    episodeNumber: 7,
+    name: "The One Where Ross Finds Out",
+    overview: "A drunken phone message leads Ross to discover Rachel's feelings, culminating in an unforgettable, rain-soaked reunion outside Central Perk.",
+    stillUrl: "https://image.tmdb.org/t/p/w300/r5t6y7u8i9o0p1a2s3d4f5g6h7j.jpg",
+    airDate: "1995-11-10",
+    theme: "monsoon",
+    themeBadge: "Rain Storm Romance",
+    voteAverage: 9.1,
+    posterUrl: "https://image.tmdb.org/t/p/w342/f496cm9enuEsZkSPghkkxYA96Bh.jpg",
+  },
+  {
+    showId: 1100,
+    showTitle: "How I Met Your Mother",
+    seasonNumber: 1,
+    episodeNumber: 22,
+    name: "Come On",
+    overview: "Ted attempts to win Robin's heart by performing a rain dance to make it pour across New York City.",
+    stillUrl: "https://image.tmdb.org/t/p/w300/b3Xv1g2y4z5a6b7c8d9e0f1g2h3.jpg",
+    airDate: "2006-05-15",
+    theme: "monsoon",
+    themeBadge: "Monsoon Rain Dance",
+    voteAverage: 8.8,
+    posterUrl: "https://image.tmdb.org/t/p/w342/b3Xv1g2y4z5a6b7c8d9e0f1g2h3.jpg",
+  },
 ];
 
 export function filterSeasonalEpisodes(options: {
@@ -338,6 +367,9 @@ export function filterSeasonalEpisodes(options: {
       }
       if (s === "summer") {
         return ep.theme === "summer";
+      }
+      if (s === "monsoon" || s === "rainy") {
+        return ep.theme === "monsoon";
       }
       return true;
     });

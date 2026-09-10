@@ -17,7 +17,7 @@ export type ExploreMediaType = "all" | "movie" | "tv" | "episodes";
 export interface FilterState {
   type: ExploreMediaType;
   genreId: number | null;
-  season: "fall" | "winter" | "spring" | "summer" | null;
+  season: "fall" | "winter" | "spring" | "summer" | "monsoon" | null;
   era: "70s" | "80s" | "90s" | "00s" | "10s" | "20s" | null;
   minRating: number | null;
   sortBy: string;
@@ -41,10 +41,11 @@ export const GENRE_OPTIONS = [
 ];
 
 export const SEASON_OPTIONS = [
-  { id: "fall", label: "🍂 Fall", title: "Autumn / Halloween / Thanksgiving" },
-  { id: "winter", label: "❄️ Winter", title: "Winter / Christmas / Holidays" },
-  { id: "spring", label: "🌸 Spring", title: "Spring / Easter / St. Patrick's" },
-  { id: "summer", label: "☀️ Summer", title: "Summer / Vacation / Road Trips" },
+  { id: "fall", label: "Fall", title: "Autumn / Halloween / Thanksgiving" },
+  { id: "winter", label: "Winter", title: "Winter / Christmas / Holidays" },
+  { id: "spring", label: "Spring", title: "Spring / Easter / St. Patrick's" },
+  { id: "summer", label: "Summer", title: "Summer / Vacation / Road Trips" },
+  { id: "monsoon", label: "Monsoon", title: "Monsoon / Rainy Season / Thunderstorms" },
 ] as const;
 
 export const ERA_OPTIONS = [
@@ -159,7 +160,7 @@ export function FilterBar({
             }`}
           >
             <Gift className="h-3.5 w-3.5 text-amber-400" />
-            <span>Holiday & Specials</span>
+            <span>Holiday Special</span>
           </button>
         </div>
 
