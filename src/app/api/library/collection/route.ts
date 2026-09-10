@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession, getPersistentUserId } from "@/lib/auth/server";
 import { getMovieDetails, getShowDetails } from "@/lib/tmdb";

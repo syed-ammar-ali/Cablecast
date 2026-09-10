@@ -183,7 +183,7 @@ export function ScheduleBroadcastModal({
 
   const expiresDate = useMemo(() => {
     return isRented && ownership?.expiresAt ? new Date(ownership.expiresAt) : null;
-  }, [isRented, ownership?.expiresAt]);
+  }, [isRented, ownership]);
 
   // Initial smart slot & day selection
   const [selectedDays, setSelectedDays] = useState<number[]>([now.getDay()]);
@@ -270,7 +270,7 @@ export function ScheduleBroadcastModal({
   const currentMinutesToday = now.getHours() * 60 + now.getMinutes();
 
   // Helper to compute target air date for a selected day
-  const getAirDateForDay = (dayOfWeek: number, minutes: number) => {
+  const getAirDateForDay = useCallback((dayOfWeek: number, minutes: number) => {
     const currentDay = now.getDay();
     let daysUntil = (dayOfWeek - currentDay + 7) % 7;
     if (daysUntil === 0 && currentMinutesToday >= minutes) {
@@ -279,7 +279,7 @@ export function ScheduleBroadcastModal({
     const airDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + daysUntil);
     airDate.setHours(Math.floor(minutes / 60), minutes % 60, 0, 0);
     return airDate;
-  };
+  }, [now, currentMinutesToday]);
 
   // Slot conflict & expiration matrix
   const { occupiedSlots, pastSlots, expiredSlots } = useMemo(() => {
@@ -327,7 +327,7 @@ export function ScheduleBroadcastModal({
     });
 
     return { occupiedSlots: occupiedMap, pastSlots: pastSet, expiredSlots: expiredSet };
-  }, [meridiem, blockCount, selectedDays, existingSchedule, media.tmdbId, currentMinutesToday, now, expiresDate, isOwned, defaultRuntime]);
+  }, [meridiem, blockCount, selectedDays, existingSchedule, media.tmdbId, currentMinutesToday, now, expiresDate, isOwned, defaultRuntime, getAirDateForDay]);
 
   // Real-time conflict checking for current selection
   const conflict = useMemo(() => {
@@ -387,7 +387,7 @@ export function ScheduleBroadcastModal({
       }
     }
     return null;
-  }, [isOwned, expiresDate, selectedDays, blockStartMinutes, defaultRuntime, upcomingDays]);
+  }, [isOwned, expiresDate, selectedDays, blockStartMinutes, defaultRuntime, upcomingDays, getAirDateForDay]);
 
   if (!isOpen) return null;
 

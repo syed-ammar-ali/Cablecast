@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import type { NextFetchEvent, NextRequest } from "next/server";
+import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { SESSION_COOKIE_NAME } from "@/lib/auth/constants";
 import { isSessionActive } from "@/lib/auth/validity";
@@ -78,7 +78,7 @@ function deny(request: NextRequest, status: 401 | 403, message: string): NextRes
   return response;
 }
 
-export async function proxy(request: NextRequest, _event: NextFetchEvent) {
+export async function proxy(request: NextRequest) {
   try {
     const { pathname } = request.nextUrl;
 

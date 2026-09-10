@@ -12,11 +12,8 @@ const MAX_SLIDES = 8;
 
 interface HeroBannerProps {
   liveNow: BroadcastScheduleItem | null;
-  onSelectFeatured?: (media: MediaSearchResult) => void;
   onSelectLive: (item: BroadcastScheduleItem) => void;
   isLiveResolving?: boolean;
-  isScheduled?: (tmdbId: number) => boolean;
-  onOpenBroadcastStudio?: () => void;
   onRent?: (media: MediaSearchResult) => void;
   onBuy?: (media: MediaSearchResult) => Promise<void> | void;
   isOwned?: (tmdbId: number) => boolean;
@@ -26,11 +23,8 @@ interface HeroBannerProps {
 
 export function HeroBanner({
   liveNow,
-  onSelectFeatured: _onSelectFeatured,
   onSelectLive,
   isLiveResolving,
-  isScheduled: _isScheduled,
-  onOpenBroadcastStudio: _onOpenBroadcastStudio,
   onRent,
   onBuy,
   isOwned,

@@ -329,7 +329,7 @@ export function ChannelRemote({ onTuneIn, onNavigateDate, onLongPress }: Channel
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [isOpen, selectedShow, handleTune, pulseIR]);
+  }, [isOpen, selectedShow, handleTune, pulseIR, handleClose]);
 
   const handleKey = useCallback(
     (key: NumKey) => {

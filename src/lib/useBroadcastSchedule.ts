@@ -52,7 +52,7 @@ export function useBroadcastSchedule(
     return () => {
       cancelled = true;
     };
-  }, [date, country]);
+  }, [date, country, enabled]);
 
   return { schedule, isLoading, error };
 }

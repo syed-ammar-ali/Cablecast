@@ -32,8 +32,6 @@ interface AppHeaderProps {
   onOpenLibrary?: () => void;
   onOpenBroadcastStudio?: () => void;
   missedBroadcastCount?: number;
-  isMobileSearchOpen?: boolean;
-  onCloseMobileSearch?: () => void;
   onAuthLoaded?: (role: "admin" | "user" | null) => void;
 }
 
@@ -182,14 +180,15 @@ export function AppHeader({
   onOpenLibrary,
   onOpenBroadcastStudio,
   missedBroadcastCount,
-  isMobileSearchOpen = false,
-  onCloseMobileSearch,
   onAuthLoaded,
 }: AppHeaderProps) {
   const isSearching = searchQuery.trim().length > 0;
   const [displayName, setDisplayName] = useState<string | null>(null);
   const [role, setRole] = useState<"admin" | "user" | null>(null);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
+
+  const onAuthLoadedRef = useRef(onAuthLoaded);
+  onAuthLoadedRef.current = onAuthLoaded;
 
   useEffect(() => {
     let cancelled = false;
@@ -198,7 +197,7 @@ export function AppHeader({
       .then((data: { role: "admin" | "user" | null; displayName: string | null }) => {
         if (cancelled) return;
         setRole(data.role);
-        onAuthLoaded?.(data.role);
+        onAuthLoadedRef.current?.(data.role);
         if (data.displayName) {
           setDisplayName(data.displayName);
         } else if (data.role) {

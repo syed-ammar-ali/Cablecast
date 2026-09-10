@@ -69,7 +69,6 @@ export function useLibrary() {
     }
 
     const controller = new AbortController();
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     void refreshCollection(controller.signal);
 
     const handleMutation = () => {

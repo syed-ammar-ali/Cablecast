@@ -160,11 +160,6 @@ export function getNotificationImages(
  * Lookahead window: slots starting between now - 2 mins and now + 20 mins in the user's local timezone.
  */
 export async function dispatchStartingSoonAlerts(now: Date = new Date()): Promise<{ count: number; failed: number; cleaned: number }> {
-  const currentMinutes = now.getHours() * 60 + now.getMinutes();
-  const currentDay = now.getDay();
-  const targetMinStart = currentMinutes - 2;
-  const targetMinEnd = currentMinutes + 20;
-
   // Fetch active schedules and user subscriptions with timezones
   const [upcomingSlots, subscriptions] = await Promise.all([
     prisma.userPersonalSchedule.findMany() || [],

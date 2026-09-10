@@ -248,7 +248,7 @@ export function ExploreView({
       cancelled = true;
       controller.abort();
     };
-  }, [filters, debouncedQuery]);
+  }, [isOpen, filters, debouncedQuery]);
 
   // Load more pages for infinite exploration
   const handleLoadMore = async () => {

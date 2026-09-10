@@ -144,7 +144,7 @@ export function PersonalBroadcastModal({
   onRemoveSubscribedChannel,
   onRescheduleMissed,
   onDismissMissed,
-  isAdmin: isAdminProp,
+  isAdmin: _isAdminProp,
   onPlay,
 }: PersonalBroadcastModalProps) {
   const [activeTab, setActiveTab] = useState<TabKey>(

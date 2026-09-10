@@ -416,8 +416,6 @@ export function CablecastApp({ initialView = "home" }: CablecastAppProps) {
           onOpenLibrary={() => navigateTo("library")}
           onOpenBroadcastStudio={() => navigateTo("broadcast")}
           missedBroadcastCount={personalBroadcast.missed.length}
-          isMobileSearchOpen={isExploreOpen}
-          onCloseMobileSearch={() => navigateTo("home")}
           onHomeClick={handleHomeClick}
           onAuthLoaded={(role) => setIsAdmin(role === "admin")}
         />

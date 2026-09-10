@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   RotateCw,
   Clock,
@@ -113,7 +113,9 @@ export function VhsModal({
   const [metadata, setMetadata] = useState<VhsMetadata | null>(null);
   const [seasonCache, setSeasonCache] = useState<Record<number, VhsMetadata>>({});
   const seasonCacheRef = useRef<Record<number, VhsMetadata>>({});
-  seasonCacheRef.current = seasonCache;
+  useEffect(() => {
+    seasonCacheRef.current = seasonCache;
+  }, [seasonCache]);
   const [ownershipStatus, setOwnershipStatus] = useState<"OWNED" | "RENTED" | "EXPIRED" | "NONE">("NONE");
   const [expiresAt, setExpiresAt] = useState<string | null>(null);
   const [isMutating, setIsMutating] = useState(false);
@@ -138,6 +140,14 @@ export function VhsModal({
   const handleClose = useCallback(() => {
     onClose();
   }, [onClose]);
+
+  const closeRentalModal = useCallback(() => {
+    if (isDirectRentalMode) {
+      handleClose();
+    } else {
+      setIsRentalModalOpen(false);
+    }
+  }, [isDirectRentalMode, handleClose]);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -441,17 +451,17 @@ export function VhsModal({
   const activeSeasonData = seasonCache[selectedSeason] || metadata;
 
   // Calculate formatted time remaining for active rental
-  const timeRemainingStr = useMemo(() => {
-    if (!expiresAt) return null;
+  let timeRemainingStr: string | null = null;
+  if (expiresAt) {
     const diff = new Date(expiresAt).getTime() - Date.now();
-    if (diff <= 0) return "Expired";
-    const totalHours = Math.floor(diff / (1000 * 60 * 60));
-    const days = Math.floor(totalHours / 24);
-    if (days >= 1) {
-      return `${days}d ${totalHours % 24}h left`;
+    if (diff <= 0) {
+      timeRemainingStr = "Expired";
+    } else {
+      const totalHours = Math.floor(diff / (1000 * 60 * 60));
+      const days = Math.floor(totalHours / 24);
+      timeRemainingStr = days >= 1 ? `${days}d ${totalHours % 24}h left` : `${totalHours}h left`;
     }
-    return `${totalHours}h left`;
-  }, [expiresAt]);
+  }
 
   // Effective rental hours for the picker
   const effectiveHours = isCustomMode
@@ -460,18 +470,7 @@ export function VhsModal({
       : Math.max(1, customAmount)
     : selectedDurationHours;
 
-  const projectedDueDate = useMemo(
-    () => new Date(Date.now() + effectiveHours * 3600 * 1000),
-    [effectiveHours]
-  );
-
-  const closeRentalModal = useCallback(() => {
-    if (isDirectRentalMode) {
-      handleClose();
-    } else {
-      setIsRentalModalOpen(false);
-    }
-  }, [isDirectRentalMode, handleClose]);
+  const projectedDueDate = new Date(Date.now() + effectiveHours * 3600 * 1000);
 
   const rentalCheckoutContent = (
     <>
