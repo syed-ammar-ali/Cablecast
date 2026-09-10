@@ -4,7 +4,7 @@ import { CablecastApp } from "@/components/home/CablecastApp";
 export const metadata: Metadata = {
   title: "Explore & Discover Catalog | Cablecast Retro TV",
   description:
-    "Explore, filter and discover movies, TV series, holiday specials and seasonal classics with vintage 90s vibes.",
+    "Explore, filter and discover movies, TV series, and seasonal classics with vintage 90s vibes.",
 };
 
 export default function ExplorePage() {

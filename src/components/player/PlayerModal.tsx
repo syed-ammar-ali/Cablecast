@@ -210,7 +210,7 @@ export function PlayerModal({
   const showPlayer = Boolean(directBroadcast) || !isTv || (details && !isLoadingDetails);
 
   return (
-    <div className="fixed inset-0 z-50 bg-black animate-in fade-in">
+    <div className="fixed inset-0 z-[100] bg-black animate-in fade-in">
       {directBroadcast ? (
         <div className="relative h-full w-full bg-black">
           <iframe

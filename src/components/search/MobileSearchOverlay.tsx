@@ -87,8 +87,8 @@ export function MobileSearchOverlay({
         </div>
       </header>
 
-      {/* Results / Empty View: Consumes 100% viewport height with minimal safe padding at bottom */}
-      <div className="no-scrollbar flex-1 overflow-y-auto px-4 pt-4 pb-[max(1rem,env(safe-area-inset-bottom,1rem))] space-y-4 h-[calc(100vh-65px)]">
+      {/* Results / Empty View: Consumes 100% viewport height with safe bottom padding for sticky BottomNav */}
+      <div className="no-scrollbar flex-1 overflow-y-auto px-4 pt-4 pb-[max(6rem,calc(env(safe-area-inset-bottom)+5.5rem))] space-y-4 h-[calc(100vh-65px)]">
         {error && (
           <div className="rounded-xl border border-red-500/30 bg-red-950/20 p-4 text-center text-xs text-red-300">
             {error}

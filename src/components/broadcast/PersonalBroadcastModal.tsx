@@ -615,7 +615,7 @@ export function PersonalBroadcastModal({
         </div>
 
         {/* Tab Content Body */}
-        <div className="no-scrollbar flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
+        <div className="no-scrollbar flex-1 overflow-y-auto p-4 sm:p-6 pb-[max(6rem,calc(env(safe-area-inset-bottom)+5.5rem))] space-y-6">
           {/* Tab 1: Weekly Grid */}
           {activeTab === "grid" && (
             <div key="grid" className="space-y-6 animate-in fade-in duration-150">
@@ -1051,7 +1051,7 @@ export function PersonalBroadcastModal({
                     No Date-Specific Screenings Scheduled
                   </p>
                   <p className="mt-1.5 max-w-sm text-xs text-neutral-500 leading-relaxed">
-                    Pick any movie, seasonal episode, or holiday special from Explore and schedule it to an exact calendar date.
+                    Pick any movie or TV series from Explore and schedule it to an exact calendar date.
                   </p>
                 </div>
               ) : (

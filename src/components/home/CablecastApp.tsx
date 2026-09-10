@@ -666,25 +666,27 @@ export function CablecastApp({ initialView = "home" }: CablecastAppProps) {
           />
         )}
 
-      {/* Mobile Bottom Navigation Bar */}
-      <BottomNav
-        isAdmin={isAdmin}
-        onGoHome={handleHomeClick}
-        isHomeActive={!isBroadcastStudioOpen && !isLibraryOpen && !isExploreOpen}
-        onOpenBroadcastStudio={() => navigateTo("broadcast")}
-        onOpenLibrary={() => navigateTo("library")}
-        onToggleSearch={() => {
-          if (isExploreOpen) {
-            navigateTo("home");
-          } else {
-            navigateTo("explore");
-          }
-        }}
-        missedBroadcastCount={personalBroadcast.missed.length}
-        isBroadcastStudioOpen={isBroadcastStudioOpen}
-        isLibraryOpen={isLibraryOpen}
-        isSearchActive={isExploreOpen}
-      />
+      {/* Mobile Bottom Navigation Bar (Stuck across Home, Broadcast, Library, and Explore) */}
+      {!playerTarget && !directBroadcastTarget && (
+        <BottomNav
+          isAdmin={isAdmin}
+          onGoHome={handleHomeClick}
+          isHomeActive={!isBroadcastStudioOpen && !isLibraryOpen && !isExploreOpen}
+          onOpenBroadcastStudio={() => navigateTo("broadcast")}
+          onOpenLibrary={() => navigateTo("library")}
+          onToggleSearch={() => {
+            if (isExploreOpen) {
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            } else {
+              navigateTo("explore");
+            }
+          }}
+          missedBroadcastCount={personalBroadcast.missed.length}
+          isBroadcastStudioOpen={isBroadcastStudioOpen}
+          isLibraryOpen={isLibraryOpen}
+          isSearchActive={isExploreOpen}
+        />
+      )}
 
       {/* First-time visitor push notification prompt */}
       <NotificationPermissionPrompt />

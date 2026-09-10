@@ -57,7 +57,7 @@ export function BottomNav({
   return (
     <nav
       aria-label="Mobile Navigation"
-      className="fixed bottom-0 left-0 right-0 z-40 block md:hidden border-t border-neutral-900/90 bg-neutral-950/95 backdrop-blur-xl pb-[max(0.375rem,env(safe-area-inset-bottom,0.375rem))] pt-1.5 shadow-2xl shadow-black"
+      className="fixed bottom-0 left-0 right-0 z-[60] block md:hidden border-t border-neutral-900/90 bg-neutral-950/95 backdrop-blur-xl pb-[max(0.375rem,env(safe-area-inset-bottom,0.375rem))] pt-1.5 shadow-2xl shadow-black"
     >
       <div className={`grid items-center px-1 ${isAdmin ? "grid-cols-5" : "grid-cols-4"}`}>
         {/* 1. Home */}

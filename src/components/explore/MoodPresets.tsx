@@ -121,8 +121,8 @@ export const MOOD_PRESETS: MoodPreset[] = [
   },
   {
     id: "cozy-winter",
-    name: "Cozy Holiday Specials",
-    tagline: "Warm fireplaces, festive snow & holiday comfort",
+    name: "Cozy Winter Classics",
+    tagline: "Warm fireplaces, festive snow & winter comfort",
     gradient: "from-blue-950/80 via-indigo-950/50 to-neutral-950",
     borderHover: "hover:border-blue-400/60 hover:shadow-[0_0_20px_rgba(96,165,250,0.25)]",
     apply: (prev) => ({

@@ -8,7 +8,6 @@ import {
   SlidersHorizontal,
   RotateCcw,
   Star,
-  Gift,
 } from "lucide-react";
 
 export type ExploreMediaType = "all" | "movie" | "tv" | "episodes";
@@ -147,19 +146,6 @@ export function FilterBar({
           >
             <Tv className="h-3.5 w-3.5" />
             TV Shows
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setType("episodes")}
-            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
-              filters.type === "episodes"
-                ? "bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm animate-pulse"
-                : "text-neutral-400 hover:text-amber-300"
-            }`}
-          >
-            <Gift className="h-3.5 w-3.5 text-amber-400" />
-            <span>Holiday Special</span>
           </button>
         </div>
 
