@@ -4,14 +4,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Check,
   ChevronDown,
-  Loader2,
   RadioTower,
   RefreshCw,
   SatelliteDish,
-  VolumeX,
-  Volume2,
-  Tv,
-  Maximize,
   X,
 } from "lucide-react";
 import {
@@ -19,18 +14,15 @@ import {
   isDynamicProvider,
   listProviders,
   PROVIDER_COUNT,
-  type ProviderListEntry,
 } from "@/lib/providers";
 import { CHANNELS } from "@/config/channels";
 import { BLOCK_MINUTES } from "@/lib/runtime";
 import {
-  formatClockTime,
   getAppointmentEndDate,
   msUntilNextBlockBoundary,
 } from "@/lib/schedule";
 import { fetchChannelNowPlaying } from "@/lib/liveChannelClient";
 import { getRandomBumper, type Bumper } from "@/lib/bumpers";
-import { useTouchGestures } from "@/lib/useTouchGestures";
 import { DeadAirScreen } from "@/components/player/DeadAirScreen";
 import type { MediaType } from "@/types/media";
 import type { ScheduleEntry } from "@/types/schedule";
@@ -39,8 +31,6 @@ import type { ScheduleEntry } from "@/types/schedule";
 const LOAD_TIMEOUT_MS = 12_000;
 /** Extra time given to dynamic providers (YouTube, KissKH, etc.) that need an async search first. */
 const DYNAMIC_LOAD_TIMEOUT_MS = 15_000;
-/** How long the 90s-style on-screen display stays up after the last interaction. */
-const OSD_AUTO_HIDE_MS = 3_000;
 
 interface VideoPlayerProps {
   tmdbId: number | string;
@@ -58,16 +48,6 @@ interface VideoPlayerProps {
    */
   initialLiveEntry?: ScheduleEntry;
   onClose?: () => void;
-}
-
-interface OsdContent {
-  channelLabel: string;
-  channelGenre: string;
-  programTitle?: string;
-  audioMode: "STEREO" | "MUTED";
-  time: string;
-  /** Human-readable offset into current program, e.g. "+14:22 into broadcast" — omitted when no live entry */
-  liveOffset?: string;
 }
 
 type ScreenMode = "tuning" | "off-air" | "bumper" | "content";
@@ -92,7 +72,7 @@ export function VideoPlayer({
   const [dynamicEmbedUrl, setDynamicEmbedUrl] = useState<string | null>(null);
   const dynamicRequestIdRef = useRef(0);
 
-  // --- Manual provider picker (the dropdown next to "Swap Channel") -------
+  // --- Manual provider picker (the dropdown next to "Swap Stream") -------
   const [isProviderMenuOpen, setIsProviderMenuOpen] = useState(false);
   const providerMenuRef = useRef<HTMLDivElement | null>(null);
   const providerList = useMemo(() => listProviders(), []);
@@ -108,9 +88,6 @@ export function VideoPlayer({
   }, [initialLiveEntry]);
 
   const [channelIndex, setChannelIndex] = useState(initialChannelIndex);
-  const [isMuted, setIsMuted] = useState(false);
-  const [osd, setOsd] = useState<OsdContent | null>(null);
-  const osdTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Once true, this player is simulating a live broadcast on the channel
   // lineup rather than the originally requested on-demand title — either
@@ -222,11 +199,11 @@ export function VideoPlayer({
     [clearLoadTimeout],
   );
 
-  // Close the provider picker on an outside click or Escape.
+  // Close the provider picker on an outside click/tap or Escape.
   useEffect(() => {
     if (!isProviderMenuOpen) return;
 
-    function handlePointerDown(event: MouseEvent) {
+    function handlePointerDown(event: MouseEvent | TouchEvent) {
       if (!providerMenuRef.current?.contains(event.target as Node)) {
         setIsProviderMenuOpen(false);
       }
@@ -236,9 +213,11 @@ export function VideoPlayer({
     }
 
     window.addEventListener("mousedown", handlePointerDown);
+    window.addEventListener("touchstart", handlePointerDown);
     window.addEventListener("keydown", handleKeyDown);
     return () => {
       window.removeEventListener("mousedown", handlePointerDown);
+      window.removeEventListener("touchstart", handlePointerDown);
       window.removeEventListener("keydown", handleKeyDown);
     };
   }, [isProviderMenuOpen]);
@@ -357,19 +336,16 @@ export function VideoPlayer({
           if (dynamicRequestIdRef.current !== requestId) return;
           advanceProvider();
         });
-    } else if (providerId === "kisskh-asian" || providerId === "dramacool-asian") {
-      const providerSlug = providerId === "kisskh-asian" ? "kisskh" : "dramacool";
+    } else if (providerId === "kisskh-asian") {
       const params = new URLSearchParams({
         title: cleanTitle,
-        mediaType: activePlayback.mediaType,
-        provider: providerSlug,
       });
       if (activePlayback.mediaType === "tv") {
         params.set("season", String(activePlayback.season));
         params.set("episode", String(activePlayback.episode));
       }
 
-      fetch(`/api/asian/search?${params.toString()}`)
+      fetch(`/api/kisskh/search?${params.toString()}`)
         .then((res) => res.json())
         .then((data: { match: { embedUrl: string } | null }) => {
           if (dynamicRequestIdRef.current !== requestId) return;
@@ -383,20 +359,32 @@ export function VideoPlayer({
           if (dynamicRequestIdRef.current !== requestId) return;
           advanceProvider();
         });
-    } else if (
-      providerId === "kartoons-me" ||
-      providerId === "kimcartoon" ||
-      providerId === "gogoanime"
-    ) {
-      const providerSlug =
-        providerId === "kartoons-me"
-          ? "kartoons"
-          : providerId === "kimcartoon"
-            ? "kimcartoon"
-            : "gogoanime";
+    } else if (providerId === "dramacool-asian") {
       const params = new URLSearchParams({
         title: cleanTitle,
-        mediaType: activePlayback.mediaType,
+      });
+      if (activePlayback.mediaType === "tv") {
+        params.set("episode", String(activePlayback.episode));
+      }
+
+      fetch(`/api/dramacool/search?${params.toString()}`)
+        .then((res) => res.json())
+        .then((data: { match: { embedUrl: string } | null }) => {
+          if (dynamicRequestIdRef.current !== requestId) return;
+          if (data.match?.embedUrl) {
+            setDynamicEmbedUrl(data.match.embedUrl);
+          } else {
+            advanceProvider();
+          }
+        })
+        .catch(() => {
+          if (dynamicRequestIdRef.current !== requestId) return;
+          advanceProvider();
+        });
+    } else if (providerId === "kartoons-direct") {
+      const providerSlug = activePlayback.mediaType === "movie" ? "kisscartoon" : "supercartoons";
+      const params = new URLSearchParams({
+        title: cleanTitle,
         provider: providerSlug,
       });
       if (activePlayback.mediaType === "tv") {
@@ -424,38 +412,6 @@ export function VideoPlayer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isDynamic, currentProviderIndex, reloadTick, exhausted, screenMode, contentIdentity]);
 
-  const [isControlsVisible, setIsControlsVisible] = useState(true);
-  const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const [gestureFeedback, setGestureFeedback] = useState<{ icon: React.ReactNode; text: string } | null>(null);
-  const gestureTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  const showControls = useCallback(() => {
-    setIsControlsVisible(true);
-    if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
-    controlsTimeoutRef.current = setTimeout(() => setIsControlsVisible(false), 3500);
-  }, []);
-
-  const showGestureFeedback = useCallback((icon: React.ReactNode, text: string) => {
-    setGestureFeedback({ icon, text });
-    if (gestureTimeoutRef.current) clearTimeout(gestureTimeoutRef.current);
-    gestureTimeoutRef.current = setTimeout(() => setGestureFeedback(null), 1500);
-  }, []);
-
-  const showOsd = useCallback((content: OsdContent) => {
-    setOsd(content);
-    if (osdTimeoutRef.current) clearTimeout(osdTimeoutRef.current);
-    osdTimeoutRef.current = setTimeout(() => setOsd(null), OSD_AUTO_HIDE_MS);
-  }, []);
-
-  useEffect(() => {
-    showControls();
-    return () => {
-      if (osdTimeoutRef.current) clearTimeout(osdTimeoutRef.current);
-      if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
-      if (gestureTimeoutRef.current) clearTimeout(gestureTimeoutRef.current);
-    };
-  }, [showControls]);
-
   // Re-checks what (if anything) is airing on `channelNumber` right now.
   // Used both after a manual channel change and when a live block rolls
   // over to the next scheduled slot automatically.
@@ -471,27 +427,12 @@ export function VideoPlayer({
       setLiveEntry(entry);
       setIsOffAir(false);
       setOffAirTargetTime(null);
-      const offsetSeconds = entry.liveOffsetSeconds ?? null;
-      const liveOffset = offsetSeconds != null && offsetSeconds > 0
-        ? `+${String(Math.floor(offsetSeconds / 60)).padStart(2, "0")}:${String(Math.floor(offsetSeconds % 60)).padStart(2, "0")} into broadcast`
-        : undefined;
-      const channel = CHANNELS.find((c) => c.number === channelNumber);
-      if (channel) {
-        showOsd({
-          channelLabel: `CH ${String(channel.number).padStart(2, "0")}`,
-          channelGenre: channel.genre.toUpperCase(),
-          programTitle: entry.title,
-          audioMode: isMuted ? "MUTED" : "STEREO",
-          time: formatClockTime(),
-          liveOffset,
-        });
-      }
     } else {
       setLiveEntry(null);
       setIsOffAir(true);
       setOffAirTargetTime(Date.now() + msUntilNextBlockBoundary());
     }
-  }, [isMuted, showOsd]);
+  }, []);
 
   const cycleChannel = useCallback(
     (direction: 1 | -1) => {
@@ -507,23 +448,9 @@ export function VideoPlayer({
       setIsOffAir(false);
       setOffAirTargetTime(null);
 
-      showControls();
-      showGestureFeedback(
-        <Tv className="h-5 w-5 text-purple-400" />,
-        `CH ${String(channel.number).padStart(2, "0")} · ${channel.name}`,
-      );
-
-      showOsd({
-        channelLabel: `CH ${String(channel.number).padStart(2, "0")}`,
-        channelGenre: channel.genre.toUpperCase(),
-        audioMode: isMuted ? "MUTED" : "STEREO",
-        time: formatClockTime(),
-        // No offset shown during a channel change — we don't know what's on yet
-      });
-
       void tuneToChannel(channel.number);
     },
-    [channelIndex, isMuted, showControls, showGestureFeedback, showOsd, tuneToChannel],
+    [channelIndex, tuneToChannel],
   );
 
   const enterBumperPhase = useCallback(() => {
@@ -582,81 +509,6 @@ export function VideoPlayer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLiveMode, isOffAir, liveEntry?.id, activeChannel.number]);
 
-  const toggleMute = useCallback(() => {
-    setIsMuted((prevMuted) => {
-      const nextMuted = !prevMuted;
-      showControls();
-      showGestureFeedback(
-        nextMuted ? <VolumeX className="h-5 w-5 text-red-400" /> : <Volume2 className="h-5 w-5 text-emerald-400" />,
-        nextMuted ? "MUTED" : "UNMUTED",
-      );
-      const offsetSeconds = liveEntry?.liveOffsetSeconds ?? null;
-      const liveOffset = offsetSeconds != null
-        ? `+${String(Math.floor(offsetSeconds / 60)).padStart(2, "0")}:${String(Math.floor(offsetSeconds % 60)).padStart(2, "0")} into broadcast`
-        : undefined;
-      showOsd({
-        channelLabel: `CH ${String(activeChannel.number).padStart(2, "0")}`,
-        channelGenre: activeChannel.genre.toUpperCase(),
-        audioMode: nextMuted ? "MUTED" : "STEREO",
-        time: formatClockTime(),
-        liveOffset,
-      });
-      return nextMuted;
-    });
-  }, [activeChannel, liveEntry?.liveOffsetSeconds, showControls, showGestureFeedback, showOsd]);
-
-  // Cross-browser fullscreen helpers. Safari (desktop + iOS) never shipped
-  // the unprefixed Fullscreen API, so every call here falls back to the
-  // `webkit`-prefixed equivalent. Promise rejections are caught and logged
-  // instead of left to surface as "unhandled rejection" — a rejection here
-  // just means the browser refused (e.g. no transient user-activation left),
-  // not a bug in our code, so it shouldn't crash anything.
-  const toggleFullscreen = useCallback(() => {
-    const container = containerRef.current as
-      | (HTMLDivElement & { webkitRequestFullscreen?: () => Promise<void> | void })
-      | null;
-    if (!container) return;
-
-    const doc = document as Document & {
-      webkitFullscreenElement?: Element | null;
-      webkitExitFullscreen?: () => Promise<void> | void;
-    };
-
-    const isCurrentlyFullscreen = Boolean(document.fullscreenElement ?? doc.webkitFullscreenElement);
-    showControls();
-    showGestureFeedback(
-      <Maximize className="h-5 w-5 text-amber-400" />,
-      isCurrentlyFullscreen ? "WINDOWED" : "FULLSCREEN",
-    );
-
-    if (isCurrentlyFullscreen) {
-      const exit = document.exitFullscreen?.bind(document) ?? doc.webkitExitFullscreen?.bind(doc);
-      Promise.resolve(exit?.())
-        .then(() => {
-          try {
-            const orientation = screen.orientation as unknown as
-              | { lock?: (orientation: string) => Promise<void>; unlock?: () => void }
-              | undefined;
-            if (orientation && typeof orientation.unlock === "function") {
-              orientation.unlock();
-            }
-          } catch {
-            // Non-fatal
-          }
-        })
-        .catch((error: unknown) => {
-          console.error("[VideoPlayer] Failed to exit fullscreen:", error);
-        });
-      return;
-    }
-
-    const request = container.requestFullscreen?.bind(container) ?? container.webkitRequestFullscreen?.bind(container);
-    Promise.resolve(request?.())
-      .catch((error: unknown) => {
-        console.error("[VideoPlayer] Failed to enter fullscreen:", error);
-      });
-  }, [showControls, showGestureFeedback]);
-
   const displayTitle = !isLiveMode
     ? title ?? "Now Playing"
     : screenMode === "off-air"
@@ -667,26 +519,7 @@ export function VideoPlayer({
           ? `Tuning ${activeChannel.name}...`
           : liveEntry?.title ?? title ?? "Now Playing";
 
-  const triggerInfoOsd = useCallback(() => {
-    const offsetSeconds = liveEntry?.liveOffsetSeconds ?? (isLiveMode ? startOffsetSeconds : null);
-    const liveOffset = offsetSeconds != null && offsetSeconds > 0
-      ? `+${String(Math.floor(offsetSeconds / 60)).padStart(2, "0")}:${String(Math.floor(offsetSeconds % 60)).padStart(2, "0")} into broadcast`
-      : undefined;
-
-    showOsd({
-      channelLabel: isLiveMode ? `CH ${String(activeChannel.number).padStart(2, "0")}` : "ON DEMAND",
-      channelGenre: isLiveMode ? activeChannel.genre.toUpperCase() : "MEDIA",
-      programTitle: displayTitle,
-      audioMode: isMuted ? "MUTED" : "STEREO",
-      time: formatClockTime(),
-      liveOffset,
-    });
-  }, [activeChannel, displayTitle, isLiveMode, isMuted, liveEntry?.liveOffsetSeconds, showOsd, startOffsetSeconds]);
-
-  // Global channel-surfing shortcuts. Scoped to this component's mounted
-  // lifetime (i.e. only while a player is actually open) rather than
-  // app-wide, so it never hijacks arrow keys while browsing the catalog or
-  // using a <select> elsewhere on the page.
+  // Desktop keyboard shortcuts: arrow keys cycle live channels, escape closes
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
       if (
@@ -704,20 +537,8 @@ export function VideoPlayer({
           event.preventDefault();
           cycleChannel(-1);
           break;
-        case "m":
-        case "M":
-          event.preventDefault();
-          toggleMute();
-          break;
-        case "i":
-        case "I":
-          event.preventDefault();
-          triggerInfoOsd();
-          break;
-        case "f":
-        case "F":
-          event.preventDefault();
-          toggleFullscreen();
+        case "Escape":
+          onClose?.();
           break;
         default:
           break;
@@ -726,37 +547,7 @@ export function VideoPlayer({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [cycleChannel, toggleMute, toggleFullscreen, triggerInfoOsd]);
-
-  // Mobile Touch Gestures:
-  // - Swipe Up: Next Channel
-  // - Swipe Down: Previous Channel
-  // - Swipe Left: Mute / Unmute
-  // - Swipe Right: Show OSD Banner
-  // - Double Tap: Fullscreen Toggle
-  const { handleTouchStart, handleTouchEnd } = useTouchGestures({
-    onTap: showControls,
-    onSwipeUp: () => {
-      showControls();
-      cycleChannel(1);
-    },
-    onSwipeDown: () => {
-      showControls();
-      cycleChannel(-1);
-    },
-    onSwipeLeft: () => {
-      showControls();
-      toggleMute();
-    },
-    onSwipeRight: () => {
-      triggerInfoOsd();
-      showControls();
-    },
-    onDoubleTap: () => {
-      showControls();
-      toggleFullscreen();
-    },
-  });
+  }, [cycleChannel, onClose]);
 
   const isLiveNow = isLiveMode && screenMode === "content";
   const isSyncedTuneIn = !isLiveMode && startOffsetSeconds > 0;
@@ -773,30 +564,10 @@ export function VideoPlayer({
   return (
     <div
       ref={containerRef}
-      onMouseMove={showControls}
-      onClick={showControls}
-      onTouchStart={(e) => {
-        showControls();
-        handleTouchStart(e);
-      }}
-      onTouchEnd={handleTouchEnd}
-      className="group relative h-full w-full overflow-hidden bg-black touch-none overscroll-none select-none"
+      className="relative h-full w-full overflow-hidden bg-black"
     >
-      {/* Screen — fills the entire player now; there's no separate bezel/remote strip */}
+      {/* Screen — fills the entire player with no invisible touch blockers */}
       <div className="relative h-full w-full bg-black">
-        {/* Transparent tap zones along top & bottom edges to reveal overlay controls on mobile touch even when an iframe is active */}
-        <div
-          className="absolute top-0 inset-x-0 h-16 z-20 cursor-pointer"
-          onClick={showControls}
-          onTouchStart={showControls}
-          aria-hidden="true"
-        />
-        <div
-          className="absolute bottom-0 inset-x-0 h-12 z-20 cursor-pointer"
-          onClick={showControls}
-          onTouchStart={showControls}
-          aria-hidden="true"
-        />
         {screenMode === "content" && !exhausted && hasLoadableSource && (
           <div className="relative h-full w-full">
             <iframe
@@ -809,9 +580,6 @@ export function VideoPlayer({
               height="100%"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
               allowFullScreen
-              // YouTube requires a real referrer/origin to validate the embed
-              // request (see the `source` memo above) — every other provider
-              // keeps the stricter no-referrer policy.
               referrerPolicy={
                 currentProvider?.id === "youtube-official"
                   ? "strict-origin-when-cross-origin"
@@ -855,63 +623,6 @@ export function VideoPlayer({
           </div>
         )}
 
-        {/*
-         * Top-left content-info badge — a retro "channel bug". Suppressed
-         * once a third-party provider's own on-screen UI is visible (it
-         * already shows the title/episode itself), unless we have live/
-         * tune-in status info the provider has no way of knowing about.
-         */}
-        {showBadge && (
-          <div
-            className={`pointer-events-none absolute left-[max(1rem,env(safe-area-inset-left))] top-[max(1rem,env(safe-area-inset-top))] z-20 max-w-[70vw] rounded-md border border-neutral-700/50 bg-black/75 px-3 py-2 backdrop-blur-md transition-opacity duration-300 ${
-              isControlsVisible ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-            }`}
-          >
-            {(isLiveNow || isSyncedTuneIn) && (
-              <p className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-widest text-red-400">
-                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-red-500" />
-                {isLiveNow ? `CH ${String(activeChannel.number).padStart(2, "0")} · Live` : "Live Tune-In"}
-              </p>
-            )}
-            {showNameInBadge && (
-              <p className="truncate text-sm font-semibold text-neutral-100">{displayTitle}</p>
-            )}
-            {isLiveNow && <p className="truncate text-xs text-neutral-400">{activeChannel.name}</p>}
-          </div>
-        )}
-
-        {/* 90s channel-surf OSD — sits below top controls with safe-area offset */}
-        {osd && (
-          <div className="pointer-events-none absolute right-[max(1rem,env(safe-area-inset-right))] top-[max(4.5rem,calc(env(safe-area-inset-top)+3.5rem))] z-30 max-w-[80vw] rounded-md border border-neutral-700/50 bg-black/80 px-3.5 py-2.5 text-right backdrop-blur-md shadow-[0_4px_24px_rgba(0,0,0,0.85)] animate-in fade-in slide-in-from-top-2 duration-200">
-            <p className="text-lg font-bold leading-tight tracking-widest text-neutral-100">{osd.channelLabel}</p>
-            <p className="text-xs font-semibold leading-tight tracking-wider text-neutral-400">
-              {osd.channelGenre}
-            </p>
-            {osd.programTitle && (
-              <p className="mt-1 truncate text-xs font-bold text-white">
-                {osd.programTitle}
-              </p>
-            )}
-            {osd.liveOffset && (
-              <p className="mt-0.5 text-[11px] leading-tight tracking-wide text-red-400 font-mono">
-                {osd.liveOffset}
-              </p>
-            )}
-            <p className="mt-1 flex items-center justify-end gap-1 text-[10px] leading-tight tracking-wide text-neutral-400 font-mono">
-              {osd.audioMode === "MUTED" && <VolumeX className="h-3 w-3 text-red-400" />}
-              {osd.audioMode} · {osd.time}
-            </p>
-          </div>
-        )}
-
-        {/* Gesture HUD Feedback Pill */}
-        {gestureFeedback && (
-          <div className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-40 flex items-center gap-2.5 rounded-2xl border border-neutral-700/80 bg-black/85 px-5 py-3 font-mono text-xs font-bold uppercase tracking-widest text-white shadow-2xl backdrop-blur-md animate-in fade-in zoom-in-90 duration-150">
-            {gestureFeedback.icon}
-            <span>{gestureFeedback.text}</span>
-          </div>
-        )}
-
         {screenMode === "content" && isDynamic && !dynamicEmbedUrl && !exhausted && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/90 text-neutral-300">
             <RadioTower className="h-10 w-10 animate-pulse" />
@@ -949,24 +660,35 @@ export function VideoPlayer({
           </div>
         )}
 
-        {/*
-         * Top-right controls cluster:
-         * Unified overlay containing the source counter, swap button, provider dropdown,
-         * and close button. Appears on touch/tap or mouse move and automatically
-         * fades out after 3.5s of inactivity so the screen remains clean and cinema-grade.
-         */}
+        {/* ── 1. Top-Left Sticky Component: On-Air / Program Badge ─────────────── */}
+        {showBadge && (
+          <div
+            className="pointer-events-auto absolute left-[max(0.75rem,env(safe-area-inset-left))] top-[max(0.75rem,env(safe-area-inset-top))] z-30 flex max-w-[48vw] sm:max-w-[320px] flex-col rounded-lg border border-neutral-800/80 bg-black/85 px-2.5 py-1.5 shadow-lg backdrop-blur-md"
+          >
+            {(isLiveNow || isSyncedTuneIn) && (
+              <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-red-400">
+                <span className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-red-500" />
+                <span className="truncate">
+                  {isLiveNow ? `CH ${String(activeChannel.number).padStart(2, "0")} · Live` : "Live Tune-In"}
+                </span>
+              </p>
+            )}
+            {showNameInBadge && (
+              <p className="truncate text-xs sm:text-sm font-semibold text-neutral-100">{displayTitle}</p>
+            )}
+            {isLiveNow && <p className="truncate text-[10px] text-neutral-400">{activeChannel.name}</p>}
+          </div>
+        )}
+
+        {/* ── 2. Top-Right Sticky Component: Stream Switcher & Close ───────────── */}
         <div
-          className={`absolute right-[max(1rem,env(safe-area-inset-right))] top-[max(1rem,env(safe-area-inset-top))] z-30 flex items-center gap-2.5 transition-opacity duration-300 ${
-            isControlsVisible
-              ? "opacity-100 pointer-events-auto"
-              : "opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto"
-          }`}
+          className="pointer-events-auto absolute right-[max(0.75rem,env(safe-area-inset-right))] top-[max(0.75rem,env(safe-area-inset-top))] z-30 flex items-center gap-2"
         >
-          <div className="flex items-center rounded-md border border-neutral-700/50 bg-black/75 text-neutral-300 backdrop-blur-md shadow-lg">
+          <div className="flex items-center rounded-lg border border-neutral-800/80 bg-black/85 text-neutral-300 shadow-lg backdrop-blur-md">
             {screenMode === "content" && (
-              <span className="flex h-9 items-center gap-1.5 rounded-l-md border-r border-neutral-700/50 px-3 text-[10px] uppercase tracking-widest text-neutral-400">
-                <SatelliteDish className="h-3.5 w-3.5" />
-                {String(currentProviderIndex + 1).padStart(2, "0")}/{String(PROVIDER_COUNT).padStart(2, "0")}
+              <span className="flex h-8 sm:h-9 items-center gap-1 rounded-l-lg border-r border-neutral-800/80 px-2 sm:px-2.5 text-[10px] font-mono uppercase tracking-wider text-neutral-400">
+                <SatelliteDish className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0" />
+                <span>{String(currentProviderIndex + 1).padStart(2, "0")}/{String(PROVIDER_COUNT).padStart(2, "0")}</span>
               </span>
             )}
 
@@ -975,29 +697,29 @@ export function VideoPlayer({
                 type="button"
                 onClick={advanceProvider}
                 disabled={exhausted || screenMode !== "content"}
-                title="Feed not working? Swap"
-                aria-label="Feed not working? Swap"
-                className={`flex h-9 items-center gap-1.5 px-2.5 transition-colors hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer ${
-                  screenMode === "content" ? "" : "rounded-l-md"
+                title="Stream not working? Swap to next"
+                aria-label="Stream not working? Swap to next"
+                className={`flex h-8 sm:h-9 items-center gap-1 px-2 sm:px-2.5 text-neutral-300 transition-colors hover:bg-white/10 hover:text-white active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer ${
+                  screenMode === "content" ? "" : "rounded-l-lg"
                 }`}
               >
-                <RefreshCw className="h-4 w-4" />
+                <RefreshCw className="h-3.5 w-3.5" />
               </button>
               <button
                 type="button"
                 onClick={() => setIsProviderMenuOpen((open) => !open)}
                 disabled={screenMode !== "content"}
-                aria-label="Choose a specific feed"
+                aria-label="Select stream source"
                 aria-expanded={isProviderMenuOpen}
-                className="flex h-9 w-6 items-center justify-center rounded-r-md border-l border-neutral-700/50 transition-colors hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+                className="flex h-8 sm:h-9 w-6 items-center justify-center rounded-r-lg border-l border-neutral-800/80 text-neutral-300 transition-colors hover:bg-white/10 hover:text-white active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
               >
-                <ChevronDown className={`h-3.5 w-3.5 transition-transform ${isProviderMenuOpen ? "rotate-180" : ""}`} />
+                <ChevronDown className={`h-3 w-3 sm:h-3.5 sm:w-3.5 transition-transform ${isProviderMenuOpen ? "rotate-180" : ""}`} />
               </button>
 
               {isProviderMenuOpen && (
-                <div className="absolute right-0 top-full mt-2 w-56 max-h-[50vh] overflow-hidden flex flex-col rounded-md border border-neutral-700/60 bg-neutral-950 shadow-[0_0_24px_rgba(0,0,0,0.85)] z-40">
-                  <p className="border-b border-neutral-800 bg-white/5 px-3 py-1.5 text-[10px] uppercase tracking-widest text-neutral-400 shrink-0">
-                    Select Feed ({currentProviderIndex + 1}/{PROVIDER_COUNT})
+                <div className="absolute right-0 top-full mt-2 w-52 sm:w-56 max-h-[50vh] sm:max-h-[60vh] overflow-hidden flex flex-col rounded-xl border border-neutral-800 bg-neutral-950/95 shadow-2xl shadow-black backdrop-blur-xl z-40">
+                  <p className="border-b border-neutral-800/80 bg-white/5 px-3 py-1.5 text-[10px] uppercase tracking-widest text-neutral-400 shrink-0 font-medium">
+                    Select Stream ({currentProviderIndex + 1}/{PROVIDER_COUNT})
                   </p>
                   <ul className="flex-1 overflow-y-auto no-scrollbar">
                     {providerList.map((provider) => {
@@ -1007,8 +729,8 @@ export function VideoPlayer({
                           <button
                             type="button"
                             onClick={() => jumpToProvider(provider.index)}
-                            className={`flex w-full items-center justify-between gap-2 px-3 py-1.5 text-left text-[11px] uppercase tracking-wide transition-colors hover:bg-white/10 cursor-pointer ${
-                              isActive ? "bg-white/10 text-white" : "text-neutral-300"
+                            className={`flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-[11px] uppercase tracking-wide transition-colors hover:bg-white/10 active:bg-white/15 cursor-pointer ${
+                              isActive ? "bg-white/10 font-semibold text-white" : "text-neutral-300"
                             }`}
                           >
                             <span className="flex items-center gap-1.5 truncate">
@@ -1016,11 +738,6 @@ export function VideoPlayer({
                                 className={`h-1.5 w-1.5 shrink-0 rounded-full ${
                                   provider.isDynamic ? "bg-amber-400" : "bg-emerald-400"
                                 }`}
-                                title={
-                                  provider.isDynamic
-                                    ? "Dynamic Search Provider"
-                                    : "Standard Stream Provider"
-                                }
                               />
                               <span className="truncate">{provider.name}</span>
                             </span>
@@ -1035,13 +752,12 @@ export function VideoPlayer({
             </div>
           </div>
 
-          {/* Close affordance - unified with controls overlay */}
           {onClose && (
             <button
               type="button"
               onClick={onClose}
               aria-label="Close player"
-              className="flex h-9 w-9 items-center justify-center rounded-full border border-neutral-700/60 bg-black/75 text-neutral-300 backdrop-blur-md transition-all duration-200 hover:scale-105 hover:text-white active:scale-95 cursor-pointer shadow-lg"
+              className="flex h-8 sm:h-9 w-8 sm:w-9 items-center justify-center rounded-full border border-neutral-800/80 bg-black/85 text-neutral-300 shadow-lg backdrop-blur-md transition-all hover:scale-105 hover:text-white active:scale-95 cursor-pointer"
             >
               <X className="h-4 w-4" />
             </button>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Loader2, X } from "lucide-react";
 import { VideoPlayer } from "@/components/player/VideoPlayer";
 import type { MediaSearchResult, ShowDetails } from "@/types/media";
@@ -53,25 +53,6 @@ export function PlayerModal({
 
   const [season, setSeason] = useState(initialSeason ?? 1);
   const episode = initialEpisode ?? 1;
-
-  // Touch-controlled overlay for direct broadcasts (auto-fades after 3.5s)
-  const [isDirectControlsVisible, setIsDirectControlsVisible] = useState(true);
-  const directControlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  const showDirectControls = useCallback(() => {
-    setIsDirectControlsVisible(true);
-    if (directControlsTimeoutRef.current) clearTimeout(directControlsTimeoutRef.current);
-    directControlsTimeoutRef.current = setTimeout(() => setIsDirectControlsVisible(false), 3500);
-  }, []);
-
-  useEffect(() => {
-    if (directBroadcast) {
-      showDirectControls();
-    }
-    return () => {
-      if (directControlsTimeoutRef.current) clearTimeout(directControlsTimeoutRef.current);
-    };
-  }, [directBroadcast, showDirectControls]);
 
   useEffect(() => {
     function handleEscape(event: KeyboardEvent) {
@@ -126,21 +107,9 @@ export function PlayerModal({
   const showPlayer = Boolean(directBroadcast) || !isTv || (details && !isLoadingDetails);
 
   return (
-    <div className="group fixed inset-0 z-50 bg-black animate-in fade-in">
+    <div className="fixed inset-0 z-50 bg-black animate-in fade-in">
       {directBroadcast ? (
-        <div
-          className="relative h-full w-full bg-black"
-          onClick={showDirectControls}
-          onTouchStart={showDirectControls}
-        >
-          {/* Top tap-catcher to reveal controls on mobile over iframe */}
-          <div
-            className="absolute top-0 inset-x-0 h-16 z-20 cursor-pointer"
-            onClick={showDirectControls}
-            onTouchStart={showDirectControls}
-            aria-hidden="true"
-          />
-
+        <div className="relative h-full w-full bg-black">
           <iframe
             key={directBroadcast.embedUrl}
             src={directBroadcast.embedUrl}
@@ -153,26 +122,23 @@ export function PlayerModal({
             referrerPolicy="strict-origin-when-cross-origin"
           />
 
-          <div
-            className={`pointer-events-none absolute left-4 top-4 z-20 max-w-[70vw] rounded-md border border-neutral-700/50 bg-black/60 px-3 py-2 backdrop-blur-sm transition-opacity duration-300 ${
-              isDirectControlsVisible ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-            }`}
-          >
-            <p className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-widest text-red-400">
-              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-red-500" />
-              {directBroadcast.label}
+          {/* Top-left broadcast badge: strictly fits its shape, pointer-events-auto */}
+          <div className="pointer-events-auto absolute left-[max(0.75rem,env(safe-area-inset-left))] top-[max(0.75rem,env(safe-area-inset-top))] z-30 max-w-[50vw] sm:max-w-[320px] rounded-lg border border-neutral-800/80 bg-black/85 px-2.5 py-1.5 shadow-lg backdrop-blur-md">
+            <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-red-400">
+              <span className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-red-500" />
+              <span className="truncate">{directBroadcast.label}</span>
             </p>
+            {directBroadcast.title && (
+              <p className="truncate text-xs sm:text-sm font-semibold text-neutral-100">{directBroadcast.title}</p>
+            )}
           </div>
 
+          {/* Top-right close button: strictly fits its shape, pointer-events-auto */}
           <button
             type="button"
             onClick={onClose}
             aria-label="Close broadcast"
-            className={`absolute right-[max(1rem,env(safe-area-inset-right))] top-[max(1rem,env(safe-area-inset-top))] z-30 flex h-9 w-9 items-center justify-center rounded-full border border-neutral-700/60 bg-black/75 text-neutral-300 backdrop-blur-md transition-all duration-300 hover:text-white hover:scale-105 active:scale-95 cursor-pointer shadow-lg ${
-              isDirectControlsVisible
-                ? "opacity-100 pointer-events-auto"
-                : "opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto"
-            }`}
+            className="pointer-events-auto absolute right-[max(0.75rem,env(safe-area-inset-right))] top-[max(0.75rem,env(safe-area-inset-top))] z-30 flex h-8 sm:h-9 w-8 sm:w-9 items-center justify-center rounded-full border border-neutral-800/80 bg-black/85 text-neutral-300 shadow-lg backdrop-blur-md transition-all hover:scale-105 hover:text-white active:scale-95 cursor-pointer"
           >
             <X className="h-4 w-4" />
           </button>
@@ -183,7 +149,7 @@ export function PlayerModal({
             type="button"
             onClick={onClose}
             aria-label="Close player"
-            className="absolute right-[max(1rem,env(safe-area-inset-right))] top-[max(1rem,env(safe-area-inset-top))] z-40 flex h-9 w-9 items-center justify-center rounded-full border border-neutral-700/60 bg-black/75 text-neutral-300 backdrop-blur-md transition-all duration-200 hover:text-white hover:scale-105 active:scale-95 cursor-pointer shadow-lg"
+            className="pointer-events-auto absolute right-[max(0.75rem,env(safe-area-inset-right))] top-[max(0.75rem,env(safe-area-inset-top))] z-40 flex h-8 sm:h-9 w-8 sm:w-9 items-center justify-center rounded-full border border-neutral-800/80 bg-black/85 text-neutral-300 shadow-lg backdrop-blur-md transition-all hover:scale-105 hover:text-white active:scale-95 cursor-pointer"
           >
             <X className="h-4 w-4" />
           </button>
