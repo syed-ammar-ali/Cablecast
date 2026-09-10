@@ -1,0 +1,23 @@
+# Git
+.git
+.gitignore
+
+# Build artifacts & dependencies
+.next
+node_modules
+
+# Local SQLite databases & migrations (Production uses Neon PostgreSQL via DATABASE_URL)
+prisma/*.db
+prisma/*.db-journal
+prisma/migrations
+
+# Local tooling and icon scripts
+scripts/
+
+# Environment files (managed securely in Vercel Dashboard)
+.env*.local
+
+# Logs and system files
+*.log
+.DS_Store
+.agents/
