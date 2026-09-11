@@ -26,11 +26,106 @@ export async function GET() {
       orderBy: { sentAt: "desc" },
     });
 
+    // Collect all unique non-admin IDs across subscriptions and logs
+    const allUserIds = Array.from(
+      new Set([
+        ...subscriptions.map((s) => s.userId),
+        ...recentLogs.map((l) => l.userId),
+      ]),
+    );
+    const nonAdminIds = allUserIds.filter((id) => id !== "admin");
+
+    const [accessCodes, sessions] = await Promise.all([
+      nonAdminIds.length > 0
+        ? prisma.accessCode.findMany({
+            where: { id: { in: nonAdminIds } },
+            select: { id: true, code: true, label: true },
+          })
+        : [],
+      nonAdminIds.length > 0
+        ? prisma.session.findMany({
+            where: {
+              OR: [
+                { id: { in: nonAdminIds } },
+                { accessCodeId: { in: nonAdminIds } },
+              ],
+            },
+            select: {
+              id: true,
+              accessCodeId: true,
+              role: true,
+              displayName: true,
+              deviceLabel: true,
+              accessCode: {
+                select: { id: true, code: true, label: true },
+              },
+            },
+            orderBy: { lastSeenAt: "desc" },
+          })
+        : [],
+    ]);
+
+    const enrichedSubscriptions = subscriptions.map((sub) => {
+      if (sub.userId === "admin") {
+        return {
+          ...sub,
+          role: "admin" as const,
+          displayName: "Admin",
+          code: null,
+          label: "Admin Console",
+        };
+      }
+
+      const matchedCode = accessCodes.find((c) => c.id === sub.userId);
+      const matchedSession = sessions.find(
+        (s) => s.id === sub.userId || s.accessCodeId === sub.userId,
+      );
+
+      const codeStr = matchedCode?.code || matchedSession?.accessCode?.code || null;
+      const labelStr = matchedCode?.label || matchedSession?.accessCode?.label || matchedSession?.deviceLabel || null;
+      const name = matchedSession?.displayName || labelStr || (codeStr ? `Viewer (${codeStr})` : "Active Viewer");
+
+      return {
+        ...sub,
+        role: (matchedSession?.role as "admin" | "user") || "user",
+        displayName: name,
+        code: codeStr,
+        label: labelStr,
+      };
+    });
+
+    const enrichedLogs = recentLogs.map((log) => {
+      if (log.userId === "admin") {
+        return {
+          ...log,
+          role: "admin" as const,
+          displayName: "Admin",
+          code: null,
+        };
+      }
+
+      const matchedCode = accessCodes.find((c) => c.id === log.userId);
+      const matchedSession = sessions.find(
+        (s) => s.id === log.userId || s.accessCodeId === log.userId,
+      );
+
+      const codeStr = matchedCode?.code || matchedSession?.accessCode?.code || null;
+      const labelStr = matchedCode?.label || matchedSession?.accessCode?.label || matchedSession?.deviceLabel || null;
+      const name = matchedSession?.displayName || labelStr || (codeStr ? `Viewer (${codeStr})` : "Active Viewer");
+
+      return {
+        ...log,
+        role: (matchedSession?.role as "admin" | "user") || "user",
+        displayName: name,
+        code: codeStr,
+      };
+    });
+
     return NextResponse.json({
       success: true,
-      totalSubscriptions: subscriptions.length,
-      subscriptions,
-      recentLogs,
+      totalSubscriptions: enrichedSubscriptions.length,
+      subscriptions: enrichedSubscriptions,
+      recentLogs: enrichedLogs,
     });
   } catch (err: unknown) {
     const status = (err as { status?: number })?.status || 500;

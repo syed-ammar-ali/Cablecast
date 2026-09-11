@@ -22,6 +22,10 @@ import { useToast } from "@/components/ui/ToastProvider";
 interface SubscriptionRecord {
   id: string;
   userId: string;
+  role?: "admin" | "user";
+  displayName?: string;
+  code?: string | null;
+  label?: string | null;
   timezone: string | null;
   timezoneOffset: number | null;
   createdAt: string;
@@ -31,6 +35,9 @@ interface SubscriptionRecord {
 interface NotificationLogRecord {
   id: string;
   userId: string;
+  role?: "admin" | "user";
+  displayName?: string;
+  code?: string | null;
   type: string;
   referenceId: string;
   sentAt: string;
@@ -195,59 +202,61 @@ export function NotificationsManager() {
       {/* Top Controls Grid: Admin Device Control & Broadcast Testing */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Card 1: Admin Device Status & Testing */}
-        <div className="rounded-2xl border border-neutral-800 bg-neutral-900/50 p-5 sm:p-6 backdrop-blur">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-400">
-                <Smartphone className="h-5 w-5" />
+        <div className="rounded-2xl border border-neutral-800 bg-neutral-900/50 p-5 sm:p-6 backdrop-blur flex flex-col justify-between">
+          <div>
+            <div className="flex items-start justify-between gap-3 mb-4">
+              <div className="flex items-start gap-3 min-w-0">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-400">
+                  <Smartphone className="h-5 w-5" />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="text-sm sm:text-base font-bold uppercase tracking-wider text-white">
+                    This Admin Device
+                  </h3>
+                  <p className="text-xs text-neutral-400 mt-0.5 leading-relaxed">
+                    Control and test push notifications directly on this current browser.
+                  </p>
+                </div>
               </div>
-              <div>
-                <h3 className="text-sm sm:text-base font-bold uppercase tracking-wider text-white">
-                  This Admin Device
-                </h3>
-                <p className="text-xs text-neutral-400">
-                  Control and test push notifications directly on this current browser.
-                </p>
-              </div>
-            </div>
-            <span
-              className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider ${
-                isSubscribed
-                  ? "border-emerald-500/40 bg-emerald-950/40 text-emerald-400"
-                  : "border-neutral-800 bg-neutral-900 text-neutral-400"
-              }`}
-            >
               <span
-                className={`h-1.5 w-1.5 rounded-full ${isSubscribed ? "bg-emerald-400 animate-pulse" : "bg-neutral-600"}`}
-              />
-              {isSubscribed ? "Subscribed" : "Not Active"}
-            </span>
-          </div>
-
-          <div className="mb-5 grid grid-cols-2 gap-3 rounded-xl border border-neutral-800/80 bg-neutral-950/60 p-3 text-xs">
-            <div>
-              <span className="text-neutral-500 block uppercase tracking-wider text-[10px]">
-                Browser Support
-              </span>
-              <span className="font-semibold text-neutral-200">
-                {isSupported ? "Supported (Push API)" : "Unsupported Browser"}
-              </span>
-            </div>
-            <div>
-              <span className="text-neutral-500 block uppercase tracking-wider text-[10px]">
-                OS Permission
-              </span>
-              <span
-                className={`font-semibold capitalize ${
-                  permission === "granted"
-                    ? "text-emerald-400"
-                    : permission === "denied"
-                      ? "text-red-400"
-                      : "text-amber-400"
+                className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-wider shrink-0 whitespace-nowrap ${
+                  isSubscribed
+                    ? "border-emerald-500/40 bg-emerald-950/40 text-emerald-400"
+                    : "border-neutral-800 bg-neutral-900 text-neutral-400"
                 }`}
               >
-                {permission}
+                <span
+                  className={`h-1.5 w-1.5 rounded-full ${isSubscribed ? "bg-emerald-400 animate-pulse" : "bg-neutral-600"}`}
+                />
+                {isSubscribed ? "Subscribed" : "Not Active"}
               </span>
+            </div>
+
+            <div className="mt-4 mb-5 grid grid-cols-2 gap-3 rounded-xl border border-neutral-800/80 bg-neutral-950/60 p-3.5 text-xs">
+              <div>
+                <span className="text-neutral-500 block uppercase tracking-wider text-[10px] font-semibold">
+                  Browser Support
+                </span>
+                <span className="mt-1.5 block font-semibold text-neutral-200">
+                  {isSupported ? "Supported (Push API)" : "Unsupported Browser"}
+                </span>
+              </div>
+              <div>
+                <span className="text-neutral-500 block uppercase tracking-wider text-[10px] font-semibold">
+                  OS Permission
+                </span>
+                <span
+                  className={`mt-1.5 block font-semibold capitalize ${
+                    permission === "granted"
+                      ? "text-emerald-400"
+                      : permission === "denied"
+                        ? "text-red-400"
+                        : "text-amber-400"
+                  }`}
+                >
+                  {permission}
+                </span>
+              </div>
             </div>
           </div>
 
@@ -297,31 +306,33 @@ export function NotificationsManager() {
         </div>
 
         {/* Card 2: Global Network Broadcast Testing */}
-        <div className="rounded-2xl border border-neutral-800 bg-neutral-900/50 p-5 sm:p-6 backdrop-blur">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-cyan-500/30 bg-cyan-500/10 text-cyan-400">
-                <Users className="h-5 w-5" />
+        <div className="rounded-2xl border border-neutral-800 bg-neutral-900/50 p-5 sm:p-6 backdrop-blur flex flex-col justify-between">
+          <div>
+            <div className="flex items-start justify-between gap-3 mb-4">
+              <div className="flex items-start gap-3 min-w-0">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-cyan-500/30 bg-cyan-500/10 text-cyan-400">
+                  <Users className="h-5 w-5" />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="text-sm sm:text-base font-bold uppercase tracking-wider text-white">
+                    Network Subscribers
+                  </h3>
+                  <p className="text-xs text-neutral-400 mt-0.5 leading-relaxed">
+                    Broadcast test notifications to all active viewer devices across the station.
+                  </p>
+                </div>
               </div>
-              <div>
-                <h3 className="text-sm sm:text-base font-bold uppercase tracking-wider text-white">
-                  Network Subscribers
-                </h3>
-                <p className="text-xs text-neutral-400">
-                  Broadcast test notifications to all active viewer devices across the station.
-                </p>
-              </div>
+              <span className="inline-flex items-center gap-1 rounded-full border border-neutral-800 bg-neutral-950 px-3 py-1 text-xs font-mono font-bold text-neutral-300 shrink-0 whitespace-nowrap">
+                {subscriptions.length} Device{subscriptions.length === 1 ? "" : "s"}
+              </span>
             </div>
-            <span className="inline-flex items-center rounded-full border border-neutral-800 bg-neutral-950 px-3 py-1 text-xs font-mono font-bold text-neutral-300">
-              {subscriptions.length} Device{subscriptions.length === 1 ? "" : "s"}
-            </span>
-          </div>
 
-          <div className="mb-5 rounded-xl border border-neutral-800/80 bg-neutral-950/60 p-3 text-xs text-neutral-400">
-            <p>
-              Testing broadcast will dispatch a live TV show preview push notification to every
-              registered device currently in the database.
-            </p>
+            <div className="mt-4 mb-5 rounded-xl border border-neutral-800/80 bg-neutral-950/60 p-3.5 text-xs text-neutral-400 leading-relaxed">
+              <p>
+                Testing broadcast will dispatch a live TV show preview push notification to every
+                registered device currently in the database.
+              </p>
+            </div>
           </div>
 
           <button
@@ -415,30 +426,56 @@ export function NotificationsManager() {
               <table className="w-full text-left text-xs text-neutral-400">
                 <thead className="border-b border-neutral-800 text-[10px] uppercase tracking-wider text-neutral-500 sticky top-0 bg-neutral-900">
                   <tr>
-                    <th className="py-2 px-2">User / Role</th>
-                    <th className="py-2 px-2">Timezone</th>
-                    <th className="py-2 px-2">Updated</th>
+                    <th className="py-2.5 px-3">Subscriber</th>
+                    <th className="py-2.5 px-3">Timezone</th>
+                    <th className="py-2.5 px-3">Updated</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-850">
-                  {subscriptions.map((sub) => (
-                    <tr key={sub.id} className="hover:bg-white/[0.02]">
-                      <td className="py-2.5 px-2 font-mono text-neutral-200 truncate max-w-[120px]">
-                        {sub.userId}
-                      </td>
-                      <td className="py-2.5 px-2 text-neutral-300">
-                        {sub.timezone || "UTC"} {sub.timezoneOffset !== null ? `(${sub.timezoneOffset}m)` : ""}
-                      </td>
-                      <td className="py-2.5 px-2 text-neutral-500 text-[11px]">
-                        {new Date(sub.updatedAt).toLocaleDateString([], {
-                          month: "short",
-                          day: "numeric",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </td>
-                    </tr>
-                  ))}
+                  {subscriptions.map((sub) => {
+                    const isAdmin = sub.role === "admin" || sub.userId === "admin";
+                    return (
+                      <tr key={sub.id} className="hover:bg-white/[0.02] transition-colors">
+                        <td className="py-2.5 px-3">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span
+                              className={`rounded px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider shrink-0 ${
+                                isAdmin
+                                  ? "bg-purple-950 text-purple-300 border border-purple-800"
+                                  : "bg-neutral-900 text-neutral-400 border border-neutral-800"
+                              }`}
+                            >
+                              {isAdmin ? "admin" : "user"}
+                            </span>
+                            <div className="min-w-0 truncate">
+                              <span className="font-semibold text-white text-xs block truncate">
+                                {sub.displayName || (isAdmin ? "Admin" : "Active Viewer")}
+                              </span>
+                              {sub.code && (
+                                <span className="font-mono text-[11px] text-neutral-400 block truncate">
+                                  Code: <span className="text-amber-400/90 font-bold">{sub.code}</span>
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-2.5 px-3 text-neutral-300">
+                          <span className="block font-medium">{sub.timezone || "UTC"}</span>
+                          <span className="block text-[11px] text-neutral-500 font-mono">
+                            {sub.timezoneOffset !== null ? `(${sub.timezoneOffset}m)` : ""}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 text-neutral-500 text-[11px] whitespace-nowrap">
+                          {new Date(sub.updatedAt).toLocaleDateString([], {
+                            month: "short",
+                            day: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -467,30 +504,53 @@ export function NotificationsManager() {
               <table className="w-full text-left text-xs text-neutral-400">
                 <thead className="border-b border-neutral-800 text-[10px] uppercase tracking-wider text-neutral-500 sticky top-0 bg-neutral-900">
                   <tr>
-                    <th className="py-2 px-2">Type</th>
-                    <th className="py-2 px-2">Recipient</th>
-                    <th className="py-2 px-2">Sent At</th>
+                    <th className="py-2.5 px-3">Type</th>
+                    <th className="py-2.5 px-3">Recipient</th>
+                    <th className="py-2.5 px-3">Sent At</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-850">
-                  {recentLogs.map((log) => (
-                    <tr key={log.id} className="hover:bg-white/[0.02]">
-                      <td className="py-2.5 px-2 font-semibold text-amber-400 text-[11px]">
-                        {log.type}
-                      </td>
-                      <td className="py-2.5 px-2 font-mono text-neutral-300 truncate max-w-[120px]">
-                        {log.userId}
-                      </td>
-                      <td className="py-2.5 px-2 text-neutral-500 text-[11px]">
-                        {new Date(log.sentAt).toLocaleDateString([], {
-                          month: "short",
-                          day: "numeric",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </td>
-                    </tr>
-                  ))}
+                  {recentLogs.map((log) => {
+                    const isAdmin = log.role === "admin" || log.userId === "admin";
+                    return (
+                      <tr key={log.id} className="hover:bg-white/[0.02] transition-colors">
+                        <td className="py-2.5 px-3 font-semibold text-amber-400 text-[11px] whitespace-nowrap">
+                          {log.type}
+                        </td>
+                        <td className="py-2.5 px-3">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span
+                              className={`rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider shrink-0 ${
+                                isAdmin
+                                  ? "bg-purple-950 text-purple-300 border border-purple-800"
+                                  : "bg-neutral-900 text-neutral-400 border border-neutral-800"
+                              }`}
+                            >
+                              {isAdmin ? "admin" : "user"}
+                            </span>
+                            <div className="min-w-0 truncate">
+                              <span className="font-semibold text-neutral-200 text-xs block truncate">
+                                {log.displayName || (isAdmin ? "Admin" : log.userId)}
+                              </span>
+                              {log.code && (
+                                <span className="font-mono text-[10px] text-neutral-400 block truncate">
+                                  {log.code}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-2.5 px-3 text-neutral-500 text-[11px] whitespace-nowrap">
+                          {new Date(log.sentAt).toLocaleDateString([], {
+                            month: "short",
+                            day: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
