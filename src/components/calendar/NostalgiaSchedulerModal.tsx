@@ -199,6 +199,121 @@ function RetroYearDropdown({
   );
 }
 
+interface RetroSelectOption<T extends string | number> {
+  value: T;
+  label: string;
+  badge?: string;
+  sublabel?: string;
+}
+
+function RetroSelectDropdown<T extends string | number>({
+  value,
+  onChange,
+  options,
+  placeholder = "Select...",
+}: {
+  value: T;
+  onChange: (val: T) => void;
+  options: RetroSelectOption<T>[];
+  placeholder?: string;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const ref = useRef<HTMLDivElement | null>(null);
+
+  const selected = options.find((o) => o.value === value) || options[0];
+
+  useEffect(() => {
+    if (!isOpen) return;
+    function handleClickOutside(e: MouseEvent | TouchEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+    window.addEventListener("mousedown", handleClickOutside);
+    window.addEventListener("touchstart", handleClickOutside, { passive: true });
+    return () => {
+      window.removeEventListener("mousedown", handleClickOutside);
+      window.removeEventListener("touchstart", handleClickOutside);
+    };
+  }, [isOpen]);
+
+  return (
+    <div ref={ref} className="relative w-full">
+      <button
+        type="button"
+        onClick={() => {
+          triggerHaptic(8);
+          setIsOpen((prev) => !prev);
+        }}
+        aria-expanded={isOpen}
+        className="flex w-full items-center justify-between gap-2 rounded-xl border border-neutral-800 bg-neutral-900/90 px-3 py-2 text-left text-xs font-mono font-bold text-white transition-colors hover:border-neutral-700 focus:border-purple-500/60 focus:outline-none cursor-pointer min-h-[38px] active:scale-[0.99]"
+      >
+        <div className="flex items-center gap-1.5 truncate min-w-0">
+          <span className="truncate text-white">
+            {selected ? selected.label : placeholder}
+          </span>
+          {selected?.sublabel && (
+            <span className="text-[10px] text-neutral-400 font-sans truncate">
+              {selected.sublabel}
+            </span>
+          )}
+        </div>
+        <ChevronDown
+          className={`h-3.5 w-3.5 text-neutral-400 shrink-0 transition-transform duration-200 ${
+            isOpen ? "rotate-180 text-purple-300" : ""
+          }`}
+        />
+      </button>
+
+      {isOpen && (
+        <div className="absolute left-0 top-full z-50 mt-1.5 max-h-56 w-full min-w-[200px] overflow-y-auto rounded-xl border border-neutral-800 bg-neutral-950/95 p-1 backdrop-blur-xl shadow-2xl shadow-black no-scrollbar animate-in fade-in zoom-in-95 duration-150">
+          {options.map((opt) => {
+            const isSelected = opt.value === value;
+            return (
+              <button
+                key={String(opt.value)}
+                type="button"
+                onClick={() => {
+                  triggerHaptic(8);
+                  onChange(opt.value);
+                  setIsOpen(false);
+                }}
+                className={`flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-left text-xs font-mono transition-colors cursor-pointer ${
+                  isSelected
+                    ? "border border-purple-500/60 bg-purple-950/80 text-purple-200 font-bold ring-1 ring-purple-500/30 shadow-md"
+                    : "text-neutral-300 hover:bg-neutral-900 hover:text-white"
+                }`}
+              >
+                <div className="flex items-center gap-1.5 truncate min-w-0">
+                  <span className={`truncate ${isSelected ? "text-purple-200 font-bold" : "text-white"}`}>
+                    {opt.label}
+                  </span>
+                  {opt.sublabel && (
+                    <span className="text-[10px] text-neutral-500 font-sans truncate">
+                      {opt.sublabel}
+                    </span>
+                  )}
+                </div>
+                {opt.badge && (
+                  <span
+                    className={`rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider shrink-0 ${
+                      isSelected
+                        ? "bg-purple-900/80 text-purple-300 border border-purple-500/40"
+                        : "bg-neutral-900 text-neutral-500"
+                    }`}
+                  >
+                    {opt.badge}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function NostalgiaSchedulerModal({
   isOpen,
   onClose,
@@ -291,22 +406,24 @@ export function NostalgiaSchedulerModal({
 
   const maxEpisodesInStartSeason = selectedStartingSeasonObj?.episodeCount || 50;
 
+  const activeScopeSeasons = useMemo(() => {
+    return availableSeasons.filter(
+      (s) => s.seasonNumber >= startSeason && (endSeason === null || s.seasonNumber <= endSeason),
+    );
+  }, [availableSeasons, startSeason, endSeason]);
+
   const includedSeasonNumbers = useMemo(() => {
-    if (availableSeasons.length === 0) return [];
-    return availableSeasons
+    if (activeScopeSeasons.length === 0) return [];
+    return activeScopeSeasons
       .map((s) => s.seasonNumber)
-      .filter((sNum) => {
-        if (sNum < startSeason) return false;
-        if (endSeason !== null && sNum > endSeason) return false;
-        if (excludedSeasons.includes(sNum)) return false;
-        return true;
-      });
-  }, [availableSeasons, startSeason, endSeason, excludedSeasons]);
+      .filter((sNum) => !excludedSeasons.includes(sNum));
+  }, [activeScopeSeasons, excludedSeasons]);
 
   const handleSelectStartSeason = (newStart: number) => {
     triggerHaptic(8);
     setStartSeason(newStart);
     setStartEpisode(1);
+    setPreviewResult(null);
     if (endSeason !== null && endSeason < newStart) {
       setEndSeason(null);
     }
@@ -314,6 +431,7 @@ export function NostalgiaSchedulerModal({
 
   const toggleSeasonInclusion = useCallback((seasonNum: number) => {
     triggerHaptic(8);
+    setPreviewResult(null);
     setExcludedSeasons((prev) => {
       if (prev.includes(seasonNum)) {
         return prev.filter((s) => s !== seasonNum);
@@ -325,6 +443,7 @@ export function NostalgiaSchedulerModal({
 
   const toggleDay = useCallback((day: number) => {
     triggerHaptic(10);
+    setPreviewResult(null);
     setSelectedDays((prev) => {
       if (prev.includes(day)) {
         if (prev.length === 1) return prev; // Keep at least one day selected
@@ -426,6 +545,7 @@ export function NostalgiaSchedulerModal({
 
   const handleSnapBackToBack = useCallback(() => {
     triggerHaptic(10);
+    setPreviewResult(null);
     const s2 = fromMinutesToSlot(blockStartMinutes + 30);
     setSlot2Index(s2.slotIndex);
     setSlot2Meridiem(s2.meridiem);
@@ -440,6 +560,7 @@ export function NostalgiaSchedulerModal({
   const handleSelectEpisodesPerDay = useCallback(
     (count: 1 | 2 | 3) => {
       triggerHaptic(8);
+      setPreviewResult(null);
       setEpisodesPerDay(count);
       setActiveSlotEditing(0);
       if (count >= 2) {
@@ -514,11 +635,45 @@ export function NostalgiaSchedulerModal({
     [currentYear],
   );
 
+  const startSeasonOptions = useMemo(
+    () =>
+      availableSeasons.map((s) => ({
+        value: s.seasonNumber,
+        label: s.name || `Season ${s.seasonNumber}`,
+        badge: `${s.episodeCount} eps`,
+      })),
+    [availableSeasons],
+  );
+
+  const endSeasonOptions = useMemo(() => {
+    const opts: RetroSelectOption<string>[] = [
+      {
+        value: "finale",
+        label: "Series Finale",
+        badge: "All Seasons",
+      },
+    ];
+    availableSeasons
+      .filter((s) => s.seasonNumber >= startSeason)
+      .forEach((s) => {
+        opts.push({
+          value: String(s.seasonNumber),
+          label: `Through ${s.name || `Season ${s.seasonNumber}`}`,
+          badge: `${s.episodeCount} eps`,
+        });
+      });
+    return opts;
+  }, [availableSeasons, startSeason]);
+
   // Fetch or calculate preview
   const handleGeneratePreview = useCallback(async () => {
     if (!selectedShow) return;
     if (intraSlotOverlapError) {
       toast.error(intraSlotOverlapError, "Slot Overlap");
+      return;
+    }
+    if (includedSeasonNumbers.length === 0) {
+      toast.error("At least one season must be included in the broadcast run.", "Invalid Selection");
       return;
     }
     triggerHaptic(15);
@@ -656,6 +811,10 @@ export function NostalgiaSchedulerModal({
     if (!selectedShow || !previewResult) return;
     if (intraSlotOverlapError) {
       toast.error(intraSlotOverlapError, "Slot Overlap");
+      return;
+    }
+    if (includedSeasonNumbers.length === 0) {
+      toast.error("At least one season must be included in the broadcast run.", "Invalid Selection");
       return;
     }
     triggerHaptic(20);
@@ -895,20 +1054,11 @@ export function NostalgiaSchedulerModal({
                       <label className="text-[11px] font-mono text-neutral-400 font-bold uppercase">
                         Start From Season
                       </label>
-                      <div className="relative">
-                        <select
-                          value={startSeason}
-                          onChange={(e) => handleSelectStartSeason(Number(e.target.value))}
-                          className="w-full appearance-none rounded-xl border border-neutral-800 bg-neutral-900/90 px-3 py-2 text-xs font-mono font-bold text-white transition-colors hover:border-neutral-700 focus:border-purple-500/60 focus:outline-none cursor-pointer"
-                        >
-                          {availableSeasons.map((s) => (
-                            <option key={s.seasonNumber} value={s.seasonNumber} className="bg-neutral-950 text-white">
-                              {s.name || `Season ${s.seasonNumber}`} ({s.episodeCount} eps)
-                            </option>
-                          ))}
-                        </select>
-                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-neutral-400 pointer-events-none" />
-                      </div>
+                      <RetroSelectDropdown
+                        value={startSeason}
+                        onChange={handleSelectStartSeason}
+                        options={startSeasonOptions}
+                      />
                     </div>
 
                     {/* 2. Start Episode */}
@@ -921,7 +1071,7 @@ export function NostalgiaSchedulerModal({
                           of {maxEpisodesInStartSeason}
                         </span>
                       </div>
-                      <div className="flex items-center rounded-xl border border-neutral-800 bg-neutral-900/90 px-3 py-1.5 focus-within:border-purple-500/60 transition-colors">
+                      <div className="flex items-center rounded-xl border border-neutral-800 bg-neutral-900/90 px-3 py-2 min-h-[38px] focus-within:border-purple-500/60 transition-colors">
                         <span className="text-xs text-neutral-500 font-mono mr-1">Ep</span>
                         <input
                           type="number"
@@ -931,6 +1081,7 @@ export function NostalgiaSchedulerModal({
                           onChange={(e) => {
                             const val = Math.max(1, Math.min(maxEpisodesInStartSeason, Number(e.target.value) || 1));
                             setStartEpisode(val);
+                            setPreviewResult(null);
                           }}
                           className="w-full bg-transparent font-mono text-xs font-bold text-white focus:outline-none"
                         />
@@ -942,98 +1093,29 @@ export function NostalgiaSchedulerModal({
                       <label className="text-[11px] font-mono text-neutral-400 font-bold uppercase">
                         Broadcast Through
                       </label>
-                      <div className="relative">
-                        <select
-                          value={endSeason ?? "finale"}
-                          onChange={(e) => {
-                            triggerHaptic(8);
-                            const val = e.target.value;
-                            setEndSeason(val === "finale" ? null : Number(val));
-                          }}
-                          className="w-full appearance-none rounded-xl border border-neutral-800 bg-neutral-900/90 px-3 py-2 text-xs font-mono font-bold text-white transition-colors hover:border-neutral-700 focus:border-purple-500/60 focus:outline-none cursor-pointer"
-                        >
-                          <option value="finale" className="bg-neutral-950 text-purple-300 font-bold">
-                            Series Finale (All Seasons)
-                          </option>
-                          {availableSeasons
-                            .filter((s) => s.seasonNumber >= startSeason)
-                            .map((s) => (
-                              <option key={s.seasonNumber} value={s.seasonNumber} className="bg-neutral-950 text-white">
-                                Through {s.name || `Season ${s.seasonNumber}`}
-                              </option>
-                            ))}
-                        </select>
-                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-neutral-400 pointer-events-none" />
-                      </div>
+                      <RetroSelectDropdown
+                        value={endSeason !== null ? String(endSeason) : "finale"}
+                        onChange={(val) => {
+                          triggerHaptic(8);
+                          setEndSeason(val === "finale" ? null : Number(val));
+                          setPreviewResult(null);
+                        }}
+                        options={endSeasonOptions}
+                      />
                     </div>
                   </div>
 
-                  {/* Quick Preset Actions */}
-                  <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        triggerHaptic(8);
-                        setStartSeason(availableSeasons[0]?.seasonNumber ?? 1);
-                        setStartEpisode(1);
-                        setEndSeason(null);
-                        setExcludedSeasons([]);
-                      }}
-                      className={`rounded-lg border px-2.5 py-1 text-[10px] font-mono font-bold uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap active:scale-95 ${
-                        startSeason === 1 && !endSeason && excludedSeasons.length === 0
-                          ? "border-purple-500/60 bg-purple-950 text-purple-200 shadow-sm font-bold"
-                          : "border-neutral-800 bg-neutral-900/80 text-neutral-400 hover:border-neutral-700 hover:text-white"
-                      }`}
-                    >
-                      Full Series (S1 ➔ Finale)
-                    </button>
-
-                    {availableSeasons.some((s) => s.seasonNumber === 2) && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          triggerHaptic(8);
-                          handleSelectStartSeason(2);
-                        }}
-                        className={`rounded-lg border px-2.5 py-1 text-[10px] font-mono font-bold uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap active:scale-95 ${
-                          startSeason === 2
-                            ? "border-purple-500/60 bg-purple-950 text-purple-200 shadow-sm font-bold"
-                            : "border-neutral-800 bg-neutral-900/80 text-neutral-400 hover:border-neutral-700 hover:text-white"
-                        }`}
-                      >
-                        Start from Season 2
-                      </button>
-                    )}
-
-                    {availableSeasons.some((s) => s.seasonNumber === 3) && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          triggerHaptic(8);
-                          handleSelectStartSeason(3);
-                        }}
-                        className={`rounded-lg border px-2.5 py-1 text-[10px] font-mono font-bold uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap active:scale-95 ${
-                          startSeason === 3
-                            ? "border-purple-500/60 bg-purple-950 text-purple-200 shadow-sm font-bold"
-                            : "border-neutral-800 bg-neutral-900/80 text-neutral-400 hover:border-neutral-700 hover:text-white"
-                        }`}
-                      >
-                        Start from Season 3
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Season Inclusion Chips */}
-                  {availableSeasons.length > 1 && (
+                  {/* Season Inclusion Chips (Within Active Broadcast Scope) */}
+                  {activeScopeSeasons.length > 1 && (
                     <div className="space-y-1.5 pt-1">
                       <div className="flex items-center justify-between text-[10px] font-mono text-neutral-400">
                         <span>Click any season to include or exclude from this run:</span>
-                        <span className="text-purple-300 font-bold">
-                          {includedSeasonNumbers.length} of {availableSeasons.length} seasons active
+                        <span className={`font-bold ${includedSeasonNumbers.length === 0 ? "text-amber-400" : "text-purple-300"}`}>
+                          {includedSeasonNumbers.length} of {activeScopeSeasons.length} seasons active
                         </span>
                       </div>
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        {availableSeasons.map((s) => {
+                        {activeScopeSeasons.map((s) => {
                           const isIncluded = includedSeasonNumbers.includes(s.seasonNumber);
                           return (
                             <button
@@ -1053,6 +1135,11 @@ export function NostalgiaSchedulerModal({
                           );
                         })}
                       </div>
+                      {includedSeasonNumbers.length === 0 && (
+                        <p className="text-[11px] font-mono text-amber-400 pt-0.5">
+                          ⚠️ At least one season must remain active in the broadcast run.
+                        </p>
+                      )}
                     </div>
                   )}
                 </div>
@@ -1214,6 +1301,7 @@ export function NostalgiaSchedulerModal({
                         if (activeSlotEditing === 0) setMeridiem("AM");
                         else if (activeSlotEditing === 1) setSlot2Meridiem("AM");
                         else setSlot3Meridiem("AM");
+                        setPreviewResult(null);
                       }}
                       className={`flex items-center gap-1.5 rounded-lg px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer ${
                         (activeSlotEditing === 0 ? meridiem : activeSlotEditing === 1 ? slot2Meridiem : slot3Meridiem) === "AM"
@@ -1231,6 +1319,7 @@ export function NostalgiaSchedulerModal({
                         if (activeSlotEditing === 0) setMeridiem("PM");
                         else if (activeSlotEditing === 1) setSlot2Meridiem("PM");
                         else setSlot3Meridiem("PM");
+                        setPreviewResult(null);
                       }}
                       className={`flex items-center gap-1.5 rounded-lg px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer ${
                         (activeSlotEditing === 0 ? meridiem : activeSlotEditing === 1 ? slot2Meridiem : slot3Meridiem) === "PM"
@@ -1263,6 +1352,7 @@ export function NostalgiaSchedulerModal({
                           if (activeSlotEditing === 0) setSelectedSlotIndex(index);
                           else if (activeSlotEditing === 1) setSlot2Index(index);
                           else setSlot3Index(index);
+                          setPreviewResult(null);
                         }}
                         className={`relative rounded-lg px-1.5 py-1 font-mono text-xs font-semibold transition-all cursor-pointer ${
                           isSelected
@@ -1287,7 +1377,10 @@ export function NostalgiaSchedulerModal({
 
               <RetroYearDropdown
                 value={startYear}
-                onChange={setStartYear}
+                onChange={(y) => {
+                  setStartYear(y);
+                  setPreviewResult(null);
+                }}
                 options={startYearOptions}
               />
             </div>
@@ -1298,7 +1391,7 @@ export function NostalgiaSchedulerModal({
                 <button
                   type="button"
                   onClick={handleGeneratePreview}
-                  disabled={isPreviewLoading}
+                  disabled={isPreviewLoading || Boolean(intraSlotOverlapError) || includedSeasonNumbers.length === 0}
                   className="w-full flex items-center justify-center gap-2 rounded-xl border border-purple-500/50 bg-purple-950/60 hover:bg-purple-900/80 text-purple-200 hover:text-white hover:border-purple-400 py-2.5 text-xs font-bold uppercase tracking-wider shadow-lg transition-all cursor-pointer disabled:opacity-40 active:scale-95"
                 >
                   {isPreviewLoading ? (
@@ -1554,7 +1647,7 @@ export function NostalgiaSchedulerModal({
             <button
               type="button"
               onClick={handleCommitSchedule}
-              disabled={isCommitting || Boolean(intraSlotOverlapError)}
+              disabled={isCommitting || Boolean(intraSlotOverlapError) || includedSeasonNumbers.length === 0}
               className="flex-1 sm:flex-initial flex items-center justify-center gap-2 rounded-xl border border-purple-500/50 bg-purple-950/60 hover:bg-purple-900/80 text-purple-200 hover:text-white hover:border-purple-400 px-5 py-2.5 sm:py-2 text-xs font-bold uppercase tracking-wider shadow-lg transition-all active:scale-95 cursor-pointer disabled:opacity-40 min-h-[42px] sm:min-h-[36px]"
             >
               {isCommitting ? (
@@ -1573,7 +1666,7 @@ export function NostalgiaSchedulerModal({
             <button
               type="button"
               onClick={handleGeneratePreview}
-              disabled={!selectedShow || isPreviewLoading || Boolean(intraSlotOverlapError)}
+              disabled={!selectedShow || isPreviewLoading || Boolean(intraSlotOverlapError) || includedSeasonNumbers.length === 0}
               className="flex-1 sm:flex-initial flex items-center justify-center gap-2 rounded-xl border border-purple-500/50 bg-purple-950/60 hover:bg-purple-900/80 text-purple-200 hover:text-white hover:border-purple-400 px-5 py-2.5 sm:py-2 text-xs font-bold uppercase tracking-wider shadow-md active:scale-95 disabled:opacity-40 cursor-pointer transition-all min-h-[42px] sm:min-h-[36px]"
             >
               {isPreviewLoading ? (
