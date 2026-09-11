@@ -647,11 +647,11 @@ export function PersonalBroadcastModal({
                   : "text-neutral-400 hover:text-neutral-200"
               }`}
             >
-              <CalendarDays className={`h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0 ${activeTab === "calendar" ? "text-amber-400" : "text-neutral-500"}`} />
+              <CalendarDays className={`h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0 ${activeTab === "calendar" ? "text-purple-400" : "text-neutral-500"}`} />
               <span className="hidden sm:inline">Calendar Planner</span>
               <span className="sm:hidden">Calendar</span>
               {calendarEntries.length > 0 && (
-                <span className="rounded-md border border-neutral-800 bg-neutral-900 px-1.5 py-0.2 font-mono text-[9px] sm:text-[10px] font-bold text-amber-400">
+                <span className="rounded-md border border-purple-500/40 bg-purple-950/80 px-1.5 py-0.2 font-mono text-[9px] sm:text-[10px] font-bold text-purple-300">
                   {calendarEntries.length}
                 </span>
               )}
@@ -1068,14 +1068,14 @@ export function PersonalBroadcastModal({
               <div className="rounded-2xl border border-neutral-800 bg-neutral-900/30 p-4 sm:p-5 shadow-sm">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-neutral-800/80 pb-3">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-neutral-800 bg-neutral-900 text-amber-400 shadow">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-neutral-800 bg-neutral-900 text-purple-400 shadow">
                       <Sparkles className="h-5 w-5" />
                     </div>
                     <div>
                       <h3 className="text-sm font-bold uppercase tracking-wider text-white flex items-center gap-2">
                         Retro TV Runs &amp; Multi-Year Broadcasts
                         {nostalgiaCampaigns.length > 0 && (
-                          <span className="rounded-md bg-neutral-900 border border-neutral-800 px-2 py-0.5 font-mono text-[9px] font-bold text-neutral-300">
+                          <span className="rounded-md bg-purple-950/80 border border-purple-500/40 px-2 py-0.5 font-mono text-[9px] font-bold text-purple-300">
                             {nostalgiaCampaigns.length} Active
                           </span>
                         )}
@@ -1089,9 +1089,9 @@ export function PersonalBroadcastModal({
                   <button
                     type="button"
                     onClick={() => setIsNostalgiaModalOpen(true)}
-                    className="flex w-full sm:w-auto items-center justify-center gap-1.5 rounded-xl bg-white hover:bg-neutral-200 text-black px-4 py-2.5 sm:py-2 text-xs font-bold transition-all shadow-md active:scale-95 cursor-pointer min-h-[40px] sm:min-h-[36px]"
+                    className="flex w-full sm:w-auto items-center justify-center gap-1.5 rounded-xl border border-purple-500/50 bg-purple-950/60 hover:bg-purple-900/80 text-purple-200 hover:text-white hover:border-purple-400 px-4 py-2.5 sm:py-2 text-xs font-bold transition-all shadow-md active:scale-95 cursor-pointer min-h-[40px] sm:min-h-[36px]"
                   >
-                    <Sparkles className="h-3.5 w-3.5" />
+                    <Sparkles className="h-3.5 w-3.5 text-purple-400" />
                     <span>+ Plan Nostalgia Series Run</span>
                   </button>
                 </div>
@@ -1099,7 +1099,7 @@ export function PersonalBroadcastModal({
                 {/* Campaigns List */}
                 {isNostalgiaLoading ? (
                   <div className="flex items-center justify-center py-6 text-neutral-500 gap-2">
-                    <Loader2 className="h-4 w-4 animate-spin text-neutral-400" />
+                    <Loader2 className="h-4 w-4 animate-spin text-purple-400" />
                     <span className="text-xs">Loading series runs...</span>
                   </div>
                 ) : nostalgiaCampaigns.length === 0 ? (
@@ -1122,20 +1122,23 @@ export function PersonalBroadcastModal({
                           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3.5">
                             {/* Poster Thumbnail */}
                             <div className="relative h-16 w-11 shrink-0 overflow-hidden rounded-lg border border-neutral-800 bg-neutral-900 shadow">
-                              {camp.posterPath ? (
-                                /* eslint-disable-next-line @next/next/no-img-element */
-                                <img src={camp.posterPath} alt={camp.title} className="h-full w-full object-cover" />
-                              ) : (
-                                <div className="flex h-full w-full items-center justify-center text-neutral-600">
-                                  <Tv className="h-4 w-4" />
-                                </div>
-                              )}
+                              {(() => {
+                                const poster = getSafePosterUrl(camp.posterPath);
+                                return poster ? (
+                                  /* eslint-disable-next-line @next/next/no-img-element */
+                                  <img src={poster} alt={camp.title} className="h-full w-full object-cover" />
+                                ) : (
+                                  <div className="flex h-full w-full items-center justify-center text-neutral-600">
+                                    <Tv className="h-4 w-4" />
+                                  </div>
+                                );
+                              })()}
                             </div>
 
                             {/* Campaign Details */}
                             <div className="min-w-0 flex-1 space-y-1">
                               <div className="flex items-center gap-2 flex-wrap">
-                                <span className="inline-flex items-center rounded-md bg-neutral-900 px-2 py-0.5 font-mono text-[9px] font-bold tracking-widest text-neutral-300 border border-neutral-800">
+                                <span className="inline-flex items-center rounded-md bg-purple-950/80 px-2 py-0.5 font-mono text-[9px] font-bold tracking-widest text-purple-300 border border-purple-500/40">
                                   VINTAGE RETRO RUN
                                 </span>
                                 <span className="rounded-md bg-neutral-900 border border-neutral-800 px-1.5 py-0.2 font-mono text-[9px] font-bold text-neutral-300">
@@ -1145,7 +1148,7 @@ export function PersonalBroadcastModal({
                               </div>
 
                               <div className="flex items-center gap-2 text-xs text-neutral-400 font-mono flex-wrap">
-                                <span className="text-amber-400 font-semibold">{dayName}s @ {timeStr}</span>
+                                <span className="text-purple-300 font-semibold">{dayName}s @ {timeStr}</span>
                                 <span className="text-neutral-600">·</span>
                                 <span>{camp.firstAirDate} ➔ {camp.lastAirDate}</span>
                               </div>
@@ -1239,12 +1242,12 @@ export function PersonalBroadcastModal({
 
               {isCalendarLoading ? (
                 <div className="flex items-center justify-center py-16 text-neutral-500 gap-2">
-                  <Loader2 className="h-5 w-5 animate-spin text-amber-400" />
+                  <Loader2 className="h-5 w-5 animate-spin text-purple-400" />
                   <span className="text-xs">Loading calendar entries...</span>
                 </div>
               ) : calendarEntries.length === 0 ? (
                 <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-neutral-800/80 bg-neutral-950/40 p-8 sm:p-12 text-center text-neutral-600 min-h-[220px]">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-neutral-800 bg-neutral-900 text-amber-400 mb-3 shadow">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-neutral-800 bg-neutral-900 text-purple-400 mb-3 shadow">
                     <CalendarDays className="h-6 w-6" />
                   </div>
                   <p className="text-sm font-bold text-neutral-300">
@@ -1288,7 +1291,7 @@ export function PersonalBroadcastModal({
                             </div>
 
                             <div className="flex items-center gap-2 font-mono text-xs text-neutral-400">
-                              <span className="text-amber-400 font-bold">{entry.scheduledDate}</span>
+                              <span className="text-purple-300 font-bold">{entry.scheduledDate}</span>
                               <span>·</span>
                               <span>{timeRange}</span>
                               <span>({entry.blockCount * 30}m)</span>

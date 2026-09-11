@@ -59,6 +59,19 @@ function toMinutesFromMidnight(hour12: number, minute: number, meridiem: "AM" | 
   return hours24 * 60 + minute;
 }
 
+function getSafePosterUrl(posterPath?: string | null, posterUrl?: string | null): string | null {
+  if (posterUrl && (posterUrl.startsWith("http://") || posterUrl.startsWith("https://"))) {
+    return posterUrl;
+  }
+  const path = posterPath || posterUrl;
+  if (!path) return null;
+  if (path.startsWith("http://") || path.startsWith("https://")) {
+    return path;
+  }
+  const clean = path.startsWith("/") ? path : `/${path}`;
+  return `https://image.tmdb.org/t/p/w185${clean}`;
+}
+
 export function CalendarSchedulerModal({
   isOpen,
   onClose,
@@ -211,7 +224,7 @@ export function CalendarSchedulerModal({
         {/* Header */}
         <div className="flex items-center justify-between border-b border-neutral-900 pb-3 sm:pb-4">
           <div className="flex items-center gap-2">
-            <CalendarIcon className="h-5 w-5 text-amber-400" />
+            <CalendarIcon className="h-5 w-5 text-purple-400" />
             <h3 className="text-base font-bold text-white">Schedule to Date</h3>
           </div>
           <button
@@ -226,13 +239,17 @@ export function CalendarSchedulerModal({
         {/* Media Preview Banner */}
         <div className="flex items-center gap-3 rounded-xl border border-neutral-800/80 bg-neutral-900/50 p-3 my-3 sm:my-4">
           <div className="relative h-16 w-12 shrink-0 overflow-hidden rounded-md bg-neutral-800 border border-neutral-700/60">
-            {media.posterUrl ? (
-              <Image src={media.posterUrl} alt={media.title} fill className="object-cover" />
-            ) : (
-              <div className="flex h-full w-full items-center justify-center">
-                <Film className="h-4 w-4 text-neutral-600" />
-              </div>
-            )}
+            {(() => {
+              const poster = getSafePosterUrl(media.posterPath, media.posterUrl);
+              return poster ? (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img src={poster} alt={media.title} className="h-full w-full object-cover" />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center">
+                  <Film className="h-4 w-4 text-neutral-600" />
+                </div>
+              );
+            })()}
           </div>
           <div className="space-y-0.5 min-w-0">
             <h4 className="text-sm font-bold text-white truncate">{media.title}</h4>
@@ -256,7 +273,7 @@ export function CalendarSchedulerModal({
                 min={todayStr}
                 value={scheduledDate}
                 onChange={(e) => setScheduledDate(e.target.value)}
-                className="rounded-lg border border-neutral-800 bg-neutral-900 px-2.5 py-1 text-base sm:text-xs font-mono font-bold text-white focus:outline-none focus:border-neutral-500 min-h-[36px]"
+                className="rounded-lg border border-neutral-800 bg-neutral-900 px-2.5 py-1 text-base sm:text-xs font-mono font-bold text-white focus:outline-none focus:border-purple-500/60 min-h-[36px]"
               />
             </div>
 
@@ -269,9 +286,9 @@ export function CalendarSchedulerModal({
                     key={d.dateStr}
                     type="button"
                     onClick={() => setScheduledDate(d.dateStr)}
-                    className={`flex flex-col items-center justify-center shrink-0 rounded-xl px-3 py-1.5 text-center transition-all ${
+                    className={`flex flex-col items-center justify-center shrink-0 rounded-xl px-3 py-1.5 text-center transition-all cursor-pointer ${
                       isSelected
-                        ? "border border-neutral-600 bg-neutral-800 text-white font-bold ring-1 ring-neutral-700 shadow-md"
+                        ? "border border-purple-500/60 bg-purple-950/80 text-purple-200 font-bold ring-1 ring-purple-500/30 shadow-md"
                         : "border border-neutral-800 bg-neutral-900/60 text-neutral-400 hover:border-neutral-700 hover:text-white"
                     }`}
                   >
@@ -294,9 +311,9 @@ export function CalendarSchedulerModal({
                 <button
                   type="button"
                   onClick={() => setMeridiem("AM")}
-                  className={`px-2.5 py-0.5 text-xs font-mono font-bold rounded-md transition-all ${
+                  className={`px-2.5 py-0.5 text-xs font-mono font-bold rounded-md transition-all cursor-pointer ${
                     meridiem === "AM"
-                      ? "bg-white text-black shadow-sm"
+                      ? "bg-neutral-800 text-white shadow-sm ring-1 ring-neutral-700"
                       : "text-neutral-400 hover:text-neutral-200"
                   }`}
                 >
@@ -305,9 +322,9 @@ export function CalendarSchedulerModal({
                 <button
                   type="button"
                   onClick={() => setMeridiem("PM")}
-                  className={`px-2.5 py-0.5 text-xs font-mono font-bold rounded-md transition-all ${
+                  className={`px-2.5 py-0.5 text-xs font-mono font-bold rounded-md transition-all cursor-pointer ${
                     meridiem === "PM"
-                      ? "bg-white text-black shadow-sm"
+                      ? "bg-neutral-800 text-white shadow-sm ring-1 ring-neutral-700"
                       : "text-neutral-400 hover:text-neutral-200"
                   }`}
                 >
@@ -325,9 +342,9 @@ export function CalendarSchedulerModal({
                     key={`${s.label}-${meridiem}`}
                     type="button"
                     onClick={() => setSelectedSlotIndex(idx)}
-                    className={`rounded-xl py-1.5 text-center font-mono text-xs transition-all ${
+                    className={`rounded-xl py-1.5 text-center font-mono text-xs transition-all cursor-pointer ${
                       isSelected
-                        ? "border border-neutral-600 bg-neutral-800 text-white font-bold shadow-md ring-1 ring-neutral-700"
+                        ? "border border-purple-500/60 bg-purple-950/80 text-purple-200 font-bold ring-1 ring-purple-500/30 shadow-md"
                         : "border border-neutral-800 bg-neutral-900/60 text-neutral-400 hover:border-neutral-700 hover:text-white"
                     }`}
                   >
@@ -350,7 +367,7 @@ export function CalendarSchedulerModal({
                 <label className="text-xs font-mono font-bold uppercase tracking-wider text-neutral-300">
                   3. Start From
                 </label>
-                <span className="font-mono text-xs font-bold text-amber-400">
+                <span className="font-mono text-xs font-bold text-purple-300">
                   Season {startSeason} · Episode {startEpisode}
                 </span>
               </div>
@@ -394,16 +411,16 @@ export function CalendarSchedulerModal({
             <button
               type="submit"
               disabled={isSubmitting}
-              className="w-full flex items-center justify-center gap-2 rounded-xl bg-white hover:bg-neutral-200 text-black py-3 text-xs font-bold uppercase tracking-wider shadow-lg active:scale-95 transition-all disabled:opacity-50 cursor-pointer min-h-[44px]"
+              className="w-full flex items-center justify-center gap-2 rounded-xl border border-purple-500/50 bg-purple-950/60 hover:bg-purple-900/80 text-purple-200 hover:text-white hover:border-purple-400 py-3 text-xs font-bold uppercase tracking-wider shadow-lg active:scale-95 transition-all disabled:opacity-50 cursor-pointer min-h-[44px]"
             >
               {isSubmitting ? (
                 <>
-                  <Loader2 className="h-4 w-4 animate-spin text-black" />
+                  <Loader2 className="h-4 w-4 animate-spin text-purple-300" />
                   <span>Locking Slot...</span>
                 </>
               ) : (
                 <>
-                  <Check className="h-4 w-4 stroke-[2.5]" />
+                  <Check className="h-4 w-4 text-purple-400 stroke-[2.5]" />
                   <span>Confirm Calendar Airing</span>
                 </>
               )}

@@ -70,72 +70,18 @@ function toMinutesFromMidnight(hour12: number, minute: number, meridiem: "AM" | 
   return hours24 * 60 + minute;
 }
 
-const CLASSIC_SHOW_SUGGESTIONS = [
-  {
-    tmdbId: 1668,
-    title: "Friends",
-    years: "1994 - 2004",
-    network: "NBC Must-See TV",
-    seasons: "10 Seasons",
-    poster: "https://image.tmdb.org/t/p/w185/f496cm9enuEsZkSPghkkxYA96Bh.jpg",
-  },
-  {
-    tmdbId: 1400,
-    title: "Seinfeld",
-    years: "1989 - 1998",
-    network: "NBC Classic",
-    seasons: "9 Seasons",
-    poster: "https://image.tmdb.org/t/p/w185/aCw8ON0fZioNHK40gtOp3umUrq9.jpg",
-  },
-  {
-    tmdbId: 4087,
-    title: "The X-Files",
-    years: "1993 - 2018",
-    network: "FOX Sci-Fi",
-    seasons: "11 Seasons",
-    poster: "https://image.tmdb.org/t/p/w185/7diUbLR4n9A7sC3Z72s5f9eC8dJ.jpg",
-  },
-  {
-    tmdbId: 95,
-    title: "Buffy the Vampire Slayer",
-    years: "1997 - 2003",
-    network: "The WB",
-    seasons: "7 Seasons",
-    poster: "https://image.tmdb.org/t/p/w185/e5y64pG3c2z7gCqV7lU8iM2e2L6.jpg",
-  },
-  {
-    tmdbId: 456,
-    title: "The Simpsons",
-    years: "1989 - Present",
-    network: "FOX Animation",
-    seasons: "Golden Era (S1-12)",
-    poster: "https://image.tmdb.org/t/p/w185/zI3E29ipAfd4fe0n0Vkv6048o4v.jpg",
-  },
-  {
-    tmdbId: 192,
-    title: "Twin Peaks",
-    years: "1990 - 1991",
-    network: "ABC Mystery",
-    seasons: "Original Run",
-    poster: "https://image.tmdb.org/t/p/w185/7BzxUo39uW6kQe5sU9m6tQ1Z5u7.jpg",
-  },
-  {
-    tmdbId: 4586,
-    title: "Gilmore Girls",
-    years: "2000 - 2007",
-    network: "The WB Drama",
-    seasons: "7 Seasons",
-    poster: "https://image.tmdb.org/t/p/w185/3V1kL9i7pW0M5jB3nU7hC6kM3k5.jpg",
-  },
-  {
-    tmdbId: 1667,
-    title: "That '70s Show",
-    years: "1998 - 2006",
-    network: "FOX Sitcom",
-    seasons: "8 Seasons",
-    poster: "https://image.tmdb.org/t/p/w185/790Yt74P20V1w2E8u4qX4lQ8v0v.jpg",
-  },
-];
+function getSafePosterUrl(posterPath?: string | null, posterUrl?: string | null): string | null {
+  if (posterUrl && (posterUrl.startsWith("http://") || posterUrl.startsWith("https://"))) {
+    return posterUrl;
+  }
+  const path = posterPath || posterUrl;
+  if (!path) return null;
+  if (path.startsWith("http://") || path.startsWith("https://")) {
+    return path;
+  }
+  const clean = path.startsWith("/") ? path : `/${path}`;
+  return `https://image.tmdb.org/t/p/w185${clean}`;
+}
 
 /**
  * Custom Vintage Dropdown for selecting Launch Years with retro tags
@@ -178,22 +124,22 @@ function RetroYearDropdown({
           setIsOpen((prev) => !prev);
         }}
         aria-expanded={isOpen}
-        className="flex w-full items-center justify-between gap-2 rounded-xl border border-neutral-800 bg-neutral-900/90 px-3.5 py-2 text-left text-xs font-mono font-bold text-neutral-200 transition-colors hover:border-neutral-700 focus:border-neutral-600 focus:outline-none cursor-pointer"
+        className="flex w-full items-center justify-between gap-2 rounded-xl border border-neutral-800 bg-neutral-900/90 px-3.5 py-2 text-left text-xs font-mono font-bold text-neutral-200 transition-colors hover:border-neutral-700 focus:border-purple-500/60 focus:outline-none cursor-pointer"
       >
         <div className="flex items-center gap-2 truncate">
-          <CalendarIcon className="h-3.5 w-3.5 text-neutral-400 shrink-0" />
+          <CalendarIcon className="h-3.5 w-3.5 text-purple-400 shrink-0" />
           <span className="text-white">{selected.year}</span>
           <span className="text-neutral-500 text-[11px] font-sans truncate">• {selected.label}</span>
         </div>
         <ChevronDown
           className={`h-3.5 w-3.5 text-neutral-400 shrink-0 transition-transform duration-200 ${
-            isOpen ? "rotate-180 text-white" : ""
+            isOpen ? "rotate-180 text-purple-300" : ""
           }`}
         />
       </button>
 
       {isOpen && (
-        <div className="absolute left-0 top-full z-40 mt-1.5 w-full overflow-hidden rounded-xl border border-neutral-700/80 bg-neutral-950/95 p-1 backdrop-blur-xl shadow-2xl shadow-black animate-in fade-in zoom-in-95 duration-150">
+        <div className="absolute left-0 top-full z-40 mt-1.5 w-full overflow-hidden rounded-xl border border-neutral-800 bg-neutral-950/95 p-1 backdrop-blur-xl shadow-2xl shadow-black animate-in fade-in zoom-in-95 duration-150">
           {options.map((opt) => {
             const isSelected = opt.year === value;
             return (
@@ -207,12 +153,12 @@ function RetroYearDropdown({
                 }}
                 className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-xs font-mono transition-colors cursor-pointer ${
                   isSelected
-                    ? "bg-neutral-800 text-white font-bold border border-neutral-700"
+                    ? "border border-purple-500/60 bg-purple-950/80 text-purple-200 font-bold ring-1 ring-purple-500/30 shadow-md"
                     : "text-neutral-300 hover:bg-neutral-900 hover:text-white"
                 }`}
               >
                 <div className="flex items-center gap-2">
-                  <span className={isSelected ? "text-white font-bold" : "text-white"}>
+                  <span className={isSelected ? "text-purple-200 font-bold" : "text-white"}>
                     {opt.year}
                   </span>
                   <span className="text-neutral-400 text-[11px] font-sans">{opt.label}</span>
@@ -220,7 +166,7 @@ function RetroYearDropdown({
                 <span
                   className={`rounded px-1.5 py-0.2 text-[9px] font-bold uppercase tracking-wider ${
                     isSelected
-                      ? "bg-neutral-900 text-amber-400 border border-neutral-700"
+                      ? "bg-purple-900/80 text-purple-300 border border-purple-500/40"
                       : "bg-neutral-900 text-neutral-500"
                   }`}
                 >
@@ -290,9 +236,12 @@ export function NostalgiaSchedulerModal({
         const res = await fetch(`/api/tmdb/search?query=${encodeURIComponent(trimmed)}`);
         if (res.ok) {
           const data = await res.json();
-          const tvOnly = Array.isArray(data)
-            ? data.filter((item: MediaSearchResult) => item.mediaType === "tv")
-            : [];
+          const rawList = Array.isArray(data)
+            ? data
+            : Array.isArray(data?.results)
+              ? data.results
+              : [];
+          const tvOnly = rawList.filter((item: MediaSearchResult) => item.mediaType === "tv");
           setSearchResults(tvOnly);
         }
       } catch {
@@ -449,18 +398,18 @@ export function NostalgiaSchedulerModal({
 
           <div className="flex items-center justify-between gap-2 border-t border-neutral-900/60 pt-2">
             <div className="flex items-center gap-2.5 min-w-0">
-              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl border border-neutral-800 bg-neutral-900 text-amber-400 shadow">
-                <Sparkles className="h-3.5 w-3.5" />
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl border border-neutral-800 bg-neutral-900 text-purple-400 shadow">
+                <Radio className="h-3.5 w-3.5" />
               </div>
               <div className="min-w-0">
                 <h1 className="text-xs sm:text-sm font-black uppercase tracking-wider text-white truncate flex items-center gap-2">
                   <span>Retro TV Broadcast Scheduler</span>
-                  <span className="rounded bg-neutral-900 border border-neutral-800 px-1.5 py-0.2 font-mono text-[9px] font-bold text-neutral-300 shrink-0">
-                    Must-See Pacing
+                  <span className="rounded bg-purple-950/80 border border-purple-500/40 px-1.5 py-0.2 font-mono text-[9px] font-bold text-purple-300 shrink-0">
+                    Must-See Lineup
                   </span>
                 </h1>
                 <p className="text-[10px] sm:text-[11px] text-neutral-400 truncate">
-                  Map authentic seasonal broadcast schedules across future years.
+                  Plan multi-year broadcast schedules matching authentic television rhythms.
                 </p>
               </div>
             </div>
@@ -472,7 +421,7 @@ export function NostalgiaSchedulerModal({
           {/* Step 1: Select Series */}
           <div className="space-y-2.5">
             <label className="flex items-center gap-1.5 text-xs font-mono font-bold uppercase tracking-wider text-neutral-300">
-              <Tv className="h-3.5 w-3.5 text-neutral-400" />
+              <Tv className="h-3.5 w-3.5 text-purple-400" />
               <span>1. Select TV Series</span>
             </label>
 
@@ -480,18 +429,21 @@ export function NostalgiaSchedulerModal({
               <div className="flex items-center justify-between rounded-xl border border-neutral-800 bg-neutral-900/60 p-3.5 transition-colors">
                 <div className="flex items-center gap-3.5 min-w-0">
                   <div className="relative h-14 w-10 shrink-0 overflow-hidden rounded-lg border border-neutral-800 bg-neutral-900 shadow">
-                    {selectedShow.posterUrl || selectedShow.posterPath ? (
-                      /* eslint-disable-next-line @next/next/no-img-element */
-                      <img
-                        src={selectedShow.posterUrl || selectedShow.posterPath || ""}
-                        alt={selectedShow.title}
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      <div className="flex h-full w-full items-center justify-center text-neutral-600">
-                        <Film className="h-4 w-4" />
-                      </div>
-                    )}
+                    {(() => {
+                      const poster = getSafePosterUrl(selectedShow.posterPath, selectedShow.posterUrl);
+                      return poster ? (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img
+                          src={poster}
+                          alt={selectedShow.title}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center text-neutral-600">
+                          <Tv className="h-4 w-4" />
+                        </div>
+                      );
+                    })()}
                   </div>
                   <div className="min-w-0 space-y-1">
                     <div className="flex items-center gap-2 flex-wrap">
@@ -526,87 +478,52 @@ export function NostalgiaSchedulerModal({
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search any show (e.g. Friends, Seinfeld, Buffy)..."
-                    className="w-full rounded-xl border border-neutral-800 bg-neutral-900/80 pl-9 pr-4 py-2.5 sm:py-2 text-base sm:text-xs font-mono text-white placeholder-neutral-500 focus:border-neutral-600 focus:bg-black focus:outline-none"
+                    placeholder="Search any show (e.g. Friends, Seinfeld, Buffy, Twin Peaks)..."
+                    className="w-full rounded-xl border border-neutral-800 bg-neutral-900/80 pl-9 pr-4 py-2.5 sm:py-2 text-base sm:text-xs font-mono text-white placeholder-neutral-500 focus:border-purple-500/60 focus:bg-black focus:outline-none focus:ring-1 focus:ring-purple-500/30"
                   />
                   {isSearching && (
-                    <Loader2 className="absolute right-3.5 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-neutral-400" />
+                    <Loader2 className="absolute right-3.5 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-purple-400" />
                   )}
                 </div>
 
                 {/* Search Dropdown */}
                 {searchResults.length > 0 && (
-                  <div className="max-h-48 overflow-y-auto rounded-xl border border-neutral-800 bg-neutral-950 divide-y divide-neutral-850 shadow-2xl no-scrollbar">
-                    {searchResults.map((item) => (
-                      <button
-                        key={item.tmdbId}
-                        type="button"
-                        onClick={() => {
-                          triggerHaptic(10);
-                          setSelectedShow(item);
-                          setSearchQuery("");
-                          setSearchResults([]);
-                        }}
-                        className="flex w-full items-center gap-3 p-2.5 text-left transition-colors hover:bg-neutral-900 cursor-pointer"
-                      >
-                        <div className="h-10 w-7 shrink-0 overflow-hidden rounded bg-neutral-900 border border-neutral-800">
-                          {item.posterPath && (
-                            /* eslint-disable-next-line @next/next/no-img-element */
-                            <img src={item.posterPath} alt="" className="h-full w-full object-cover" />
-                          )}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-xs font-bold text-white truncate">{item.title}</p>
-                          <p className="text-[10px] text-neutral-400 font-mono">
-                            {item.releaseYear ? `${item.releaseYear} • ` : ""}TV Series
-                          </p>
-                        </div>
-                      </button>
-                    ))}
+                  <div className="max-h-60 overflow-y-auto rounded-xl border border-neutral-800 bg-neutral-950 divide-y divide-neutral-900 shadow-2xl no-scrollbar">
+                    {searchResults.map((item) => {
+                      const poster = getSafePosterUrl(item.posterPath, item.posterUrl);
+                      return (
+                        <button
+                          key={item.tmdbId}
+                          type="button"
+                          onClick={() => {
+                            triggerHaptic(10);
+                            setSelectedShow(item);
+                            setSearchQuery("");
+                            setSearchResults([]);
+                          }}
+                          className="flex w-full items-center gap-3 p-2.5 text-left transition-colors hover:bg-neutral-900 cursor-pointer"
+                        >
+                          <div className="relative h-11 w-8 shrink-0 overflow-hidden rounded bg-neutral-900 border border-neutral-800">
+                            {poster ? (
+                              /* eslint-disable-next-line @next/next/no-img-element */
+                              <img src={poster} alt="" className="h-full w-full object-cover" />
+                            ) : (
+                              <div className="flex h-full w-full items-center justify-center text-neutral-600">
+                                <Tv className="h-3.5 w-3.5" />
+                              </div>
+                            )}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs font-bold text-white truncate">{item.title}</p>
+                            <p className="text-[10px] text-neutral-400 font-mono">
+                              {item.releaseYear ? `${item.releaseYear} • ` : ""}TV Series
+                            </p>
+                          </div>
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
-
-                {/* Classic Suggestions Carousel */}
-                <div className="space-y-1.5 pt-0.5">
-                  <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-neutral-500">
-                    Iconic Television Classics:
-                  </span>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                    {CLASSIC_SHOW_SUGGESTIONS.map((s) => (
-                      <button
-                        key={s.tmdbId}
-                        type="button"
-                        onClick={() => {
-                          triggerHaptic(10);
-                          setSelectedShow({
-                            tmdbId: s.tmdbId,
-                            mediaType: "tv",
-                            title: s.title,
-                            releaseYear: s.years.slice(0, 4),
-                            posterPath: s.poster,
-                            posterUrl: s.poster,
-                            backdropUrl: null,
-                            overview: "",
-                            voteAverage: 8.8,
-                          });
-                        }}
-                        className="flex items-center gap-2 rounded-xl border border-neutral-800/80 bg-neutral-900/40 p-2 text-left hover:border-neutral-700 hover:bg-neutral-850/50 transition-all cursor-pointer group"
-                      >
-                        <div className="h-11 w-8 shrink-0 overflow-hidden rounded-md bg-neutral-900 border border-neutral-800">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={s.poster} alt={s.title} className="h-full w-full object-cover" />
-                        </div>
-                        <div className="min-w-0 space-y-0.5">
-                          <p className="text-xs font-bold text-neutral-200 group-hover:text-white truncate">
-                            {s.title}
-                          </p>
-                          <p className="text-[9px] font-mono text-neutral-400 truncate">{s.network}</p>
-                          <p className="text-[9px] text-neutral-500 truncate">{s.seasons}</p>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
               </div>
             )}
           </div>
@@ -617,11 +534,11 @@ export function NostalgiaSchedulerModal({
             <div className="space-y-2">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
                 <label className="flex items-center gap-1.5 text-xs font-mono font-bold uppercase tracking-wider text-neutral-300">
-                  <CalendarDays className="h-3.5 w-3.5 text-neutral-400" />
+                  <CalendarDays className="h-3.5 w-3.5 text-purple-400" />
                   <span>2. Weekly Airing Day ({dayObj?.name || "Thursday"})</span>
                 </label>
 
-                {/* Preset quick jumps */}
+                {/* Preset quick jumps matching ScheduleBroadcastModal */}
                 <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5 touch-pan-x">
                   <button
                     type="button"
@@ -631,7 +548,7 @@ export function NostalgiaSchedulerModal({
                     }}
                     className={`rounded-lg border px-2.5 py-1 text-[10px] sm:text-[9px] font-mono font-bold uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap active:scale-95 ${
                       targetDayOfWeek === 4
-                        ? "border-neutral-700 bg-neutral-800 text-white shadow-sm font-bold"
+                        ? "border-purple-500/60 bg-purple-950 text-purple-200 shadow-sm font-bold"
                         : "border-neutral-800 bg-neutral-900 text-neutral-400 hover:border-neutral-700 hover:text-white"
                     }`}
                   >
@@ -645,7 +562,7 @@ export function NostalgiaSchedulerModal({
                     }}
                     className={`rounded-lg border px-2.5 py-1 text-[10px] sm:text-[9px] font-mono font-bold uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap active:scale-95 ${
                       targetDayOfWeek === 5
-                        ? "border-neutral-700 bg-neutral-800 text-white shadow-sm font-bold"
+                        ? "border-purple-500/60 bg-purple-950 text-purple-200 shadow-sm font-bold"
                         : "border-neutral-800 bg-neutral-900 text-neutral-400 hover:border-neutral-700 hover:text-white"
                     }`}
                   >
@@ -659,7 +576,7 @@ export function NostalgiaSchedulerModal({
                     }}
                     className={`rounded-lg border px-2.5 py-1 text-[10px] sm:text-[9px] font-mono font-bold uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap active:scale-95 ${
                       targetDayOfWeek === 0
-                        ? "border-neutral-700 bg-neutral-800 text-white shadow-sm font-bold"
+                        ? "border-purple-500/60 bg-purple-950 text-purple-200 shadow-sm font-bold"
                         : "border-neutral-800 bg-neutral-900 text-neutral-400 hover:border-neutral-700 hover:text-white"
                     }`}
                   >
@@ -683,7 +600,7 @@ export function NostalgiaSchedulerModal({
                       title={d.name}
                       className={`flex flex-col items-center justify-center rounded-xl py-2.5 sm:py-2 px-0.5 sm:px-1 min-h-[44px] sm:min-h-[38px] text-center transition-all cursor-pointer active:scale-95 ${
                         isSelected
-                          ? "border border-neutral-600 bg-neutral-800 text-white font-bold shadow-md ring-1 ring-neutral-700"
+                          ? "border border-purple-500/60 bg-purple-950/80 text-purple-200 font-bold ring-1 ring-purple-500/30 shadow-md"
                           : "border border-neutral-800 bg-neutral-900/60 text-neutral-400 hover:border-neutral-700 hover:text-white"
                       }`}
                     >
@@ -698,7 +615,7 @@ export function NostalgiaSchedulerModal({
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <label className="flex items-center gap-1.5 text-xs font-mono font-bold uppercase tracking-wider text-neutral-300">
-                  <Clock className="h-3.5 w-3.5 text-neutral-400" />
+                  <Clock className="h-3.5 w-3.5 text-purple-400" />
                   <span>3. Air Time Slot ({formattedSelectedTime})</span>
                 </label>
 
@@ -751,7 +668,7 @@ export function NostalgiaSchedulerModal({
                       }}
                       className={`relative rounded-lg px-1.5 py-1 font-mono text-xs font-semibold transition-all cursor-pointer ${
                         isSelected
-                          ? "border border-neutral-600 bg-neutral-800 text-white font-bold ring-1 ring-neutral-700 shadow-md"
+                          ? "border border-purple-500/60 bg-purple-950/80 text-purple-200 font-bold ring-1 ring-purple-500/30 shadow-md"
                           : "border border-neutral-800/80 bg-neutral-900/60 text-neutral-400 hover:border-neutral-700 hover:text-white"
                       }`}
                     >
@@ -765,7 +682,7 @@ export function NostalgiaSchedulerModal({
             {/* Launch Year Selector with Custom Vintage Dropdown */}
             <div className="space-y-2">
               <label className="flex items-center gap-1.5 text-xs font-mono font-bold uppercase tracking-wider text-neutral-300">
-                <Layers className="h-3.5 w-3.5 text-neutral-400" />
+                <Layers className="h-3.5 w-3.5 text-purple-400" />
                 <span>4. Season 1 Launch Year</span>
               </label>
 
@@ -783,16 +700,16 @@ export function NostalgiaSchedulerModal({
                   type="button"
                   onClick={handleGeneratePreview}
                   disabled={isPreviewLoading}
-                  className="w-full flex items-center justify-center gap-2 rounded-xl border border-neutral-700 bg-neutral-800 hover:bg-neutral-750 text-white py-2.5 text-xs font-bold uppercase tracking-wider shadow transition-all cursor-pointer disabled:opacity-40 active:scale-95"
+                  className="w-full flex items-center justify-center gap-2 rounded-xl border border-purple-500/50 bg-purple-950/60 hover:bg-purple-900/80 text-purple-200 hover:text-white hover:border-purple-400 py-2.5 text-xs font-bold uppercase tracking-wider shadow-lg transition-all cursor-pointer disabled:opacity-40 active:scale-95"
                 >
                   {isPreviewLoading ? (
                     <>
-                      <Loader2 className="h-4 w-4 animate-spin text-neutral-300" />
+                      <Loader2 className="h-4 w-4 animate-spin text-purple-300" />
                       <span>Scanning Historical Broadcast Weeks...</span>
                     </>
                   ) : (
                     <>
-                      <Sparkles className="h-4 w-4 text-amber-400" />
+                      <Sparkles className="h-4 w-4 text-purple-400" />
                       <span>Preview Multi-Year Broadcast Roadmap</span>
                     </>
                   )}
@@ -808,21 +725,21 @@ export function NostalgiaSchedulerModal({
               <div className="rounded-xl border border-neutral-800 bg-neutral-900/70 p-3.5 space-y-2">
                 <div className="flex items-center justify-between gap-2 flex-wrap">
                   <div className="flex items-center gap-2">
-                    <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-neutral-800 border border-neutral-700 text-neutral-200">
+                    <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-neutral-800 border border-neutral-700 text-purple-400">
                       <CalendarCheck2 className="h-3.5 w-3.5" />
                     </span>
                     <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-white">
                       Affiliate Lineup Matrix
                     </h3>
                   </div>
-                  <span className="rounded-md border border-neutral-800 bg-neutral-950 px-2 py-0.5 font-mono text-[10px] font-bold text-neutral-300">
+                  <span className="rounded-md border border-purple-500/40 bg-purple-950/80 px-2 py-0.5 font-mono text-[10px] font-bold text-purple-300">
                     {previewResult.totalSeasons} Seasons · {previewResult.totalEpisodes} Episodes
                   </span>
                 </div>
 
                 <p className="text-xs text-neutral-400 font-mono">
                   Broadcasting every{" "}
-                  <span className="text-white font-bold">{dayObj?.name} at {formattedSelectedTime}</span>{" "}
+                  <span className="text-purple-300 font-bold">{dayObj?.name} at {formattedSelectedTime}</span>{" "}
                   from <span className="text-white font-semibold">{previewResult.firstAirDate}</span> through{" "}
                   <span className="text-white font-semibold">{previewResult.lastAirDate}</span>.
                 </p>
@@ -849,7 +766,7 @@ export function NostalgiaSchedulerModal({
                         className="w-full flex items-center justify-between p-3 text-left hover:bg-neutral-850/50 transition-colors cursor-pointer"
                       >
                         <div className="flex items-center gap-3 min-w-0">
-                          <span className="flex h-7 w-9 shrink-0 items-center justify-center rounded-lg bg-neutral-800 font-mono text-xs font-bold text-neutral-200 border border-neutral-700">
+                          <span className="flex h-7 w-9 shrink-0 items-center justify-center rounded-lg bg-purple-950/80 font-mono text-xs font-bold text-purple-200 border border-purple-500/40">
                             S{String(season.seasonNumber).padStart(2, "0")}
                           </span>
                           <div className="min-w-0">
@@ -920,7 +837,7 @@ export function NostalgiaSchedulerModal({
                                     [season.seasonNumber]: { customStartDate: e.target.value },
                                   }));
                                 }}
-                                className="rounded-lg border border-neutral-700 bg-neutral-950 px-2.5 py-1 font-mono text-base sm:text-xs text-white focus:border-neutral-600 focus:outline-none cursor-pointer min-h-[36px]"
+                                className="rounded-lg border border-neutral-700 bg-neutral-950 px-2.5 py-1 font-mono text-base sm:text-xs text-white focus:border-purple-500/60 focus:outline-none cursor-pointer min-h-[36px]"
                               />
                               {override?.customStartDate && (
                                 <button
@@ -948,7 +865,7 @@ export function NostalgiaSchedulerModal({
                                 className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-2 pt-2 pb-1 text-xs text-neutral-300"
                               >
                                 <div className="flex items-center gap-2 min-w-0">
-                                  <span className="font-mono text-[10px] font-bold text-neutral-500 shrink-0">
+                                  <span className="font-mono text-[10px] font-bold text-purple-400 shrink-0">
                                     E{String(ep.episodeNumber).padStart(2, "0")}
                                   </span>
                                   <span className="truncate">{ep.episodeTitle}</span>
@@ -995,16 +912,16 @@ export function NostalgiaSchedulerModal({
               type="button"
               onClick={handleCommitSchedule}
               disabled={isCommitting}
-              className="flex-1 sm:flex-initial flex items-center justify-center gap-2 rounded-xl bg-white hover:bg-neutral-200 text-black px-5 py-2.5 sm:py-2 text-xs font-bold uppercase tracking-wider shadow-lg transition-all active:scale-95 cursor-pointer disabled:opacity-40 min-h-[42px] sm:min-h-[36px]"
+              className="flex-1 sm:flex-initial flex items-center justify-center gap-2 rounded-xl border border-purple-500/50 bg-purple-950/60 hover:bg-purple-900/80 text-purple-200 hover:text-white hover:border-purple-400 px-5 py-2.5 sm:py-2 text-xs font-bold uppercase tracking-wider shadow-lg transition-all active:scale-95 cursor-pointer disabled:opacity-40 min-h-[42px] sm:min-h-[36px]"
             >
               {isCommitting ? (
                 <>
-                  <Loader2 className="h-4 w-4 animate-spin text-black" />
+                  <Loader2 className="h-4 w-4 animate-spin text-purple-300" />
                   <span>Locking In Lineup...</span>
                 </>
               ) : (
                 <>
-                  <Check className="h-4 w-4 text-black stroke-[2.5]" />
+                  <Radio className="h-4 w-4 text-purple-400" />
                   <span className="truncate">Lock In Multi-Year Broadcast</span>
                 </>
               )}
@@ -1014,12 +931,12 @@ export function NostalgiaSchedulerModal({
               type="button"
               onClick={handleGeneratePreview}
               disabled={!selectedShow || isPreviewLoading}
-              className="flex-1 sm:flex-initial flex items-center justify-center gap-2 rounded-xl bg-white hover:bg-neutral-200 text-black px-5 py-2.5 sm:py-2 text-xs font-bold uppercase tracking-wider shadow-md active:scale-95 disabled:opacity-40 cursor-pointer transition-all min-h-[42px] sm:min-h-[36px]"
+              className="flex-1 sm:flex-initial flex items-center justify-center gap-2 rounded-xl border border-purple-500/50 bg-purple-950/60 hover:bg-purple-900/80 text-purple-200 hover:text-white hover:border-purple-400 px-5 py-2.5 sm:py-2 text-xs font-bold uppercase tracking-wider shadow-md active:scale-95 disabled:opacity-40 cursor-pointer transition-all min-h-[42px] sm:min-h-[36px]"
             >
               {isPreviewLoading ? (
-                <Loader2 className="h-4 w-4 animate-spin text-black" />
+                <Loader2 className="h-4 w-4 animate-spin text-purple-300" />
               ) : (
-                <Sparkles className="h-4 w-4 text-black" />
+                <Sparkles className="h-4 w-4 text-purple-400" />
               )}
               <span>Calculate Timeline</span>
             </button>
