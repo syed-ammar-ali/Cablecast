@@ -132,7 +132,10 @@ export async function GET() {
 
         // TV episodic progression & Season completion check
         if (item.mediaType === "tv") {
-          const nextEpisode = item.currentEpisode + 1;
+          // Count total non-rerun weekly broadcast slots for this TV show
+          const showWeeklySlots = items.filter((it) => it.tmdbId === item.tmdbId && !it.isRerun);
+          const weeklyIncrement = Math.max(1, showWeeklySlots.length);
+          const nextEpisode = item.currentEpisode + weeklyIncrement;
           const totalSeasonEpisodes = item.totalEpisodes ?? 24;
 
           if (nextEpisode > totalSeasonEpisodes) {
@@ -153,9 +156,9 @@ export async function GET() {
               where: { sessionId: { in: userKeys }, tmdbId: item.tmdbId },
             });
           } else {
-            // Advance to next episode
-            await prisma.userPersonalSchedule.updateMany({
-              where: { sessionId: { in: userKeys }, tmdbId: item.tmdbId },
+            // Advance this specific slot to its next weekly episode occurrence
+            await prisma.userPersonalSchedule.update({
+              where: { id: item.id },
               data: {
                 currentEpisode: nextEpisode,
                 lastAiredDate: todayIsoDate,
@@ -508,52 +511,90 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Conflict validation
-    for (const day of input.daysOfWeek) {
-      const dayMatches = existing.filter((item) => item.dayOfWeek === day);
+    const targetDailySlots: number[] =
+      input.mediaType === "tv" && Array.isArray(input.dailySlots) && input.dailySlots.length > 0
+        ? input.dailySlots.map(Number)
+        : [Number(input.blockStartMinutes)];
 
-      for (const item of dayMatches) {
-        const itemEnd = item.blockStartMinutes + item.blockCount * BLOCK_MINUTES;
-        const overlaps =
-          input.blockStartMinutes < itemEnd && requestedEnd > item.blockStartMinutes;
-
-        if (overlaps) {
-          const dayName = DAYS_OF_WEEK.find((d) => d.day === day)?.name ?? `Day ${day}`;
-          const itemTime = formatBlockTime(item.blockStartMinutes);
-          return NextResponse.json(
-            {
-              error: `Slot conflict on ${dayName} at ${itemTime}: Already occupied by "${item.title}". You cannot schedule two broadcasts at the same time.`,
-              conflictWith: item.title,
-              conflictDay: day,
-            },
-            { status: 409 },
-          );
+    // 1. Intra-request slot collision validation
+    if (targetDailySlots.length > 1) {
+      for (let i = 0; i < targetDailySlots.length; i++) {
+        for (let j = i + 1; j < targetDailySlots.length; j++) {
+          const s1 = targetDailySlots[i];
+          const s2 = targetDailySlots[j];
+          const s1End = s1 + blockCount * BLOCK_MINUTES;
+          const s2End = s2 + blockCount * BLOCK_MINUTES;
+          if (s1 < s2End && s1End > s2) {
+            return NextResponse.json(
+              {
+                error: `Episode time slot conflict: ${formatBlockTime(s1)} overlaps with ${formatBlockTime(s2)}. Please space out your episode times.`,
+              },
+              { status: 400 },
+            );
+          }
         }
       }
     }
 
-    // Create appointments for each selected day with persistent userId
-    const created = [];
+    // 2. Conflict validation with existing personal schedule
     for (const day of input.daysOfWeek) {
-      const item = await prisma.userPersonalSchedule.create({
-        data: {
-          sessionId: userId,
-          tmdbId: input.tmdbId,
-          mediaType: input.mediaType,
-          title: input.title,
-          posterPath: input.posterPath ?? null,
-          backdropUrl: input.backdropUrl ?? null,
-          runtimeMinutes: input.runtimeMinutes ?? (input.mediaType === "movie" ? 120 : 30),
-          dayOfWeek: day,
-          blockStartMinutes: input.blockStartMinutes,
-          blockCount,
-          currentSeason: input.startSeason ?? 1,
-          currentEpisode: input.startEpisode ?? 1,
-          totalEpisodes: input.totalEpisodes ?? (input.mediaType === "tv" ? 24 : null),
-          timezoneOffset: typeof input.timezoneOffset === "number" ? input.timezoneOffset : null,
-        },
-      });
-      created.push(item);
+      const dayMatches = existing.filter((item) => item.dayOfWeek === day);
+
+      for (const slotStart of targetDailySlots) {
+        const slotEnd = slotStart + blockCount * BLOCK_MINUTES;
+
+        for (const item of dayMatches) {
+          const itemEnd = item.blockStartMinutes + item.blockCount * BLOCK_MINUTES;
+          const overlaps = slotStart < itemEnd && slotEnd > item.blockStartMinutes;
+
+          if (overlaps) {
+            const dayName = DAYS_OF_WEEK.find((d) => d.day === day)?.name ?? `Day ${day}`;
+            const itemTime = formatBlockTime(item.blockStartMinutes);
+            return NextResponse.json(
+              {
+                error: `Slot conflict on ${dayName} at ${itemTime}: Already occupied by "${item.title}". You cannot schedule two broadcasts at the same time.`,
+                conflictWith: item.title,
+                conflictDay: day,
+              },
+              { status: 409 },
+            );
+          }
+        }
+      }
+    }
+
+    // Create appointments for each selected day and daily slot with sequential episode numbers
+    const created = [];
+    const sortedDays = [...input.daysOfWeek].sort((a, b) => a - b);
+    const baseEpisode = Math.max(1, Number(input.startEpisode) || 1);
+    let episodeOffsetCounter = 0;
+
+    for (const day of sortedDays) {
+      for (const slotMinutes of targetDailySlots) {
+        const episodeNum = input.mediaType === "tv" ? baseEpisode + episodeOffsetCounter : 1;
+        const item = await prisma.userPersonalSchedule.create({
+          data: {
+            sessionId: userId,
+            tmdbId: input.tmdbId,
+            mediaType: input.mediaType,
+            title: input.title,
+            posterPath: input.posterPath ?? null,
+            backdropUrl: input.backdropUrl ?? null,
+            runtimeMinutes: input.runtimeMinutes ?? (input.mediaType === "movie" ? 120 : 30),
+            dayOfWeek: day,
+            blockStartMinutes: slotMinutes,
+            blockCount,
+            currentSeason: input.startSeason ?? 1,
+            currentEpisode: episodeNum,
+            totalEpisodes: input.totalEpisodes ?? (input.mediaType === "tv" ? 24 : null),
+            timezoneOffset: typeof input.timezoneOffset === "number" ? input.timezoneOffset : null,
+          },
+        });
+        created.push(item);
+        if (input.mediaType === "tv") {
+          episodeOffsetCounter++;
+        }
+      }
     }
 
     return NextResponse.json({ success: true, createdCount: created.length, created });

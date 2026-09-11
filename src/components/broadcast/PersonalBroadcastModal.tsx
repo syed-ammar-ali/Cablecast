@@ -1110,6 +1110,15 @@ export function PersonalBroadcastModal({
                   <div className="grid grid-cols-1 gap-3 pt-3">
                     {nostalgiaCampaigns.map((camp) => {
                       const dayName = DAYS_OF_WEEK.find((d) => d.day === camp.dayOfWeek)?.name || "Weekly";
+                      const daysLabel = Array.isArray(camp.daysOfWeek) && camp.daysOfWeek.length > 0
+                        ? camp.daysOfWeek.length === 7
+                          ? "Daily"
+                          : camp.daysOfWeek.length === 5 && [1, 2, 3, 4, 5].every((d: number) => camp.daysOfWeek.includes(d))
+                            ? "Weekdays"
+                            : camp.daysOfWeek.length === 2 && [0, 6].every((d: number) => camp.daysOfWeek.includes(d))
+                              ? "Weekends"
+                              : camp.daysOfWeek.map((d: number) => DAYS_OF_WEEK.find((item) => item.day === d)?.short).filter(Boolean).join(", ")
+                        : `${dayName}s`;
                       const timeStr = formatBlockTime(camp.blockStartMinutes);
                       const isDeleting = deletingCampaignId === camp.tmdbId;
                       const isConfirming = confirmDeleteCampaign?.tmdbId === camp.tmdbId;
@@ -1148,7 +1157,7 @@ export function PersonalBroadcastModal({
                               </div>
 
                               <div className="flex items-center gap-2 text-xs text-neutral-400 font-mono flex-wrap">
-                                <span className="text-purple-300 font-semibold">{dayName}s @ {timeStr}</span>
+                                <span className="text-purple-300 font-semibold">{daysLabel} @ {timeStr}</span>
                                 <span className="text-neutral-600">·</span>
                                 <span>{camp.firstAirDate} ➔ {camp.lastAirDate}</span>
                               </div>

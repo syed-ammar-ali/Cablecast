@@ -20,10 +20,17 @@ export interface NostalgiaScheduleConfig {
   showTitle: string;
   posterPath: string | null;
   backdropUrl: string | null;
-  targetDayOfWeek: number; // 0 = Sunday, 1 = Monday, ..., 4 = Thursday, ..., 6 = Saturday
+  targetDayOfWeek?: number; // legacy backwards compatibility
+  daysOfWeek?: number[]; // single or multiple days: 0 = Sun, 1 = Mon ... 6 = Sat
   blockStartMinutes: number; // 0-1410 (in 30-min increments)
+  dailySlots?: number[]; // Array of start minutes for each episode of the day [slot1, slot2, slot3]
+  episodesPerDay?: number; // 1, 2, or 3 episodes per airing day
   startYear: number; // e.g. 2026
   seasons: NostalgiaSeasonInput[];
+  startSeason?: number;
+  startEpisode?: number;
+  endSeason?: number;
+  includedSeasonNumbers?: number[];
   seasonOverrides?: Record<number, { customStartDate?: string }>;
 }
 
@@ -58,8 +65,15 @@ export interface NostalgiaScheduleResult {
   posterPath: string | null;
   backdropUrl: string | null;
   targetDayOfWeek: number;
+  daysOfWeek: number[];
   blockStartMinutes: number;
+  dailySlots: number[];
+  episodesPerDay: number;
   startYear: number;
+  startSeason: number;
+  startEpisode: number;
+  endSeason: number | null;
+  includedSeasonNumbers: number[];
   totalSeasons: number;
   totalEpisodes: number;
   firstAirDate: string;
@@ -97,6 +111,46 @@ export function findClosestWeekday(year: number, month: number, day: number, tar
 
   d.setDate(d.getDate() + diff);
   return d;
+}
+
+/**
+ * Given a date, finds the next calendar day whose day-of-week is in `targetDays`.
+ */
+export function getNextTargetWeekday(fromDate: Date, targetDays: number[]): Date {
+  const next = new Date(fromDate.getTime());
+  for (let i = 1; i <= 7; i++) {
+    next.setDate(next.getDate() + 1);
+    if (targetDays.includes(next.getDay())) {
+      return next;
+    }
+  }
+  return next;
+}
+
+/**
+ * Given a year, month (0-11), and day, finds the weekday closest to that date matching one of `targetDays`.
+ */
+export function findClosestTargetWeekday(year: number, month: number, day: number, targetDays: number[]): Date {
+  if (targetDays.length === 1) {
+    return findClosestWeekday(year, month, day, targetDays[0]);
+  }
+
+  const d = new Date(year, month, day, 12, 0, 0);
+  if (targetDays.includes(d.getDay())) return d;
+
+  let bestDate = findClosestWeekday(year, month, day, targetDays[0]);
+  let bestDiff = Math.abs(bestDate.getTime() - d.getTime());
+
+  for (let i = 1; i < targetDays.length; i++) {
+    const candidate = findClosestWeekday(year, month, day, targetDays[i]);
+    const diff = Math.abs(candidate.getTime() - d.getTime());
+    if (diff < bestDiff) {
+      bestDiff = diff;
+      bestDate = candidate;
+    }
+  }
+
+  return bestDate;
 }
 
 /**
@@ -156,17 +210,58 @@ export function generateNostalgiaSchedule(config: NostalgiaScheduleConfig): Nost
     showTitle,
     posterPath,
     backdropUrl,
-    targetDayOfWeek,
     blockStartMinutes,
     startYear,
     seasons,
+    startSeason = 1,
+    startEpisode = 1,
+    endSeason,
+    includedSeasonNumbers,
     seasonOverrides = {},
   } = config;
 
+  const rawDays = Array.isArray(config.daysOfWeek) && config.daysOfWeek.length > 0
+    ? config.daysOfWeek
+    : [config.targetDayOfWeek ?? 4];
+  const targetDays = Array.from(
+    new Set(rawDays.filter((d) => typeof d === "number" && d >= 0 && d <= 6)),
+  ).sort((a, b) => a - b);
+  if (targetDays.length === 0) targetDays.push(4);
+  const targetDayOfWeek = targetDays[0];
+
+  const rawEpisodesPerDay =
+    config.episodesPerDay ??
+    (Array.isArray(config.dailySlots) && config.dailySlots.length > 0 ? config.dailySlots.length : 1);
+  const effectiveEpisodesPerDay = Math.max(1, Math.min(3, rawEpisodesPerDay));
+
+  let effectiveDailySlots: number[];
+  if (Array.isArray(config.dailySlots) && config.dailySlots.length > 0) {
+    effectiveDailySlots = config.dailySlots.slice(0, effectiveEpisodesPerDay);
+  } else {
+    effectiveDailySlots = [blockStartMinutes];
+  }
+  while (effectiveDailySlots.length < effectiveEpisodesPerDay) {
+    const last = effectiveDailySlots[effectiveDailySlots.length - 1];
+    effectiveDailySlots.push((last + 30) % 1440);
+  }
+
+  const effectiveStartSeason = Math.max(1, startSeason);
+  const effectiveStartEpisode = Math.max(1, startEpisode);
+
   // Filter valid seasons (seasonNumber > 0) and sort chronologically
-  const validSeasons = seasons
+  let validSeasons = seasons
     .filter((s) => s.seasonNumber > 0 && s.episodes && s.episodes.length > 0)
     .sort((a, b) => a.seasonNumber - b.seasonNumber);
+
+  if (effectiveStartSeason > 1) {
+    validSeasons = validSeasons.filter((s) => s.seasonNumber >= effectiveStartSeason);
+  }
+  if (endSeason && endSeason >= effectiveStartSeason) {
+    validSeasons = validSeasons.filter((s) => s.seasonNumber <= endSeason);
+  }
+  if (Array.isArray(includedSeasonNumbers) && includedSeasonNumbers.length > 0) {
+    validSeasons = validSeasons.filter((s) => includedSeasonNumbers.includes(s.seasonNumber));
+  }
 
   if (validSeasons.length === 0) {
     return {
@@ -175,8 +270,15 @@ export function generateNostalgiaSchedule(config: NostalgiaScheduleConfig): Nost
       posterPath,
       backdropUrl,
       targetDayOfWeek,
+      daysOfWeek: targetDays,
       blockStartMinutes,
+      dailySlots: effectiveDailySlots,
+      episodesPerDay: effectiveEpisodesPerDay,
       startYear,
+      startSeason: effectiveStartSeason,
+      startEpisode: effectiveStartEpisode,
+      endSeason: endSeason ?? null,
+      includedSeasonNumbers: [],
       totalSeasons: 0,
       totalEpisodes: 0,
       firstAirDate: "",
@@ -186,25 +288,33 @@ export function generateNostalgiaSchedule(config: NostalgiaScheduleConfig): Nost
     };
   }
 
-  // Determine the baseline premiere year of the series from Season 1
-  const s1 = validSeasons[0];
-  const s1FirstEpAir = s1.episodes.find((e) => Boolean(e.airDate))?.airDate || s1.airDate;
-  const s1OrigYear = s1FirstEpAir ? parseDateSafe(s1FirstEpAir).getFullYear() : startYear;
+  // Determine the baseline premiere year from the first scheduled season
+  const sFirst = validSeasons[0];
+  const sFirstEpAir = sFirst.episodes.find((e) => Boolean(e.airDate))?.airDate || sFirst.airDate;
+  const sFirstOrigYear = sFirstEpAir ? parseDateSafe(sFirstEpAir).getFullYear() : startYear;
 
   const scheduledSeasons: ScheduledSeasonPreview[] = [];
   const allEntries: ScheduledEpisodeOutput[] = [];
 
   for (let sIdx = 0; sIdx < validSeasons.length; sIdx++) {
     const season = validSeasons[sIdx];
-    const episodes = [...season.episodes].sort((a, b) => a.episodeNumber - b.episodeNumber);
+    let episodes = [...season.episodes].sort((a, b) => a.episodeNumber - b.episodeNumber);
+
+    // If this is the starting season and user requested starting midway through the season
+    if (sIdx === 0 && effectiveStartEpisode > 1) {
+      const sliced = episodes.filter((ep) => ep.episodeNumber >= effectiveStartEpisode);
+      if (sliced.length > 0) {
+        episodes = sliced;
+      }
+    }
 
     // Original premiere date for this season
     const firstEpAir = episodes.find((e) => Boolean(e.airDate))?.airDate || season.airDate;
     const seasonOrigDate = firstEpAir ? parseDateSafe(firstEpAir) : null;
-    const seasonOrigYear = seasonOrigDate ? seasonOrigDate.getFullYear() : s1OrigYear + sIdx;
+    const seasonOrigYear = seasonOrigDate ? seasonOrigDate.getFullYear() : sFirstOrigYear + sIdx;
 
     // Calculate projected target year: preserves gap years if a show took a multi-year break
-    const projectedYear = startYear + (seasonOrigYear - s1OrigYear);
+    const projectedYear = startYear + (seasonOrigYear - sFirstOrigYear);
 
     // Calculate season premiere date
     let seasonPremiereDate: Date;
@@ -213,16 +323,16 @@ export function generateNostalgiaSchedule(config: NostalgiaScheduleConfig): Nost
     if (override?.customStartDate) {
       seasonPremiereDate = parseDateSafe(override.customStartDate);
     } else if (seasonOrigDate) {
-      // Snap to target weekday in the projected year
-      seasonPremiereDate = findClosestWeekday(
+      // Snap to closest target weekday in the projected year
+      seasonPremiereDate = findClosestTargetWeekday(
         projectedYear,
         seasonOrigDate.getMonth(),
         seasonOrigDate.getDate(),
-        targetDayOfWeek,
+        targetDays,
       );
     } else {
       // Fallback if no air date is known: start in September of that projected year
-      seasonPremiereDate = findClosestWeekday(projectedYear, 8, 20, targetDayOfWeek);
+      seasonPremiereDate = findClosestTargetWeekday(projectedYear, 8, 20, targetDays);
     }
 
     // Schedule each episode in the season
@@ -234,39 +344,77 @@ export function generateNostalgiaSchedule(config: NostalgiaScheduleConfig): Nost
     let lastAssignedWeekOffset = 0;
     let sameDayEpCount = 0;
     let lastScheduledDateStr = "";
+    let currentEpDate = new Date(seasonPremiereDate.getTime());
 
     for (let eIdx = 0; eIdx < episodes.length; eIdx++) {
       const ep = episodes[eIdx];
       const isPremiere = eIdx === 0;
       const isFinale = eIdx === episodes.length - 1;
 
-      let weekOffset = eIdx; // Default: 1 episode per week consecutive
+      let scheduledDateStr: string;
+      let epBlockStartMinutes: number;
 
-      if (origBaseTime && ep.airDate) {
-        const epOrigTime = parseDateSafe(ep.airDate).getTime();
-        const diffMs = epOrigTime - origBaseTime;
-        const rawWeeks = Math.round(diffMs / (7 * 24 * 60 * 60 * 1000));
-        // Ensure episode order is monotonic (never go backward)
-        weekOffset = Math.max(lastAssignedWeekOffset, rawWeeks);
+      if (effectiveEpisodesPerDay === 1) {
+        // Standard 1 episode per airing day
+        if (targetDays.length === 1) {
+          let weekOffset = eIdx;
+          if (origBaseTime && ep.airDate) {
+            const epOrigTime = parseDateSafe(ep.airDate).getTime();
+            const diffMs = epOrigTime - origBaseTime;
+            const rawWeeks = Math.round(diffMs / (7 * 24 * 60 * 60 * 1000));
+            weekOffset = Math.max(lastAssignedWeekOffset, rawWeeks);
+          } else {
+            weekOffset = lastAssignedWeekOffset + (eIdx > 0 ? 1 : 0);
+          }
+          lastAssignedWeekOffset = weekOffset;
+
+          const epDate = new Date(seasonPremiereDate.getTime());
+          epDate.setDate(seasonPremiereDate.getDate() + weekOffset * 7);
+          scheduledDateStr = formatDateStr(epDate);
+        } else {
+          if (eIdx === 0) {
+            scheduledDateStr = formatDateStr(currentEpDate);
+          } else {
+            const prevEp = episodes[eIdx - 1];
+            const isSameDayStunt = Boolean(ep.airDate && prevEp.airDate && ep.airDate === prevEp.airDate);
+            if (!isSameDayStunt) {
+              currentEpDate = getNextTargetWeekday(currentEpDate, targetDays);
+            }
+            scheduledDateStr = formatDateStr(currentEpDate);
+          }
+        }
+
+        // Handle same-day stunt episodes (e.g. 2-part premiere)
+        if (scheduledDateStr === lastScheduledDateStr) {
+          sameDayEpCount++;
+          epBlockStartMinutes = (blockStartMinutes + sameDayEpCount * BLOCK_MINUTES) % 1440;
+        } else {
+          sameDayEpCount = 0;
+          epBlockStartMinutes = blockStartMinutes;
+          lastScheduledDateStr = scheduledDateStr;
+        }
       } else {
-        weekOffset = lastAssignedWeekOffset + (eIdx > 0 ? 1 : 0);
-      }
+        // Multi-episode per day mode (2 or 3 episodes per airing day)
+        const slotIndex = eIdx % effectiveEpisodesPerDay;
+        epBlockStartMinutes = effectiveDailySlots[slotIndex];
 
-      lastAssignedWeekOffset = weekOffset;
-
-      // Project date
-      const epDate = new Date(seasonPremiereDate.getTime());
-      epDate.setDate(seasonPremiereDate.getDate() + weekOffset * 7);
-      const scheduledDateStr = formatDateStr(epDate);
-
-      // Handle multiple episodes on the same scheduled date (e.g. 2-part premiere/finale)
-      let epBlockStartMinutes = blockStartMinutes;
-      if (scheduledDateStr === lastScheduledDateStr) {
-        sameDayEpCount++;
-        epBlockStartMinutes = (blockStartMinutes + sameDayEpCount * BLOCK_MINUTES) % 1440;
-      } else {
-        sameDayEpCount = 0;
-        lastScheduledDateStr = scheduledDateStr;
+        if (targetDays.length === 1) {
+          const weekOffset = Math.floor(eIdx / effectiveEpisodesPerDay);
+          const epDate = new Date(seasonPremiereDate.getTime());
+          epDate.setDate(seasonPremiereDate.getDate() + weekOffset * 7);
+          scheduledDateStr = formatDateStr(epDate);
+        } else {
+          if (eIdx === 0) {
+            scheduledDateStr = formatDateStr(currentEpDate);
+          } else if (slotIndex === 0) {
+            // First episode of a new broadcast day: advance to next target day
+            currentEpDate = getNextTargetWeekday(currentEpDate, targetDays);
+            scheduledDateStr = formatDateStr(currentEpDate);
+          } else {
+            // Consecutive episode on the same broadcast day
+            scheduledDateStr = formatDateStr(currentEpDate);
+          }
+        }
       }
 
       // Runtime block
@@ -318,8 +466,15 @@ export function generateNostalgiaSchedule(config: NostalgiaScheduleConfig): Nost
     posterPath,
     backdropUrl,
     targetDayOfWeek,
+    daysOfWeek: targetDays,
     blockStartMinutes,
+    dailySlots: effectiveDailySlots,
+    episodesPerDay: effectiveEpisodesPerDay,
     startYear,
+    startSeason: effectiveStartSeason,
+    startEpisode: effectiveStartEpisode,
+    endSeason: endSeason ?? null,
+    includedSeasonNumbers: validSeasons.map((s) => s.seasonNumber),
     totalSeasons: scheduledSeasons.length,
     totalEpisodes: allEntries.length,
     firstAirDate,

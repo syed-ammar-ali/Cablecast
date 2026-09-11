@@ -57,9 +57,26 @@ export async function GET(request: NextRequest) {
         if (e.startSeason) seasonSet.add(e.startSeason);
       }
 
-      // Determine day of week from first entry
-      const [y, m, d] = firstEntry.scheduledDate.split("-").map(Number);
-      const dayOfWeek = new Date(y, m - 1, d).getDay();
+      // Determine unique days of week from entries
+      const daysSet = new Set<number>();
+      for (const e of showEntries) {
+        const [y, m, d] = e.scheduledDate.split("-").map(Number);
+        daysSet.add(new Date(y, m - 1, d).getDay());
+      }
+      const daysOfWeek = Array.from(daysSet).sort((a, b) => a - b);
+      const dayOfWeek = daysOfWeek[0] ?? 4;
+
+      // Find lowest and highest season among showEntries
+      let minSeason = 999;
+      let maxSeason = 0;
+      for (const e of showEntries) {
+        if (e.startSeason) {
+          if (e.startSeason < minSeason) minSeason = e.startSeason;
+          if (e.startSeason > maxSeason) maxSeason = e.startSeason;
+        }
+      }
+      const startSeason = minSeason <= maxSeason ? minSeason : 1;
+      const endSeason = minSeason <= maxSeason ? maxSeason : undefined;
 
       // Find next upcoming episode
       const nextEntry = showEntries.find((e) => e.scheduledDate >= todayStr) || null;
@@ -70,7 +87,12 @@ export async function GET(request: NextRequest) {
         posterPath: firstEntry.posterPath,
         backdropUrl: firstEntry.backdropUrl,
         dayOfWeek,
+        daysOfWeek,
         blockStartMinutes: firstEntry.blockStartMinutes,
+        dailySlots: Array.from(new Set(showEntries.map((e) => e.blockStartMinutes))).sort((a, b) => a - b),
+        episodesPerDay: Array.from(new Set(showEntries.map((e) => e.blockStartMinutes))).length,
+        startSeason,
+        endSeason,
         totalSeasons: seasonSet.size,
         totalEpisodes: showEntries.length,
         firstAirDate: firstEntry.scheduledDate,
@@ -113,8 +135,15 @@ export async function POST(request: NextRequest) {
       action = "preview",
       tmdbId,
       targetDayOfWeek = 4, // default Thursday
+      daysOfWeek,
       blockStartMinutes = 1200, // default 8:00 PM
+      dailySlots,
+      episodesPerDay,
       startYear = new Date().getFullYear(),
+      startSeason = 1,
+      startEpisode = 1,
+      endSeason,
+      includedSeasonNumbers,
       seasonOverrides = {},
     } = body;
 
@@ -134,12 +163,36 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 2. Fetch episodes for each valid season
-    const validSeasons = show.seasons.filter((s) => s.seasonNumber > 0);
+    // 2. Filter seasons according to user selection
+    const numStartSeason = Math.max(1, Number(startSeason) || 1);
+    const numStartEpisode = Math.max(1, Number(startEpisode) || 1);
+    const numEndSeason = endSeason ? Number(endSeason) : undefined;
+    const targetSeasonNums = Array.isArray(includedSeasonNumbers) && includedSeasonNumbers.length > 0
+      ? includedSeasonNumbers.map(Number)
+      : null;
+
+    let targetSeasons = show.seasons.filter((s) => s.seasonNumber > 0);
+    if (numStartSeason > 1) {
+      targetSeasons = targetSeasons.filter((s) => s.seasonNumber >= numStartSeason);
+    }
+    if (numEndSeason && numEndSeason >= numStartSeason) {
+      targetSeasons = targetSeasons.filter((s) => s.seasonNumber <= numEndSeason);
+    }
+    if (targetSeasonNums) {
+      targetSeasons = targetSeasons.filter((s) => targetSeasonNums.includes(s.seasonNumber));
+    }
+
+    if (targetSeasons.length === 0) {
+      return NextResponse.json(
+        { error: "No seasons match the selected season range." },
+        { status: 400 },
+      );
+    }
+
     const seasonInputs: NostalgiaSeasonInput[] = [];
 
-    // Fetch season details in parallel
-    const seasonEpisodePromises = validSeasons.map(async (s) => {
+    // Fetch season details in parallel for only target seasons
+    const seasonEpisodePromises = targetSeasons.map(async (s) => {
       try {
         const episodes = await getSeasonEpisodes(tmdbId, s.seasonNumber);
         return {
@@ -173,14 +226,26 @@ export async function POST(request: NextRequest) {
     }
 
     // 3. Run Nostalgia Scheduling Algorithm
+    const resolvedDays =
+      Array.isArray(daysOfWeek) && daysOfWeek.length > 0
+        ? daysOfWeek.map(Number).filter((d) => !isNaN(d) && d >= 0 && d <= 6)
+        : [Number(targetDayOfWeek)];
+
     const scheduleConfig: NostalgiaScheduleConfig = {
       tmdbId: Number(tmdbId),
       showTitle: show.title,
       posterPath: show.posterUrl,
       backdropUrl: show.backdropUrl,
-      targetDayOfWeek: Number(targetDayOfWeek),
+      targetDayOfWeek: resolvedDays[0] ?? Number(targetDayOfWeek),
+      daysOfWeek: resolvedDays,
       blockStartMinutes: Number(blockStartMinutes),
+      dailySlots: Array.isArray(dailySlots) ? dailySlots.map(Number) : undefined,
+      episodesPerDay: episodesPerDay ? Number(episodesPerDay) : undefined,
       startYear: Number(startYear),
+      startSeason: numStartSeason,
+      startEpisode: numStartEpisode,
+      endSeason: numEndSeason,
+      includedSeasonNumbers: targetSeasonNums ?? undefined,
       seasons: seasonInputs,
       seasonOverrides,
     };

@@ -16,6 +16,7 @@ import {
   ShoppingBag,
   Sun,
   Tv,
+  Zap,
 } from "lucide-react";
 import type { MediaSearchResult } from "@/types/media";
 import type { PersonalScheduleItem } from "@/types/broadcast";
@@ -39,6 +40,8 @@ interface ScheduleBroadcastModalProps {
     runtimeMinutes?: number | null;
     daysOfWeek: number[];
     blockStartMinutes: number;
+    dailySlots?: number[];
+    episodesPerDay?: number;
     timezoneOffset?: number;
     startSeason?: number;
     startEpisode?: number;
@@ -77,6 +80,20 @@ function toMinutesFromMidnight(hour12: number, minute: number, meridiem: "AM" | 
   let hours24 = hour12 % 12;
   if (meridiem === "PM") hours24 += 12;
   return hours24 * 60 + minute;
+}
+
+function fromMinutesToSlot(minutes: number): { slotIndex: number; meridiem: "AM" | "PM" } {
+  const norm = ((minutes % 1440) + 1440) % 1440;
+  const isPM = norm >= 720;
+  const meridiem: "AM" | "PM" = isPM ? "PM" : "AM";
+  const hour24 = Math.floor(norm / 60);
+  const min = norm % 60;
+  let hour12 = hour24 % 12;
+  if (hour12 === 0) hour12 = 12;
+  const slotIndex = HALF_DAY_SLOTS.findIndex(
+    (s) => s.hour12 === hour12 && s.minute === (min >= 30 ? 30 : 0),
+  );
+  return { slotIndex: slotIndex !== -1 ? slotIndex : 0, meridiem };
 }
 
 interface UpcomingDay {
@@ -192,6 +209,14 @@ export function ScheduleBroadcastModal({
   const [startSeason, setStartSeason] = useState<number>(initialSeason || 1);
   const [startEpisode, setStartEpisode] = useState<number>(1);
 
+  // Multi-episode per day configuration (for TV shows)
+  const [episodesPerDay, setEpisodesPerDay] = useState<1 | 2 | 3>(1);
+  const [activeSlotEditing, setActiveSlotEditing] = useState<number>(0);
+  const [slot2Index, setSlot2Index] = useState<number>(19); // 9:30 PM default
+  const [slot2Meridiem, setSlot2Meridiem] = useState<"AM" | "PM">("PM");
+  const [slot3Index, setSlot3Index] = useState<number>(20); // 10:00 PM default
+  const [slot3Meridiem, setSlot3Meridiem] = useState<"AM" | "PM">("PM");
+
   useEffect(() => {
     if (initialSeason) setStartSeason(initialSeason);
   }, [initialSeason]);
@@ -250,6 +275,112 @@ export function ScheduleBroadcastModal({
   const currentSlot = HALF_DAY_SLOTS[selectedSlotIndex] ?? HALF_DAY_SLOTS[18];
   const blockStartMinutes = toMinutesFromMidnight(currentSlot.hour12, currentSlot.minute, meridiem);
 
+  const slot2Slot = HALF_DAY_SLOTS[slot2Index] ?? HALF_DAY_SLOTS[19];
+  const slot2Minutes = toMinutesFromMidnight(slot2Slot.hour12, slot2Slot.minute, slot2Meridiem);
+
+  const slot3Slot = HALF_DAY_SLOTS[slot3Index] ?? HALF_DAY_SLOTS[20];
+  const slot3Minutes = toMinutesFromMidnight(slot3Slot.hour12, slot3Slot.minute, slot3Meridiem);
+
+  const dailySlots = useMemo(() => {
+    if (!isTv || episodesPerDay === 1) return [blockStartMinutes];
+    if (episodesPerDay === 2) return [blockStartMinutes, slot2Minutes];
+    return [blockStartMinutes, slot2Minutes, slot3Minutes];
+  }, [isTv, episodesPerDay, blockStartMinutes, slot2Minutes, slot3Minutes]);
+
+  const formattedSlot1Time = formatBlockTime(blockStartMinutes);
+  const formattedSlot2Time = formatBlockTime(slot2Minutes);
+  const formattedSlot3Time = formatBlockTime(slot3Minutes);
+
+  const formattedDailyTimesSummary = useMemo(() => {
+    if (!isTv || episodesPerDay === 1) return formattedSlot1Time;
+    if (episodesPerDay === 2) return `${formattedSlot1Time} & ${formattedSlot2Time}`;
+    return `${formattedSlot1Time}, ${formattedSlot2Time}, ${formattedSlot3Time}`;
+  }, [isTv, episodesPerDay, formattedSlot1Time, formattedSlot2Time, formattedSlot3Time]);
+
+  const handleSnapBackToBack = useCallback(() => {
+    const s2 = fromMinutesToSlot(blockStartMinutes + 30);
+    setSlot2Index(s2.slotIndex);
+    setSlot2Meridiem(s2.meridiem);
+    if (episodesPerDay === 3) {
+      const s3 = fromMinutesToSlot(blockStartMinutes + 60);
+      setSlot3Index(s3.slotIndex);
+      setSlot3Meridiem(s3.meridiem);
+    }
+  }, [blockStartMinutes, episodesPerDay]);
+
+  const handleSelectEpisodesPerDay = useCallback(
+    (count: 1 | 2 | 3) => {
+      setEpisodesPerDay(count);
+      setActiveSlotEditing(0);
+      if (count >= 2) {
+        const s2 = fromMinutesToSlot(blockStartMinutes + 30);
+        setSlot2Index(s2.slotIndex);
+        setSlot2Meridiem(s2.meridiem);
+      }
+      if (count === 3) {
+        const s3 = fromMinutesToSlot(blockStartMinutes + 60);
+        setSlot3Index(s3.slotIndex);
+        setSlot3Meridiem(s3.meridiem);
+      }
+    },
+    [blockStartMinutes],
+  );
+
+  const intraSlotOverlapError = useMemo(() => {
+    if (!isTv || episodesPerDay === 1) return null;
+    if (episodesPerDay >= 2) {
+      if (slot2Minutes < blockStartMinutes + 30 && slot2Minutes >= blockStartMinutes) {
+        return "Episode 2 starts before Episode 1 finishes. Space out times or snap back-to-back.";
+      }
+      if (blockStartMinutes === slot2Minutes) {
+        return "Episode 1 and Episode 2 cannot air at the exact same time.";
+      }
+      if (slot2Minutes < blockStartMinutes) {
+        return "Episode 2 must air after Episode 1 in chronological order.";
+      }
+    }
+    if (episodesPerDay === 3) {
+      if (slot3Minutes < slot2Minutes + 30 && slot3Minutes >= slot2Minutes) {
+        return "Episode 3 starts before Episode 2 finishes. Space out times or snap back-to-back.";
+      }
+      if (slot3Minutes === blockStartMinutes || slot3Minutes === slot2Minutes) {
+        return "Episode 3 cannot air at the exact same time as an earlier episode.";
+      }
+      if (slot3Minutes < slot2Minutes) {
+        return "Episode 3 must air after Episode 2 in chronological order.";
+      }
+    }
+    return null;
+  }, [isTv, episodesPerDay, blockStartMinutes, slot2Minutes, slot3Minutes]);
+
+  const currentEditingMeridiem =
+    activeSlotEditing === 0
+      ? meridiem
+      : activeSlotEditing === 1
+        ? slot2Meridiem
+        : slot3Meridiem;
+
+  const currentEditingSlotIndex =
+    activeSlotEditing === 0
+      ? selectedSlotIndex
+      : activeSlotEditing === 1
+        ? slot2Index
+        : slot3Index;
+
+  const handleSetEditingMeridiem = useCallback((newMeridiem: "AM" | "PM") => {
+    if (activeSlotEditing === 0) setMeridiem(newMeridiem);
+    else if (activeSlotEditing === 1) setSlot2Meridiem(newMeridiem);
+    else setSlot3Meridiem(newMeridiem);
+    setErrorMessage(null);
+  }, [activeSlotEditing]);
+
+  const handleSetEditingSlotIndex = useCallback((index: number) => {
+    if (activeSlotEditing === 0) setSelectedSlotIndex(index);
+    else if (activeSlotEditing === 1) setSlot2Index(index);
+    else setSlot3Index(index);
+    setErrorMessage(null);
+  }, [activeSlotEditing]);
+
   // Runtime calculation (default movie = 120m, TV episode = 30m)
   const defaultRuntime = isTv ? 30 : 120;
   const blockCount = Math.max(1, Math.ceil(defaultRuntime / BLOCK_MINUTES));
@@ -290,7 +421,7 @@ export function ScheduleBroadcastModal({
     const isTodaySelected = selectedDays.includes(now.getDay());
 
     HALF_DAY_SLOTS.forEach((slot, index) => {
-      const slotStart = toMinutesFromMidnight(slot.hour12, slot.minute, meridiem);
+      const slotStart = toMinutesFromMidnight(slot.hour12, slot.minute, currentEditingMeridiem);
       const slotEnd = slotStart + blockCount * BLOCK_MINUTES;
 
       // Check if slot has passed for Today (only for rented content where pass doesn't cover next week)
@@ -327,34 +458,37 @@ export function ScheduleBroadcastModal({
     });
 
     return { occupiedSlots: occupiedMap, pastSlots: pastSet, expiredSlots: expiredSet };
-  }, [meridiem, blockCount, selectedDays, existingSchedule, media.tmdbId, currentMinutesToday, now, expiresDate, isOwned, defaultRuntime, getAirDateForDay]);
+  }, [currentEditingMeridiem, blockCount, selectedDays, existingSchedule, media.tmdbId, currentMinutesToday, now, expiresDate, isOwned, defaultRuntime, getAirDateForDay]);
 
-  // Real-time conflict checking for current selection
+  // Real-time conflict checking for current selection across all daily slots
   const conflict = useMemo(() => {
     for (const day of selectedDays) {
       const dayItems = existingSchedule.filter(
         (item) => item.dayOfWeek === day && item.tmdbId !== media.tmdbId,
       );
 
-      for (const item of dayItems) {
-        const itemEnd = item.blockStartMinutes + item.blockCount * BLOCK_MINUTES;
-        const overlaps =
-          blockStartMinutes < itemEnd && requestedEndMinutes > item.blockStartMinutes;
+      for (const slotStart of dailySlots) {
+        const slotEnd = slotStart + blockCount * BLOCK_MINUTES;
 
-        if (overlaps) {
-          const dayName = isOwned
-            ? (DAYS_OF_WEEK.find((d) => d.day === day)?.name ?? `Day ${day}`)
-            : (upcomingDays.find((d) => d.dayOfWeek === day)?.name ?? `Day ${day}`);
-          return {
-            dayName,
-            title: item.title,
-            timeStr: `${formatBlockTime(item.blockStartMinutes)} – ${formatBlockTime(itemEnd)}`,
-          };
+        for (const item of dayItems) {
+          const itemEnd = item.blockStartMinutes + item.blockCount * BLOCK_MINUTES;
+          const overlaps = slotStart < itemEnd && slotEnd > item.blockStartMinutes;
+
+          if (overlaps) {
+            const dayName = isOwned
+              ? (DAYS_OF_WEEK.find((d) => d.day === day)?.name ?? `Day ${day}`)
+              : (upcomingDays.find((d) => d.dayOfWeek === day)?.name ?? `Day ${day}`);
+            return {
+              dayName,
+              title: item.title,
+              timeStr: `${formatBlockTime(item.blockStartMinutes)} – ${formatBlockTime(itemEnd)}`,
+            };
+          }
         }
       }
     }
     return null;
-  }, [selectedDays, blockStartMinutes, requestedEndMinutes, existingSchedule, media.tmdbId, isOwned, upcomingDays]);
+  }, [selectedDays, dailySlots, blockCount, existingSchedule, media.tmdbId, isOwned, upcomingDays]);
 
   // Rental expiration conflict check (only for rented items)
   const rentalExpirationConflict = useMemo(() => {
@@ -502,6 +636,11 @@ export function ScheduleBroadcastModal({
       return;
     }
 
+    if (intraSlotOverlapError) {
+      setErrorMessage(intraSlotOverlapError);
+      return;
+    }
+
     if (conflict) {
       setErrorMessage(
         `Conflict on ${conflict.dayName}: Overlaps with "${conflict.title}" (${conflict.timeStr}).`,
@@ -542,6 +681,8 @@ export function ScheduleBroadcastModal({
       timezoneOffset: new Date().getTimezoneOffset(),
       startSeason: isTv ? startSeason : undefined,
       startEpisode: isTv ? startEpisode : undefined,
+      dailySlots: isTv ? dailySlots : undefined,
+      episodesPerDay: isTv ? episodesPerDay : undefined,
     });
 
     setIsSubmitting(false);
@@ -776,21 +917,124 @@ export function ScheduleBroadcastModal({
               )}
             </div>
 
-            {/* Air Time Selection with Segmented AM / PM Switch */}
-            <div className="border-t border-neutral-900 pt-4 space-y-2">
-              <div className="flex items-center justify-between">
+            {/* Air Time Selection & Episodes Per Day */}
+            <div className="border-t border-neutral-900 pt-4 space-y-3">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
                 <label className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-neutral-300 font-mono">
                   <Clock className="h-3.5 w-3.5 text-purple-400" />
-                  <span>2. Air Time ({formatBlockTime(blockStartMinutes)})</span>
+                  <span>2. Air Time {isTv && episodesPerDay > 1 ? `(${episodesPerDay} Episodes / Day)` : `(${formatBlockTime(blockStartMinutes)})`}</span>
                 </label>
+                {isTv && (
+                  <span className="font-mono text-[10px] text-purple-300 bg-purple-950/70 border border-purple-500/40 rounded-md px-2 py-0.5 font-bold">
+                    {formattedDailyTimesSummary}
+                  </span>
+                )}
+              </div>
 
-                {/* AM / PM Segmented Switch */}
+              {/* TV Only: Episodes Per Broadcast Day Selector (1, 2, or 3) */}
+              {isTv && (
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-neutral-900/40 p-2.5 rounded-xl border border-neutral-800">
+                  <div className="space-y-0.5">
+                    <span className="text-[11px] font-mono text-neutral-300 font-bold uppercase">
+                      Episodes Per Broadcast Day
+                    </span>
+                    <p className="text-[10px] font-mono text-neutral-500">
+                      Air single episodes or multi-episode runs each scheduled day
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1.5 self-start sm:self-auto">
+                    {([1, 2, 3] as const).map((count) => (
+                      <button
+                        key={count}
+                        type="button"
+                        onClick={() => handleSelectEpisodesPerDay(count)}
+                        className={`rounded-lg border px-2.5 py-1 text-xs font-mono font-bold transition-all cursor-pointer active:scale-95 ${
+                          episodesPerDay === count
+                            ? "border-purple-500/60 bg-purple-950 text-purple-200 shadow-sm"
+                            : "border-neutral-800 bg-neutral-900/80 text-neutral-400 hover:border-neutral-700 hover:text-white"
+                        }`}
+                      >
+                        {count} {count === 1 ? "Episode" : "Episodes"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Multi-Episode Slot Selection Tabs & Snap Back-to-Back button */}
+              {isTv && episodesPerDay > 1 && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {Array.from({ length: episodesPerDay }).map((_, sIdx) => {
+                        const isSlotActive = activeSlotEditing === sIdx;
+                        const slotTime =
+                          sIdx === 0
+                            ? formattedSlot1Time
+                            : sIdx === 1
+                              ? formattedSlot2Time
+                              : formattedSlot3Time;
+                        return (
+                          <button
+                            key={sIdx}
+                            type="button"
+                            onClick={() => setActiveSlotEditing(sIdx)}
+                            className={`flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-mono font-bold transition-all cursor-pointer active:scale-95 ${
+                              isSlotActive
+                                ? "border-purple-500/80 bg-purple-950 text-purple-200 shadow-md ring-1 ring-purple-500/40"
+                                : "border-neutral-800 bg-neutral-900/60 text-neutral-400 hover:border-neutral-700 hover:text-white"
+                            }`}
+                          >
+                            <span>Ep {sIdx + 1}:</span>
+                            <span className={isSlotActive ? "text-white" : "text-neutral-300"}>
+                              {slotTime}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleSnapBackToBack}
+                      title="Automatically set consecutive 30-min time slots"
+                      className="inline-flex items-center gap-1 rounded-lg border border-neutral-800 bg-neutral-900/80 px-2.5 py-1 text-[10px] font-mono font-bold uppercase tracking-wider text-purple-300 hover:border-purple-500/40 hover:bg-purple-950/60 transition-all cursor-pointer active:scale-95"
+                    >
+                      <Zap className="h-3 w-3 text-purple-400" />
+                      <span>Snap Back-to-Back</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Intra-Slot Overlap Error Warning */}
+              {intraSlotOverlapError && (
+                <div className="flex items-center justify-between p-2.5 rounded-xl border border-amber-900/60 bg-amber-950/40 text-amber-200 text-xs font-mono animate-in fade-in">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <AlertTriangle className="h-4 w-4 shrink-0 text-amber-400" />
+                    <span className="truncate">{intraSlotOverlapError}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleSnapBackToBack}
+                    className="underline text-[10px] font-bold text-amber-300 hover:text-white shrink-0 ml-2 cursor-pointer"
+                  >
+                    Snap Back-to-Back
+                  </button>
+                </div>
+              )}
+
+              {/* AM / PM Segmented Switch */}
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-mono text-neutral-400 font-bold uppercase">
+                  {isTv && episodesPerDay > 1 ? `Adjust Time for Episode ${activeSlotEditing + 1}` : "Select Air Time"}
+                </span>
+
                 <div className="flex items-center rounded-xl bg-neutral-950 p-1 border border-neutral-800 gap-1">
                   <button
                     type="button"
-                    onClick={() => setMeridiem("AM")}
+                    onClick={() => handleSetEditingMeridiem("AM")}
                     className={`flex items-center gap-1.5 rounded-lg px-3 py-1 text-[11px] font-bold uppercase tracking-wider transition-all cursor-pointer ${
-                      meridiem === "AM"
+                      currentEditingMeridiem === "AM"
                         ? "bg-neutral-800 text-white shadow-md ring-1 ring-neutral-700"
                         : "text-neutral-400 hover:text-neutral-200"
                     }`}
@@ -801,9 +1045,9 @@ export function ScheduleBroadcastModal({
 
                   <button
                     type="button"
-                    onClick={() => setMeridiem("PM")}
+                    onClick={() => handleSetEditingMeridiem("PM")}
                     className={`flex items-center gap-1.5 rounded-lg px-3 py-1 text-[11px] font-bold uppercase tracking-wider transition-all cursor-pointer ${
-                      meridiem === "PM"
+                      currentEditingMeridiem === "PM"
                         ? "bg-neutral-800 text-white shadow-md ring-1 ring-neutral-700"
                         : "text-neutral-400 hover:text-neutral-200"
                     }`}
@@ -817,7 +1061,7 @@ export function ScheduleBroadcastModal({
               {/* Time Slot Matrix (24 half-hour options) */}
               <div className="grid grid-cols-4 sm:grid-cols-6 gap-1 max-h-[140px] overflow-y-auto no-scrollbar rounded-xl border border-neutral-800 bg-neutral-950 p-2">
                 {HALF_DAY_SLOTS.map((slot, index) => {
-                  const isSelected = selectedSlotIndex === index;
+                  const isSelected = currentEditingSlotIndex === index;
                   const occupiedBy = occupiedSlots.get(index);
                   const isOccupied = Boolean(occupiedBy);
                   const isPast = pastSlots.has(index);
@@ -826,13 +1070,12 @@ export function ScheduleBroadcastModal({
 
                   return (
                     <button
-                      key={`${slot.label}-${meridiem}`}
+                      key={`${slot.label}-${currentEditingMeridiem}-${activeSlotEditing}`}
                       type="button"
                       disabled={isDisabled}
                       onClick={() => {
                         if (isDisabled) return;
-                        setSelectedSlotIndex(index);
-                        setErrorMessage(null);
+                        handleSetEditingSlotIndex(index);
                       }}
                       title={
                         isOccupied
@@ -875,10 +1118,20 @@ export function ScheduleBroadcastModal({
               {/* Window explainer */}
               <div className="flex items-center justify-between rounded-lg border border-neutral-800/80 bg-neutral-900/40 px-3 py-1.5 text-[11px] text-neutral-400 font-mono">
                 <span>
-                  Window: {formatBlockTime(blockStartMinutes)} – {formatBlockTime(requestedEndMinutes)}
+                  {isTv && episodesPerDay > 1
+                    ? `Current Slot (Ep ${activeSlotEditing + 1}): ${formatBlockTime(
+                        activeSlotEditing === 0
+                          ? blockStartMinutes
+                          : activeSlotEditing === 1
+                            ? slot2Minutes
+                            : slot3Minutes,
+                      )}`
+                    : `Window: ${formatBlockTime(blockStartMinutes)} – ${formatBlockTime(requestedEndMinutes)}`}
                 </span>
                 <span>
-                  {blockCount * 30}m ({blockCount} {blockCount === 1 ? "slot" : "slots"})
+                  {isTv
+                    ? `${episodesPerDay} × 30m (${episodesPerDay * 30}m total)`
+                    : `${blockCount * 30}m (${blockCount} ${blockCount === 1 ? "slot" : "slots"})`}
                 </span>
               </div>
             </div>
@@ -1030,7 +1283,7 @@ export function ScheduleBroadcastModal({
             {/* Submit Button */}
             <button
               type="submit"
-              disabled={isSubmitting || Boolean(conflict) || (!isOwned && Boolean(rentalExpirationConflict))}
+              disabled={isSubmitting || Boolean(conflict) || Boolean(intraSlotOverlapError) || (!isOwned && Boolean(rentalExpirationConflict))}
               className="flex w-full items-center justify-center gap-2 rounded-xl border border-purple-500/50 bg-purple-950/60 hover:bg-purple-900/80 px-4 py-3 text-xs font-bold uppercase tracking-wider text-purple-200 shadow-lg transition-all hover:border-purple-400 hover:text-white cursor-pointer active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {isSubmitting ? (

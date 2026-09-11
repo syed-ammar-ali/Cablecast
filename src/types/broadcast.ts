@@ -75,6 +75,8 @@ export interface CreatePersonalScheduleInput {
   runtimeMinutes?: number | null;
   daysOfWeek: number[]; // 0-6
   blockStartMinutes: number; // 0-1410
+  dailySlots?: number[]; // [slot1, slot2, slot3] in minutes from midnight for TV multi-episode
+  episodesPerDay?: number; // 1, 2, or 3
   timezoneOffset?: number; // client's Date.prototype.getTimezoneOffset()
   startSeason?: number;
   startEpisode?: number;
