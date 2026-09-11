@@ -22,12 +22,12 @@ export const MOOD_PRESETS: MoodPreset[] = [
     borderHover: "hover:border-indigo-400/60 hover:shadow-[0_0_20px_rgba(99,102,241,0.25)]",
     apply: (prev) => ({
       ...prev,
-      genreId: 80, // Crime
+      genreIds: [80], // Crime
       minRating: 7.0,
-      season: null,
-      era: null,
+      seasons: [],
+      eras: [],
     }),
-    matches: (c) => c.genreId === 80 && c.minRating === 7.0,
+    matches: (c) => c.genreIds.includes(80) && c.minRating === 7.0,
   },
   {
     id: "feel-good",
@@ -37,12 +37,12 @@ export const MOOD_PRESETS: MoodPreset[] = [
     borderHover: "hover:border-amber-400/60 hover:shadow-[0_0_20px_rgba(251,191,36,0.25)]",
     apply: (prev) => ({
       ...prev,
-      genreId: 35, // Comedy
-      era: "90s",
-      season: null,
+      genreIds: [35], // Comedy
+      eras: ["90s"],
+      seasons: [],
       minRating: null,
     }),
-    matches: (c) => c.genreId === 35 && c.era === "90s",
+    matches: (c) => c.genreIds.includes(35) && c.eras.includes("90s"),
   },
   {
     id: "mind-bending",
@@ -52,12 +52,12 @@ export const MOOD_PRESETS: MoodPreset[] = [
     borderHover: "hover:border-cyan-400/60 hover:shadow-[0_0_20px_rgba(34,211,238,0.25)]",
     apply: (prev) => ({
       ...prev,
-      genreId: 878, // Sci-Fi
+      genreIds: [878], // Sci-Fi
       minRating: 7.5,
-      season: null,
-      era: null,
+      seasons: [],
+      eras: [],
     }),
-    matches: (c) => c.genreId === 878 && c.minRating === 7.5,
+    matches: (c) => c.genreIds.includes(878) && c.minRating === 7.5,
   },
   {
     id: "high-adrenaline",
@@ -67,12 +67,12 @@ export const MOOD_PRESETS: MoodPreset[] = [
     borderHover: "hover:border-rose-400/60 hover:shadow-[0_0_20px_rgba(244,63,94,0.25)]",
     apply: (prev) => ({
       ...prev,
-      genreId: 28, // Action
+      genreIds: [28], // Action
       minRating: 7.0,
-      season: null,
-      era: null,
+      seasons: [],
+      eras: [],
     }),
-    matches: (c) => c.genreId === 28 && c.minRating === 7.0,
+    matches: (c) => c.genreIds.includes(28) && c.minRating === 7.0,
   },
   {
     id: "spooky-autumn",
@@ -82,12 +82,12 @@ export const MOOD_PRESETS: MoodPreset[] = [
     borderHover: "hover:border-orange-500/60 hover:shadow-[0_0_20px_rgba(249,115,22,0.25)]",
     apply: (prev) => ({
       ...prev,
-      genreId: 27, // Horror
-      season: "fall",
-      era: null,
+      genreIds: [27], // Horror
+      seasons: ["fall"],
+      eras: [],
       minRating: null,
     }),
-    matches: (c) => c.genreId === 27 && c.season === "fall",
+    matches: (c) => c.genreIds.includes(27) && c.seasons.includes("fall"),
   },
   {
     id: "vhs-golden-era",
@@ -97,12 +97,12 @@ export const MOOD_PRESETS: MoodPreset[] = [
     borderHover: "hover:border-fuchsia-400/60 hover:shadow-[0_0_20px_rgba(217,70,239,0.25)]",
     apply: (prev) => ({
       ...prev,
-      era: "80s",
+      eras: ["80s"],
       minRating: 7.5,
-      genreId: null,
-      season: null,
+      genreIds: [],
+      seasons: [],
     }),
-    matches: (c) => c.era === "80s" && c.minRating === 7.5,
+    matches: (c) => c.eras.includes("80s") && c.minRating === 7.5,
   },
   {
     id: "cyberpunk",
@@ -112,12 +112,12 @@ export const MOOD_PRESETS: MoodPreset[] = [
     borderHover: "hover:border-teal-400/60 hover:shadow-[0_0_20px_rgba(45,212,191,0.25)]",
     apply: (prev) => ({
       ...prev,
-      genreId: 878,
-      era: "90s",
+      genreIds: [878],
+      eras: ["90s"],
       minRating: 7.0,
-      season: null,
+      seasons: [],
     }),
-    matches: (c) => c.genreId === 878 && c.era === "90s" && c.minRating === 7.0,
+    matches: (c) => c.genreIds.includes(878) && c.eras.includes("90s") && c.minRating === 7.0,
   },
   {
     id: "cozy-winter",
@@ -127,12 +127,12 @@ export const MOOD_PRESETS: MoodPreset[] = [
     borderHover: "hover:border-blue-400/60 hover:shadow-[0_0_20px_rgba(96,165,250,0.25)]",
     apply: (prev) => ({
       ...prev,
-      season: "winter",
-      genreId: 10751, // Family
-      era: null,
+      seasons: ["winter"],
+      genreIds: [10751], // Family
+      eras: [],
       minRating: null,
     }),
-    matches: (c) => c.season === "winter" && c.genreId === 10751,
+    matches: (c) => c.seasons.includes("winter") && c.genreIds.includes(10751),
   },
   {
     id: "edge-of-seat-thrillers",
@@ -142,12 +142,12 @@ export const MOOD_PRESETS: MoodPreset[] = [
     borderHover: "hover:border-red-400/60 hover:shadow-[0_0_20px_rgba(248,113,113,0.25)]",
     apply: (prev) => ({
       ...prev,
-      genreId: 53, // Thriller
+      genreIds: [53], // Thriller
       minRating: 7.5,
-      season: null,
-      era: null,
+      seasons: [],
+      eras: [],
     }),
-    matches: (c) => c.genreId === 53 && c.minRating === 7.5,
+    matches: (c) => c.genreIds.includes(53) && c.minRating === 7.5,
   },
   {
     id: "saturday-cartoons",
@@ -157,12 +157,12 @@ export const MOOD_PRESETS: MoodPreset[] = [
     borderHover: "hover:border-emerald-400/60 hover:shadow-[0_0_20px_rgba(52,211,153,0.25)]",
     apply: (prev) => ({
       ...prev,
-      genreId: 16, // Animation
+      genreIds: [16], // Animation
       minRating: 7.0,
-      season: null,
-      era: null,
+      seasons: [],
+      eras: [],
     }),
-    matches: (c) => c.genreId === 16 && c.minRating === 7.0,
+    matches: (c) => c.genreIds.includes(16) && c.minRating === 7.0,
   },
   {
     id: "classic-cinema",
@@ -172,12 +172,12 @@ export const MOOD_PRESETS: MoodPreset[] = [
     borderHover: "hover:border-amber-500/60 hover:shadow-[0_0_20px_rgba(245,158,11,0.25)]",
     apply: (prev) => ({
       ...prev,
-      era: "70s",
+      eras: ["70s"],
       minRating: 7.5,
-      genreId: null,
-      season: null,
+      genreIds: [],
+      seasons: [],
     }),
-    matches: (c) => c.era === "70s" && c.minRating === 7.5,
+    matches: (c) => c.eras.includes("70s") && c.minRating === 7.5,
   },
   {
     id: "summer-road-trip",
@@ -187,12 +187,12 @@ export const MOOD_PRESETS: MoodPreset[] = [
     borderHover: "hover:border-yellow-400/60 hover:shadow-[0_0_20px_rgba(250,204,21,0.25)]",
     apply: (prev) => ({
       ...prev,
-      season: "summer",
-      genreId: 35, // Comedy
-      era: null,
+      seasons: ["summer"],
+      genreIds: [35], // Comedy
+      eras: [],
       minRating: null,
     }),
-    matches: (c) => c.season === "summer" && c.genreId === 35,
+    matches: (c) => c.seasons.includes("summer") && c.genreIds.includes(35),
   },
   {
     id: "monsoon-rain",
@@ -202,12 +202,12 @@ export const MOOD_PRESETS: MoodPreset[] = [
     borderHover: "hover:border-sky-400/60 hover:shadow-[0_0_20px_rgba(56,189,248,0.25)]",
     apply: (prev) => ({
       ...prev,
-      season: "monsoon",
-      genreId: 18, // Drama
-      era: null,
+      seasons: ["monsoon"],
+      genreIds: [18], // Drama
+      eras: [],
       minRating: null,
     }),
-    matches: (c) => c.season === "monsoon" && c.genreId === 18,
+    matches: (c) => c.seasons.includes("monsoon") && c.genreIds.includes(18),
   },
 ];
 
@@ -241,12 +241,12 @@ export function MoodPresets({ filters, onSelectMood }: MoodPresetsProps) {
                 if (isActive) {
                   onSelectMood(() => ({
                     type: "all",
-                    genreId: null,
-                    season: null,
-                    era: null,
+                    genreIds: [],
+                    seasons: [],
+                    eras: [],
                     minRating: null,
                     sortBy: "popularity.desc",
-                    language: null,
+                    languages: [],
                   }));
                 } else {
                   onSelectMood(mood.apply);

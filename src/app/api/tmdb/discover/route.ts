@@ -23,48 +23,59 @@ function computeDateBounds(
     };
   }
 
-  const eraBounds = era ? ERA_RANGES[era.toLowerCase()] : null;
   const currentYear = new Date().getFullYear();
 
-  if (eraBounds && season) {
-    const [startYear, endYear] = eraBounds;
-    switch (season.toLowerCase()) {
-      case "fall":
-      case "autumn":
-        return { dateFrom: `${startYear}-09-01`, dateTo: `${endYear}-11-30` };
-      case "winter":
-        return { dateFrom: `${startYear}-12-01`, dateTo: `${endYear + 1}-02-28` };
-      case "spring":
-        return { dateFrom: `${startYear}-03-01`, dateTo: `${endYear}-05-31` };
-      case "summer":
-        return { dateFrom: `${startYear}-06-01`, dateTo: `${endYear}-08-31` };
-      case "monsoon":
-      case "rainy":
-        return { dateFrom: `${startYear}-06-15`, dateTo: `${endYear}-09-30` };
+  // Multi-era resolution
+  const eraList = era ? era.toLowerCase().split(/[,|]/).filter(Boolean) : [];
+  const eraBoundsList = eraList.map((e) => ERA_RANGES[e]).filter(Boolean) as [number, number][];
+
+  let startYear: number | undefined;
+  let endYear: number | undefined;
+
+  if (eraBoundsList.length > 0) {
+    startYear = Math.min(...eraBoundsList.map(([start]) => start));
+    endYear = Math.max(...eraBoundsList.map(([, end]) => end));
+  }
+
+  const seasonList = season ? season.toLowerCase().split(/[,|]/).filter(Boolean) : [];
+
+  if (seasonList.length > 0) {
+    const sYear = startYear ?? (currentYear - 1);
+    const eYear = endYear ?? currentYear;
+
+    // Determine month bounds across all selected seasons
+    const SEASON_MONTHS: Record<string, { startM: string; endM: string; rollEndYear?: boolean }> = {
+      fall: { startM: "09-01", endM: "11-30" },
+      autumn: { startM: "09-01", endM: "11-30" },
+      winter: { startM: "12-01", endM: "02-28", rollEndYear: true },
+      spring: { startM: "03-01", endM: "05-31" },
+      summer: { startM: "06-01", endM: "08-31" },
+      monsoon: { startM: "06-15", endM: "09-30" },
+      rainy: { startM: "06-15", endM: "09-30" },
+    };
+
+    const validConfigs = seasonList.map((s) => SEASON_MONTHS[s]).filter(Boolean);
+    if (validConfigs.length > 0) {
+      // If full year or multiple spanning seasons, clamp safely
+      const hasWinter = seasonList.includes("winter");
+      const effectiveEndYear = hasWinter ? eYear + 1 : eYear;
+
+      // Find earliest start date and latest end date
+      const minStartM = validConfigs.reduce((min, cur) => cur.startM < min ? cur.startM : min, "12-31");
+      const maxEndM = validConfigs.reduce((max, cur) => cur.endM > max ? cur.endM : max, "01-01");
+
+      return {
+        dateFrom: `${sYear}-${minStartM}`,
+        dateTo: `${effectiveEndYear}-${maxEndM}`,
+      };
     }
   }
 
-  if (eraBounds) {
-    const [startYear, endYear] = eraBounds;
-    return { dateFrom: `${startYear}-01-01`, dateTo: `${endYear}-12-31` };
-  }
-
-  if (season) {
-    const year = currentYear - 1; // Default to recent seasons
-    switch (season.toLowerCase()) {
-      case "fall":
-      case "autumn":
-        return { dateFrom: `${year}-09-01`, dateTo: `${currentYear}-11-30` };
-      case "winter":
-        return { dateFrom: `${year}-12-01`, dateTo: `${currentYear}-02-28` };
-      case "spring":
-        return { dateFrom: `${year}-03-01`, dateTo: `${currentYear}-05-31` };
-      case "summer":
-        return { dateFrom: `${year}-06-01`, dateTo: `${currentYear}-08-31` };
-      case "monsoon":
-      case "rainy":
-        return { dateFrom: `${year}-06-15`, dateTo: `${currentYear}-09-30` };
-    }
+  if (startYear !== undefined && endYear !== undefined) {
+    return {
+      dateFrom: `${startYear}-01-01`,
+      dateTo: `${endYear}-12-31`,
+    };
   }
 
   return {};

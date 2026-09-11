@@ -14,10 +14,12 @@ import {
   AlertCircle,
   Film,
   Compass,
+  SlidersHorizontal,
+  RotateCcw,
 } from "lucide-react";
 import type { MediaSearchResult } from "@/types/media";
 import type { SeasonalEpisodeItem } from "@/lib/seasonalEpisodes";
-import { FilterBar, type FilterState, GENRE_OPTIONS, SEASON_OPTIONS, ERA_OPTIONS } from "./FilterBar";
+import { type FilterState, GENRE_OPTIONS, SEASON_OPTIONS, ERA_OPTIONS } from "./FilterBar";
 import { MoodPresets } from "./MoodPresets";
 import { MoreFiltersPanel } from "./MoreFiltersPanel";
 import { EpisodeCard } from "./EpisodeCard";
@@ -54,12 +56,12 @@ const CalendarSchedulerModal = dynamic(
 
 const INITIAL_FILTERS: FilterState = {
   type: "all",
-  genreId: null,
-  season: null,
-  era: null,
+  genreIds: [],
+  seasons: [],
+  eras: [],
   minRating: null,
   sortBy: "popularity.desc",
-  language: null,
+  languages: [],
 };
 
 export interface ExploreViewProps {
@@ -168,12 +170,12 @@ export function ExploreView({
   const activeFilterCount = useMemo(() => {
     let count = 0;
     if (filters.type !== "all") count++;
-    if (filters.genreId !== null) count++;
-    if (filters.season !== null) count++;
-    if (filters.era !== null) count++;
+    count += filters.genreIds.length;
+    count += filters.seasons.length;
+    count += filters.eras.length;
+    count += filters.languages.length;
     if (filters.minRating !== null) count++;
     if (filters.sortBy !== "popularity.desc") count++;
-    if (filters.language !== null) count++;
     return count;
   }, [filters]);
 
@@ -191,8 +193,8 @@ export function ExploreView({
         if (filters.type === "episodes") {
           // Fetch seasonal episodes
           const params = new URLURLSearchParamsSafe({
-            season: filters.season || "",
-            era: filters.era || "",
+            season: filters.seasons.join(","),
+            era: filters.eras.join(","),
             query: debouncedQuery,
           });
           const res = await fetch(`/api/tmdb/episodes/seasonal?${params.toString()}`, {
@@ -230,12 +232,12 @@ export function ExploreView({
           // Discover mode with filters
           const params = new URLURLSearchParamsSafe({
             type: filters.type,
-            genres: filters.genreId ? String(filters.genreId) : "",
-            season: filters.season || "",
-            era: filters.era || "",
+            genres: filters.genreIds.join("|"),
+            season: filters.seasons.join(","),
+            era: filters.eras.join(","),
             sortBy: filters.sortBy,
             voteAverageGte: filters.minRating ? String(filters.minRating) : "",
-            language: filters.language || "",
+            language: filters.languages.join("|"),
             page: "1",
           });
 
@@ -283,12 +285,12 @@ export function ExploreView({
       } else {
         const params = new URLURLSearchParamsSafe({
           type: filters.type,
-          genres: filters.genreId ? String(filters.genreId) : "",
-          season: filters.season || "",
-          era: filters.era || "",
+          genres: filters.genreIds.join("|"),
+          season: filters.seasons.join(","),
+          era: filters.eras.join(","),
           sortBy: filters.sortBy,
           voteAverageGte: filters.minRating ? String(filters.minRating) : "",
-          language: filters.language || "",
+          language: filters.languages.join("|"),
           page: String(nextPage),
         });
         url = `/api/tmdb/discover?${params.toString()}`;
@@ -380,11 +382,6 @@ export function ExploreView({
     });
   };
 
-  // Active filter label resolution
-  const activeSeasonLabel = SEASON_OPTIONS.find((s) => s.id === filters.season)?.label;
-  const activeEraLabel = ERA_OPTIONS.find((e) => e.id === filters.era)?.label;
-  const activeGenreLabel = GENRE_OPTIONS.find((g) => g.id === filters.genreId)?.name;
-
   useEffect(() => {
     onLoadingChange?.(isLoading);
   }, [isLoading, onLoadingChange]);
@@ -447,44 +444,7 @@ export function ExploreView({
               <h1 className="text-xs sm:text-sm font-black uppercase tracking-wider text-white truncate">
                 Explore &amp; Discover
               </h1>
-              {totalResults > 0 && (
-                <span className="hidden sm:inline-flex rounded-md border border-neutral-800 bg-neutral-900 px-2 py-0.5 font-mono text-[10px] font-bold text-neutral-400">
-                  {totalResults} Titles
-                </span>
-              )}
             </div>
-
-            {/* Layout Mode (Shelf vs Grid) */}
-            {filters.type !== "episodes" && (
-              <div className="flex items-center rounded-lg border border-neutral-800 bg-neutral-900/80 p-0.5 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => setLayoutMode("shelf")}
-                  className={`flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-all ${
-                    layoutMode === "shelf"
-                      ? "bg-amber-400/20 text-amber-300 border border-amber-400/40 shadow-sm"
-                      : "text-neutral-500 hover:text-neutral-300"
-                  }`}
-                  title="3D VHS Shelf View"
-                >
-                  <CassetteTape className="h-3.5 w-3.5" />
-                  <span className="hidden sm:inline">VHS Shelf</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setLayoutMode("grid")}
-                  className={`flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-all ${
-                    layoutMode === "grid"
-                      ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm"
-                      : "text-neutral-500 hover:text-neutral-300"
-                  }`}
-                  title="Poster Grid View"
-                >
-                  <LayoutGrid className="h-3.5 w-3.5" />
-                  <span className="hidden sm:inline">Grid</span>
-                </button>
-              </div>
-            )}
           </div>
 
           {/* Search Input with Auto-Dismiss Keyboard on Enter (Desktop: search is driven from AppHeader when embedded; on mobile or standalone page, show search input) */}
@@ -495,9 +455,22 @@ export function ExploreView({
             }}
             className={`relative mt-2.5 ${isEmbedded ? "md:hidden" : ""}`}
           >
-            <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-500" />
+            {query ? (
+              <button
+                type="button"
+                onClick={() => updateQuery("")}
+                className="absolute left-2.5 top-1/2 -translate-y-1/2 flex h-6 w-6 items-center justify-center rounded-full text-neutral-400 hover:text-white transition-colors cursor-pointer z-10"
+                title="Clear search"
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </button>
+            ) : (
+              <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-500" />
+            )}
+
             <input
-              type="search"
+              type="text"
+              inputMode="search"
               enterKeyHint="search"
               value={query}
               onChange={(e) => updateQuery(e.target.value)}
@@ -507,7 +480,7 @@ export function ExploreView({
                 }
               }}
               placeholder="Search catalog by title, theme, era, or genre..."
-              className="w-full rounded-xl border border-neutral-800 bg-neutral-900/90 py-2.5 pl-10 pr-9 text-xs sm:text-sm text-neutral-100 placeholder:text-neutral-500 transition-all hover:border-neutral-700 focus:border-cyan-500/60 focus:bg-black focus:outline-none shadow-inner"
+              className="w-full rounded-xl border border-neutral-800 bg-neutral-900/90 py-2.5 pl-10 pr-9 text-xs sm:text-sm text-neutral-100 placeholder:text-neutral-500 transition-all hover:border-neutral-700 focus:border-cyan-500/60 focus:bg-black focus:outline-none shadow-inner [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-decoration]:hidden [&::-webkit-search-results-button]:hidden [&::-webkit-search-results-decoration]:hidden"
             />
             {query ? (
               <button
@@ -537,18 +510,77 @@ export function ExploreView({
           </section>
         )}
 
-        {/* Filter controls row */}
-        <section className="rounded-2xl border border-neutral-900 bg-neutral-950/60 p-3.5 sm:p-4 backdrop-blur-md shadow-xl">
-          <FilterBar
-            filters={filters}
-            onChange={setFilters}
-            onOpenMoreFilters={() => setIsMoreFiltersOpen(true)}
-            activeFilterCount={activeFilterCount}
-          />
+        {/* ── Lower Section Controls Toolbar (Filters Button & VHS / Grid Switcher) ── */}
+        <div className="space-y-3 pt-1">
+          <div className="flex items-center justify-between gap-3 border-b border-neutral-900/80 pb-3">
+            {/* Left: Filters Modal Trigger + Active Counter */}
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsMoreFiltersOpen(true)}
+                className={`flex items-center gap-2 rounded-xl border px-3.5 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
+                  activeFilterCount > 0
+                    ? "border-cyan-500/60 bg-cyan-950/40 text-cyan-300 shadow-[0_0_15px_rgba(6,182,212,0.2)]"
+                    : "border-neutral-800 bg-neutral-900/60 text-neutral-300 hover:border-neutral-700 hover:text-white"
+                }`}
+              >
+                <SlidersHorizontal className="h-3.5 w-3.5 text-cyan-400" />
+                <span>Filters</span>
+                {activeFilterCount > 0 && (
+                  <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-cyan-500 px-1 text-[9px] font-bold text-black">
+                    {activeFilterCount}
+                  </span>
+                )}
+              </button>
+
+              {activeFilterCount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setFilters(INITIAL_FILTERS)}
+                  title="Reset all filters"
+                  className="flex h-8 w-8 items-center justify-center rounded-xl border border-neutral-800 bg-neutral-900/60 text-neutral-400 hover:border-red-500/50 hover:text-red-400 transition-colors cursor-pointer"
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+
+            {/* Right: VHS Shelf vs Poster Grid Toggle */}
+            {filters.type !== "episodes" && (
+              <div className="flex items-center rounded-lg border border-neutral-800 bg-neutral-900/80 p-0.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setLayoutMode("shelf")}
+                  className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-all cursor-pointer ${
+                    layoutMode === "shelf"
+                      ? "bg-amber-400/20 text-amber-300 border border-amber-400/40 shadow-sm"
+                      : "text-neutral-500 hover:text-neutral-300"
+                  }`}
+                  title="3D VHS Shelf View"
+                >
+                  <CassetteTape className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">VHS Shelf</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLayoutMode("grid")}
+                  className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-all cursor-pointer ${
+                    layoutMode === "grid"
+                      ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm"
+                      : "text-neutral-500 hover:text-neutral-300"
+                  }`}
+                  title="Poster Grid View"
+                >
+                  <LayoutGrid className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Grid</span>
+                </button>
+              </div>
+            )}
+          </div>
 
           {/* Active Filter Badges Ribbon */}
           {(activeFilterCount > 0 || debouncedQuery) && (
-            <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-neutral-900/90 pt-3 text-xs">
+            <div className="flex flex-wrap items-center gap-2 text-xs">
               <span className="text-[11px] font-semibold uppercase tracking-wider text-neutral-500">
                 Active:
               </span>
@@ -558,52 +590,110 @@ export function ExploreView({
                   Search: &ldquo;{debouncedQuery}&rdquo;
                   <button
                     type="button"
-                    onClick={() => setQuery("")}
-                    className="hover:text-white"
+                    onClick={() => updateQuery("")}
+                    className="hover:text-white cursor-pointer"
                   >
                     <X className="h-3 w-3" />
                   </button>
                 </span>
               )}
 
-              {activeSeasonLabel && (
-                <span className="flex items-center gap-1 rounded-full bg-amber-400/20 border border-amber-400/40 px-2.5 py-0.5 text-amber-200">
-                  {activeSeasonLabel}
-                  <button
-                    type="button"
-                    onClick={() => setFilters((p) => ({ ...p, season: null }))}
-                    className="hover:text-white"
+              {filters.seasons.map((sId) => {
+                const label = SEASON_OPTIONS.find((s) => s.id === sId)?.label || sId;
+                return (
+                  <span
+                    key={sId}
+                    className="flex items-center gap-1 rounded-full bg-amber-400/20 border border-amber-400/40 px-2.5 py-0.5 text-amber-200"
                   >
-                    <X className="h-3 w-3" />
-                  </button>
-                </span>
-              )}
+                    {label}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setFilters((p) => ({
+                          ...p,
+                          seasons: p.seasons.filter((s) => s !== sId),
+                        }))
+                      }
+                      className="hover:text-white cursor-pointer"
+                      title={`Remove ${label} filter`}
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                );
+              })}
 
-              {activeEraLabel && (
-                <span className="flex items-center gap-1 rounded-full bg-fuchsia-500/20 border border-fuchsia-500/40 px-2.5 py-0.5 text-fuchsia-300">
-                  {activeEraLabel} Era
-                  <button
-                    type="button"
-                    onClick={() => setFilters((p) => ({ ...p, era: null }))}
-                    className="hover:text-white"
+              {filters.eras.map((eId) => {
+                const label = ERA_OPTIONS.find((e) => e.id === eId)?.label || eId;
+                return (
+                  <span
+                    key={eId}
+                    className="flex items-center gap-1 rounded-full bg-fuchsia-500/20 border border-fuchsia-500/40 px-2.5 py-0.5 text-fuchsia-300"
                   >
-                    <X className="h-3 w-3" />
-                  </button>
-                </span>
-              )}
+                    {label} Era
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setFilters((p) => ({
+                          ...p,
+                          eras: p.eras.filter((e) => e !== eId),
+                        }))
+                      }
+                      className="hover:text-white cursor-pointer"
+                      title={`Remove ${label} Era filter`}
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                );
+              })}
 
-              {activeGenreLabel && (
-                <span className="flex items-center gap-1 rounded-full bg-cyan-500/20 border border-cyan-500/40 px-2.5 py-0.5 text-cyan-300">
-                  {activeGenreLabel}
+              {filters.genreIds.map((gId) => {
+                const label = GENRE_OPTIONS.find((g) => g.id === gId)?.name || String(gId);
+                return (
+                  <span
+                    key={gId}
+                    className="flex items-center gap-1 rounded-full bg-cyan-500/20 border border-cyan-500/40 px-2.5 py-0.5 text-cyan-300"
+                  >
+                    {label}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setFilters((p) => ({
+                          ...p,
+                          genreIds: p.genreIds.filter((g) => g !== gId),
+                        }))
+                      }
+                      className="hover:text-white cursor-pointer"
+                      title={`Remove ${label} filter`}
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                );
+              })}
+
+              {filters.languages.map((code) => (
+                <span
+                  key={code}
+                  className="flex items-center gap-1 rounded-full bg-purple-500/20 border border-purple-500/40 px-2.5 py-0.5 text-purple-300"
+                >
+                  Lang: {code.toUpperCase()}
                   <button
                     type="button"
-                    onClick={() => setFilters((p) => ({ ...p, genreId: null }))}
-                    className="hover:text-white"
+                    onClick={() =>
+                      setFilters((p) => ({
+                        ...p,
+                        languages: p.languages.filter((l) => l !== code),
+                      }))
+                    }
+                    className="hover:text-white cursor-pointer"
+                    title={`Remove language ${code}`}
                   >
                     <X className="h-3 w-3" />
                   </button>
                 </span>
-              )}
+              ))}
 
               {filters.minRating && (
                 <span className="flex items-center gap-1 rounded-full bg-emerald-500/20 border border-emerald-500/40 px-2.5 py-0.5 text-emerald-300">
@@ -611,32 +701,15 @@ export function ExploreView({
                   <button
                     type="button"
                     onClick={() => setFilters((p) => ({ ...p, minRating: null }))}
-                    className="hover:text-white"
+                    className="hover:text-white cursor-pointer"
                   >
                     <X className="h-3 w-3" />
                   </button>
                 </span>
               )}
-
-              {filters.language && (
-                <span className="flex items-center gap-1 rounded-full bg-purple-500/20 border border-purple-500/40 px-2.5 py-0.5 text-purple-300">
-                  Lang: {filters.language.toUpperCase()}
-                  <button
-                    type="button"
-                    onClick={() => setFilters((p) => ({ ...p, language: null }))}
-                    className="hover:text-white"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </span>
-              )}
-
-              <span className="ml-auto font-mono text-[11px] text-neutral-500">
-                {totalResults > 0 ? `${totalResults} titles found` : ""}
-              </span>
             </div>
           )}
-        </section>
+        </div>
 
         {/* ── Results View ──────────────────────────────────────────────────── */}
         <section className="min-h-[50vh] space-y-4">

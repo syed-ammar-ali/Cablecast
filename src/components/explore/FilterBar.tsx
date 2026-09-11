@@ -14,12 +14,12 @@ export type ExploreMediaType = "all" | "movie" | "tv" | "episodes";
 
 export interface FilterState {
   type: ExploreMediaType;
-  genreId: number | null;
-  season: "fall" | "winter" | "spring" | "summer" | "monsoon" | null;
-  era: "70s" | "80s" | "90s" | "00s" | "10s" | "20s" | null;
+  genreIds: number[];
+  seasons: ("fall" | "winter" | "spring" | "summer" | "monsoon")[];
+  eras: ("70s" | "80s" | "90s" | "00s" | "10s" | "20s")[];
   minRating: number | null;
   sortBy: string;
-  language: string | null;
+  languages: string[];
 }
 
 export const GENRE_OPTIONS = [
@@ -73,15 +73,30 @@ export function FilterBar({
   };
 
   const toggleGenre = (id: number) => {
-    onChange((prev) => ({ ...prev, genreId: prev.genreId === id ? null : id }));
+    onChange((prev) => ({
+      ...prev,
+      genreIds: prev.genreIds.includes(id)
+        ? prev.genreIds.filter((g) => g !== id)
+        : [...prev.genreIds, id],
+    }));
   };
 
-  const toggleSeason = (season: FilterState["season"]) => {
-    onChange((prev) => ({ ...prev, season: prev.season === season ? null : season }));
+  const toggleSeason = (season: FilterState["seasons"][number]) => {
+    onChange((prev) => ({
+      ...prev,
+      seasons: prev.seasons.includes(season)
+        ? prev.seasons.filter((s) => s !== season)
+        : [...prev.seasons, season],
+    }));
   };
 
-  const toggleEra = (era: FilterState["era"]) => {
-    onChange((prev) => ({ ...prev, era: prev.era === era ? null : era }));
+  const toggleEra = (era: FilterState["eras"][number]) => {
+    onChange((prev) => ({
+      ...prev,
+      eras: prev.eras.includes(era)
+        ? prev.eras.filter((e) => e !== era)
+        : [...prev.eras, era],
+    }));
   };
 
   const toggleRating = (rating: number) => {
@@ -94,12 +109,12 @@ export function FilterBar({
   const resetFilters = () => {
     onChange(() => ({
       type: "all",
-      genreId: null,
-      season: null,
-      era: null,
+      genreIds: [],
+      seasons: [],
+      eras: [],
       minRating: null,
       sortBy: "popularity.desc",
-      language: null,
+      languages: [],
     }));
   };
 
@@ -189,7 +204,7 @@ export function FilterBar({
           Season:
         </span>
         {SEASON_OPTIONS.map((item) => {
-          const isSelected = filters.season === item.id;
+          const isSelected = filters.seasons.includes(item.id);
           return (
             <button
               key={item.id}
@@ -214,7 +229,7 @@ export function FilterBar({
           Era:
         </span>
         {ERA_OPTIONS.map((item) => {
-          const isSelected = filters.era === item.id;
+          const isSelected = filters.eras.includes(item.id);
           return (
             <button
               key={item.id}
@@ -262,7 +277,7 @@ export function FilterBar({
       {filters.type !== "episodes" && (
         <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
           {GENRE_OPTIONS.map((genre) => {
-            const isSelected = filters.genreId === genre.id;
+            const isSelected = filters.genreIds.includes(genre.id);
             return (
               <button
                 key={genre.id}

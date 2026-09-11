@@ -354,39 +354,47 @@ export function filterSeasonalEpisodes(options: {
   let list = [...CURATED_SEASONAL_EPISODES];
 
   if (options.season) {
-    const s = options.season.toLowerCase();
-    list = list.filter((ep) => {
-      if (s === "fall" || s === "autumn") {
-        return ep.theme === "fall" || ep.theme === "halloween" || ep.theme === "thanksgiving";
-      }
-      if (s === "winter") {
-        return ep.theme === "winter" || ep.theme === "christmas";
-      }
-      if (s === "spring") {
-        return ep.theme === "spring";
-      }
-      if (s === "summer") {
-        return ep.theme === "summer";
-      }
-      if (s === "monsoon" || s === "rainy") {
-        return ep.theme === "monsoon";
-      }
-      return true;
-    });
+    const seasonList = options.season.toLowerCase().split(/[,|]/).filter(Boolean);
+    if (seasonList.length > 0) {
+      list = list.filter((ep) => {
+        return seasonList.some((s) => {
+          if (s === "fall" || s === "autumn") {
+            return ep.theme === "fall" || ep.theme === "halloween" || ep.theme === "thanksgiving";
+          }
+          if (s === "winter") {
+            return ep.theme === "winter" || ep.theme === "christmas";
+          }
+          if (s === "spring") {
+            return ep.theme === "spring";
+          }
+          if (s === "summer") {
+            return ep.theme === "summer";
+          }
+          if (s === "monsoon" || s === "rainy") {
+            return ep.theme === "monsoon";
+          }
+          return false;
+        });
+      });
+    }
   }
 
   if (options.era) {
-    const era = options.era.toLowerCase();
-    list = list.filter((ep) => {
-      const year = parseInt(ep.airDate.slice(0, 4), 10);
-      if (era === "70s") return year >= 1970 && year <= 1979;
-      if (era === "80s") return year >= 1980 && year <= 1989;
-      if (era === "90s") return year >= 1990 && year <= 1999;
-      if (era === "00s") return year >= 2000 && year <= 2009;
-      if (era === "10s") return year >= 2010 && year <= 2019;
-      if (era === "20s") return year >= 2020 && year <= 2029;
-      return true;
-    });
+    const eraList = options.era.toLowerCase().split(/[,|]/).filter(Boolean);
+    if (eraList.length > 0) {
+      list = list.filter((ep) => {
+        const year = parseInt(ep.airDate.slice(0, 4), 10);
+        return eraList.some((era) => {
+          if (era === "70s") return year >= 1970 && year <= 1979;
+          if (era === "80s") return year >= 1980 && year <= 1989;
+          if (era === "90s") return year >= 1990 && year <= 1999;
+          if (era === "00s") return year >= 2000 && year <= 2009;
+          if (era === "10s") return year >= 2010 && year <= 2019;
+          if (era === "20s") return year >= 2020 && year <= 2029;
+          return false;
+        });
+      });
+    }
   }
 
   if (options.query && options.query.trim()) {

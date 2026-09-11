@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
+  ArrowLeft,
   Bookmark,
   CalendarDays,
   Check,
@@ -286,9 +287,25 @@ export function AppHeader({
             }}
             className="relative flex-1"
           >
-            <Search className="pointer-events-none absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-neutral-500" />
+            {isExploreActive || searchQuery.trim() ? (
+              <button
+                type="button"
+                onClick={() => {
+                  onSearchQueryChange("");
+                  onHomeClick?.();
+                }}
+                className="absolute left-2.5 top-1/2 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-full text-neutral-400 hover:text-white hover:bg-neutral-800/80 transition-all cursor-pointer z-10"
+                title="Back to Cablecast"
+              >
+                <ArrowLeft className="h-4 w-4 transition-transform hover:-translate-x-0.5" />
+              </button>
+            ) : (
+              <Search className="pointer-events-none absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-neutral-500" />
+            )}
+
             <input
-              type="search"
+              type="text"
+              inputMode="search"
               enterKeyHint="search"
               value={searchQuery}
               onChange={(event) => onSearchQueryChange(event.target.value)}
@@ -300,7 +317,7 @@ export function AppHeader({
                 }
               }}
               placeholder="Search movies & TV shows..."
-              className={`w-full rounded-full border bg-transparent py-2.5 pl-10 pr-9 text-base text-neutral-200 placeholder:text-neutral-500 transition-colors ${
+              className={`w-full rounded-full border bg-transparent py-2.5 pl-10 pr-9 text-base text-neutral-200 placeholder:text-neutral-500 transition-colors [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-decoration]:hidden [&::-webkit-search-results-button]:hidden [&::-webkit-search-results-decoration]:hidden ${
                 isExploreActive
                   ? "border-sky-500/60 shadow-[0_0_15px_rgba(14,165,233,0.15)]"
                   : "border-neutral-700 hover:border-sky-500/40 focus:border-sky-500/60"
