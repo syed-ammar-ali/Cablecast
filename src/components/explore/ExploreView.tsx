@@ -122,6 +122,7 @@ export function ExploreView({
     title?: string;
     initialSeason?: number;
     initialAction?: "RENT" | "BUY";
+    posterUrl?: string | null;
   } | null>(null);
 
   const [schedulingTarget, setSchedulingTarget] = useState<{
@@ -352,6 +353,7 @@ export function ExploreView({
       title: episode.showTitle,
       initialSeason: episode.seasonNumber,
       initialAction: "RENT",
+      posterUrl: episode.posterUrl,
     });
   };
 
@@ -378,6 +380,9 @@ export function ExploreView({
       id: media.tmdbId,
       type: media.mediaType.toUpperCase() as "MOVIE" | "TV",
       title: media.title,
+      posterUrl:
+        media.posterUrl ||
+        (media.posterPath ? `https://image.tmdb.org/t/p/w780${media.posterPath}` : null),
     });
   };
 
@@ -802,6 +807,7 @@ export function ExploreView({
           title={selectedMedia.title}
           initialSeason={selectedMedia.initialSeason}
           initialAction={selectedMedia.initialAction}
+          initialPosterUrl={selectedMedia.posterUrl}
         />
       )}
 

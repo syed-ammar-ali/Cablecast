@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import { createPortal } from "react-dom";
 import {
   RotateCw,
   Clock,
@@ -27,6 +28,7 @@ interface VhsModalProps {
   totalSeasons?: number;
   title?: string;
   initialAction?: "RENT" | "BUY";
+  initialPosterUrl?: string | null;
 }
 
 /**
@@ -101,8 +103,15 @@ export function VhsModal({
   totalSeasons = 1,
   title,
   initialAction,
+  initialPosterUrl,
 }: VhsModalProps) {
   const { toast } = useToast();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const normalizedType = rawMediaType.toUpperCase() === "TV" ? "TV" : "MOVIE";
   const isTv = normalizedType === "TV";
 
@@ -140,6 +149,16 @@ export function VhsModal({
   const handleClose = useCallback(() => {
     onClose();
   }, [onClose]);
+
+  // Keyboard Escape listener
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") handleClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, handleClose]);
 
   const closeRentalModal = useCallback(() => {
     if (isDirectRentalMode) {
@@ -203,15 +222,16 @@ export function VhsModal({
     touchStartXRef.current = null;
   }, []);
 
-  // Smoothly scroll active card into center without layout thrashing
+  // Smoothly scroll active card into center of horizontal carousel without scrolling outer page
   const scrollToActiveCard = useCallback((index: number) => {
     const cardEl = cardRefs.current[index];
-    if (cardEl && scrollContainerRef.current) {
+    const container = scrollContainerRef.current;
+    if (cardEl && container) {
       isProgrammaticScrollRef.current = true;
-      cardEl.scrollIntoView({
+      const targetLeft = cardEl.offsetLeft - (container.clientWidth - cardEl.clientWidth) / 2;
+      container.scrollTo({
+        left: Math.max(0, targetLeft),
         behavior: "smooth",
-        inline: "center",
-        block: "nearest",
       });
       setTimeout(() => {
         isProgrammaticScrollRef.current = false;
@@ -444,7 +464,7 @@ export function VhsModal({
     }
   }
 
-  if (!isOpen) return null;
+  if (!isOpen || !mounted) return null;
 
   const displayTitle = title || (isTv ? `Series #${mediaId}` : `Movie #${mediaId}`);
   const allSeasons = Array.from({ length: numSeasons }, (_, i) => i);
@@ -507,10 +527,10 @@ export function VhsModal({
       {/* Selected Show / Movie Preview Card */}
       <div className="flex items-center gap-3.5 rounded-xl border border-neutral-800 bg-neutral-900/60 p-3">
         <div className="relative h-14 w-10 shrink-0 overflow-hidden rounded-md border border-neutral-800 bg-neutral-900 shadow">
-          {activeSeasonData?.frontPosterPath || metadata?.frontPosterPath ? (
+          {activeSeasonData?.frontPosterPath || metadata?.frontPosterPath || initialPosterUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
-              src={activeSeasonData?.frontPosterPath || metadata?.frontPosterPath || ""}
+              src={activeSeasonData?.frontPosterPath || metadata?.frontPosterPath || initialPosterUrl || ""}
               alt={displayTitle}
               className="h-full w-full object-cover object-center"
             />
@@ -680,7 +700,7 @@ export function VhsModal({
     </>
   );
 
-  return (
+  const modalContent = (
     <div
       role="dialog"
       aria-modal="true"
@@ -700,12 +720,12 @@ export function VhsModal({
       {isRentalActive ? (
         <div
           data-interactive="true"
-          className="relative z-50 w-full max-w-md rounded-2xl border border-neutral-800 bg-neutral-950 p-5 sm:p-6 shadow-2xl backdrop-blur-xl flex flex-col gap-4 my-auto animate-in zoom-in-95"
+          className="relative z-50 w-full max-w-md rounded-2xl border border-neutral-800 bg-neutral-950 p-5 sm:p-6 shadow-2xl backdrop-blur-xl flex flex-col gap-4 animate-in zoom-in-95"
         >
           {rentalCheckoutContent}
         </div>
       ) : (
-        <div className="flex flex-col items-center justify-center relative z-50 my-auto w-full max-w-full animate-in zoom-in-95">
+        <div className="flex flex-col items-center justify-center relative z-50 w-full max-w-full animate-in zoom-in-95">
         {/* Floating Flip Button attached tightly above active card */}
         <button
           type="button"
@@ -729,7 +749,7 @@ export function VhsModal({
             data-interactive="true"
             onTouchStart={handleTouchStart}
             onTouchEnd={handleTouchEnd}
-            className="w-[86vw] max-w-[320px] sm:w-[370px] aspect-[2/3] max-h-[76vh] sm:max-h-[82vh] relative [perspective:1400px] mx-auto cursor-grab active:cursor-grabbing"
+            className="w-[86vw] max-w-[320px] sm:w-[360px] aspect-[2/3] max-h-[70vh] sm:max-h-[76vh] relative [perspective:1400px] mx-auto cursor-grab active:cursor-grabbing"
           >
             <div
               className={`h-full w-full transition-transform duration-500 ease-[cubic-bezier(0.2,0.8,0.2,1)] [transform-style:preserve-3d] relative ${isFlipped ? "[transform:rotateY(180deg)]" : ""
@@ -750,10 +770,10 @@ export function VhsModal({
                 </div>
 
                 <div className="absolute inset-0 pt-7 bg-neutral-900 overflow-hidden flex items-center justify-center">
-                  {metadata?.frontPosterPath ? (
+                  {(metadata?.frontPosterPath || initialPosterUrl) ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
-                      src={metadata.frontPosterPath}
+                      src={metadata?.frontPosterPath || initialPosterUrl || ""}
                       alt={displayTitle}
                       className="w-full h-full object-cover object-center"
                       loading="eager"
@@ -883,7 +903,8 @@ export function VhsModal({
               const seasonPoster =
                 metadata?.seasons?.find((s) => s.seasonNumber === seasonNum)?.posterPath ||
                 seasonCache[seasonNum]?.frontPosterPath ||
-                metadata?.frontPosterPath;
+                metadata?.frontPosterPath ||
+                (seasonNum === 1 ? initialPosterUrl : null);
 
               if (isSelected) {
                 // ── ACTIVE FLIPPABLE 3D CARD ──
@@ -896,7 +917,7 @@ export function VhsModal({
                     ref={(el) => {
                       cardRefs.current[seasonIndex] = el;
                     }}
-                    className="shrink-0 snap-center w-[86vw] max-w-[320px] sm:w-[360px] aspect-[2/3] max-h-[76vh] sm:max-h-[82vh] relative [perspective:1400px] transition-transform transition-opacity duration-300 transform-gpu will-change-transform z-30 scale-100 opacity-100 outline-none focus:outline-none focus-visible:outline-none [-webkit-tap-highlight-color:transparent] cursor-grab active:cursor-grabbing"
+                    className="shrink-0 snap-center w-[86vw] max-w-[320px] sm:w-[360px] aspect-[2/3] max-h-[70vh] sm:max-h-[76vh] relative [perspective:1400px] transition-transform transition-opacity duration-300 transform-gpu will-change-transform z-30 scale-100 opacity-100 outline-none focus:outline-none focus-visible:outline-none [-webkit-tap-highlight-color:transparent] cursor-grab active:cursor-grabbing"
                   >
                     <div
                       className={`h-full w-full transition-transform duration-500 ease-[cubic-bezier(0.2,0.8,0.2,1)] [transform-style:preserve-3d] relative ${isFlipped ? "[transform:rotateY(180deg)]" : ""
@@ -1156,4 +1177,6 @@ export function VhsModal({
       )}
     </div>
   );
+
+  return createPortal(modalContent, document.body);
 }

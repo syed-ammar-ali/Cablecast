@@ -101,6 +101,7 @@ export function CablecastApp({ initialView = "home" }: CablecastAppProps) {
     type: "MOVIE" | "TV";
     title?: string;
     initialAction?: "RENT" | "BUY";
+    posterUrl?: string | null;
   } | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -482,6 +483,9 @@ export function CablecastApp({ initialView = "home" }: CablecastAppProps) {
             id: media.tmdbId,
             type: media.mediaType.toUpperCase() as "MOVIE" | "TV",
             title: media.title,
+            posterUrl:
+              media.posterUrl ||
+              (media.posterPath ? `https://image.tmdb.org/t/p/w780${media.posterPath}` : null),
           });
           setIsModalOpen(true);
         }}
@@ -564,6 +568,7 @@ export function CablecastApp({ initialView = "home" }: CablecastAppProps) {
           mediaType={selectedMedia.type}
           title={selectedMedia.title}
           initialAction={selectedMedia.initialAction}
+          initialPosterUrl={selectedMedia.posterUrl}
         />
       )}
 
