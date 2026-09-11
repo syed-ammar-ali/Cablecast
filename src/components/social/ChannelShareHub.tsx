@@ -87,7 +87,7 @@ export function ChannelShareModal({
         {/* Header */}
         <div className="flex items-center justify-between border-b border-neutral-900 pb-3">
           <div className="flex items-center gap-2">
-            <Share2 className="h-4 w-4 text-cyan-400" />
+            <Share2 className="h-4 w-4 text-purple-400" />
             <h3 className="text-sm font-bold text-white uppercase tracking-wider">
               Share Channel Lineup
             </h3>
@@ -117,16 +117,16 @@ export function ChannelShareModal({
               type="button"
               onClick={handleGenerate}
               disabled={isGenerating || itemCount === 0}
-              className="w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 py-3 text-xs font-bold uppercase tracking-wider text-black shadow-lg shadow-cyan-500/20 hover:from-cyan-400 hover:to-blue-500 transition-all disabled:opacity-50 cursor-pointer"
+              className="w-full flex items-center justify-center gap-2 rounded-xl bg-white hover:bg-neutral-200 text-black py-3 text-xs font-bold uppercase tracking-wider shadow-lg transition-all disabled:opacity-40 cursor-pointer active:scale-95"
             >
               {isGenerating ? (
                 <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <Loader2 className="h-4 w-4 animate-spin text-black" />
                   <span>Packaging Snapshot...</span>
                 </>
               ) : (
                 <>
-                  <Sparkles className="h-4 w-4" />
+                  <Sparkles className="h-4 w-4 text-black" />
                   <span>Create 24h Share Link</span>
                 </>
               )}
@@ -139,12 +139,12 @@ export function ChannelShareModal({
                 type="text"
                 readOnly
                 value={shareData.shareUrl}
-                className="w-full bg-transparent text-xs font-mono text-cyan-300 select-all outline-none"
+                className="w-full bg-transparent text-xs font-mono text-purple-300 select-all outline-none"
               />
               <button
                 type="button"
                 onClick={handleCopy}
-                className="flex items-center gap-1.5 shrink-0 rounded-lg bg-cyan-500 px-3 py-1.5 text-xs font-bold text-black hover:bg-cyan-400 transition-colors cursor-pointer shadow-sm"
+                className="flex items-center gap-1.5 shrink-0 rounded-lg border border-neutral-700 bg-neutral-800 hover:bg-neutral-700 px-3 py-1.5 text-xs font-bold text-white transition-colors cursor-pointer shadow-sm"
               >
                 {hasCopied ? (
                   <>
@@ -300,8 +300,8 @@ export function ChannelResolveView({ token }: ChannelResolveViewProps) {
 
         {/* Success / Imported View */}
         {importResult && (
-          <div className="rounded-2xl border border-cyan-500/50 bg-cyan-950/20 p-6 text-center space-y-4 animate-in fade-in">
-            <Check className="h-12 w-12 mx-auto text-cyan-400" />
+          <div className="rounded-2xl border border-purple-500/50 bg-purple-950/20 p-6 text-center space-y-4 animate-in fade-in">
+            <Check className="h-12 w-12 mx-auto text-purple-400" />
             <div className="space-y-1">
               <h3 className="text-lg font-bold text-white">Channel Added to Your TV Guide!</h3>
               <p className="text-xs text-neutral-300">
@@ -312,10 +312,10 @@ export function ChannelResolveView({ token }: ChannelResolveViewProps) {
               <button
                 type="button"
                 onClick={() => router.push("/home")}
-                className="inline-flex items-center gap-2 rounded-xl bg-cyan-400 px-6 py-3 text-xs font-bold uppercase tracking-wider text-black shadow-lg shadow-cyan-500/20 hover:bg-cyan-300 transition-colors cursor-pointer"
+                className="inline-flex items-center gap-2 rounded-xl bg-white hover:bg-neutral-200 text-black px-6 py-3 text-xs font-bold uppercase tracking-wider shadow-lg transition-all cursor-pointer active:scale-95"
               >
                 <span>Watch on TV Guide</span>
-                <ArrowRight className="h-4 w-4" />
+                <ArrowRight className="h-4 w-4 text-black" />
               </button>
             </div>
           </div>
@@ -326,7 +326,7 @@ export function ChannelResolveView({ token }: ChannelResolveViewProps) {
           <div className="rounded-2xl border border-neutral-800 bg-neutral-950 p-6 shadow-2xl space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-neutral-900 pb-4">
               <div>
-                <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-cyan-400">
+                <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-purple-400">
                   Shared Standalone Channel
                 </span>
                 <h2 className="text-xl font-black text-white">{snapshot.channelName}</h2>
@@ -339,16 +339,16 @@ export function ChannelResolveView({ token }: ChannelResolveViewProps) {
                 type="button"
                 onClick={handleImport}
                 disabled={isImporting}
-                className="flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 px-6 py-3 text-xs font-bold uppercase tracking-wider text-black font-semibold shadow-lg shadow-cyan-500/25 hover:from-cyan-400 hover:to-blue-500 transition-all disabled:opacity-50 cursor-pointer"
+                className="flex items-center justify-center gap-2 rounded-xl bg-white hover:bg-neutral-200 text-black px-6 py-3 text-xs font-bold uppercase tracking-wider shadow-lg transition-all disabled:opacity-40 cursor-pointer active:scale-95"
               >
                 {isImporting ? (
                   <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <Loader2 className="h-4 w-4 animate-spin text-black" />
                     <span>Adding Channel...</span>
                   </>
                 ) : (
                   <>
-                    <Sparkles className="h-4 w-4" />
+                    <Sparkles className="h-4 w-4 text-black" />
                     <span>Add {snapshot.channelName} as Channel</span>
                   </>
                 )}

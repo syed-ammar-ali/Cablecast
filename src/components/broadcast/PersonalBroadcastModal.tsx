@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { ChannelShareModal } from "@/components/social/ChannelShareHub";
 import { BroadcastSlotCard } from "./BroadcastSlotCard";
+import { NostalgiaSchedulerModal } from "@/components/calendar/NostalgiaSchedulerModal";
 import { usePushNotifications } from "@/lib/usePushNotifications";
 import type {
   CalendarEntry,
@@ -167,6 +168,12 @@ export function PersonalBroadcastModal({
   const [calendarEntries, setCalendarEntries] = useState<CalendarEntry[]>([]);
   const [isCalendarLoading, setIsCalendarLoading] = useState(false);
 
+  // Retro Nostalgia Series Runs state
+  const [isNostalgiaModalOpen, setIsNostalgiaModalOpen] = useState(false);
+  const [nostalgiaCampaigns, setNostalgiaCampaigns] = useState<any[]>([]);
+  const [isNostalgiaLoading, setIsNostalgiaLoading] = useState(false);
+  const [deletingCampaignId, setDeletingCampaignId] = useState<number | null>(null);
+
   const fetchCalendarEntries = useCallback(async () => {
     setIsCalendarLoading(true);
     try {
@@ -182,12 +189,50 @@ export function PersonalBroadcastModal({
     }
   }, []);
 
+  const fetchNostalgiaCampaigns = useCallback(async () => {
+    setIsNostalgiaLoading(true);
+    try {
+      const res = await fetch("/api/calendar/nostalgia");
+      if (res.ok) {
+        const data = await res.json();
+        setNostalgiaCampaigns(data.campaigns || []);
+      }
+    } catch {
+      // ignore
+    } finally {
+      setIsNostalgiaLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (isOpen) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       void fetchCalendarEntries();
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      void fetchNostalgiaCampaigns();
     }
-  }, [isOpen, fetchCalendarEntries]);
+  }, [isOpen, fetchCalendarEntries, fetchNostalgiaCampaigns]);
+
+  const [confirmDeleteCampaign, setConfirmDeleteCampaign] = useState<{
+    tmdbId: number;
+    title: string;
+  } | null>(null);
+
+  const executeDeleteNostalgiaCampaign = async (tmdbId: number) => {
+    setDeletingCampaignId(tmdbId);
+    try {
+      const res = await fetch(`/api/calendar/nostalgia?tmdbId=${tmdbId}`, { method: "DELETE" });
+      if (res.ok) {
+        setNostalgiaCampaigns((prev) => prev.filter((c) => c.tmdbId !== tmdbId));
+        void fetchCalendarEntries();
+        setConfirmDeleteCampaign(null);
+      }
+    } catch {
+      // ignore
+    } finally {
+      setDeletingCampaignId(null);
+    }
+  };
 
   const handleDeleteCalendarEntry = async (id: string) => {
     try {
@@ -433,10 +478,10 @@ export function PersonalBroadcastModal({
               <button
                 type="button"
                 onClick={() => setIsShareModalOpen(true)}
-                className="flex items-center gap-1.5 rounded-md border border-neutral-800 bg-neutral-900/60 px-2.5 py-1 text-[11px] sm:text-xs font-semibold text-cyan-300 hover:border-cyan-500/50 hover:bg-cyan-950/20 hover:text-white transition-all cursor-pointer shadow-sm shrink-0"
+                className="flex items-center gap-1.5 rounded-md border border-neutral-800 bg-neutral-900/60 px-2.5 py-1 text-[11px] sm:text-xs font-semibold text-neutral-300 hover:border-purple-500/50 hover:bg-purple-950/20 hover:text-white transition-all cursor-pointer shadow-sm shrink-0"
                 title="Share your channel lineup via link"
               >
-                <Share2 className="h-3 w-3" />
+                <Share2 className="h-3 w-3 text-neutral-400 group-hover:text-purple-400" />
                 <span className="hidden sm:inline">Share</span>
               </button>
             </div>
@@ -602,11 +647,11 @@ export function PersonalBroadcastModal({
                   : "text-neutral-400 hover:text-neutral-200"
               }`}
             >
-              <CalendarDays className={`h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0 ${activeTab === "calendar" ? "text-fuchsia-400" : "text-neutral-500"}`} />
+              <CalendarDays className={`h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0 ${activeTab === "calendar" ? "text-amber-400" : "text-neutral-500"}`} />
               <span className="hidden sm:inline">Calendar Planner</span>
               <span className="sm:hidden">Calendar</span>
               {calendarEntries.length > 0 && (
-                <span className="rounded-md border border-neutral-800 bg-neutral-900 px-1.5 py-0.2 font-mono text-[9px] sm:text-[10px] font-bold text-fuchsia-300">
+                <span className="rounded-md border border-neutral-800 bg-neutral-900 px-1.5 py-0.2 font-mono text-[9px] sm:text-[10px] font-bold text-amber-400">
                   {calendarEntries.length}
                 </span>
               )}
@@ -845,7 +890,7 @@ export function PersonalBroadcastModal({
                 <div className="pt-4 border-t border-neutral-900 space-y-3">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h4 className="text-xs font-bold uppercase tracking-wider text-cyan-400 flex items-center gap-2">
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-purple-300 flex items-center gap-2">
                         <Radio className="h-3.5 w-3.5" />
                         Subscribed Standalone Channels ({subscribedChannels.length})
                       </h4>
@@ -859,10 +904,10 @@ export function PersonalBroadcastModal({
                     {subscribedChannels.map((subChan) => (
                       <div
                         key={subChan.id}
-                        className="flex items-center justify-between gap-3 rounded-xl border border-cyan-900/40 bg-cyan-950/10 p-3"
+                        className="flex items-center justify-between gap-3 rounded-xl border border-purple-900/40 bg-purple-950/10 p-3"
                       >
                         <div className="flex items-center gap-3 min-w-0">
-                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-cyan-800/40 bg-neutral-900 text-cyan-400">
+                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-purple-800/40 bg-neutral-900 text-purple-300">
                             <Radio className="h-4 w-4" />
                           </div>
                           <div className="min-w-0">
@@ -1019,10 +1064,162 @@ export function PersonalBroadcastModal({
           {/* Tab 4: Calendar Planner */}
           {activeTab === "calendar" && (
             <div key="calendar" className="space-y-6 animate-in fade-in duration-150">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-neutral-900 pb-3">
+              {/* Retro Nostalgia Runs Section */}
+              <div className="rounded-2xl border border-neutral-800 bg-neutral-900/30 p-4 sm:p-5 shadow-sm">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-neutral-800/80 pb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-neutral-800 bg-neutral-900 text-amber-400 shadow">
+                      <Sparkles className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold uppercase tracking-wider text-white flex items-center gap-2">
+                        Retro TV Runs &amp; Multi-Year Broadcasts
+                        {nostalgiaCampaigns.length > 0 && (
+                          <span className="rounded-md bg-neutral-900 border border-neutral-800 px-2 py-0.5 font-mono text-[9px] font-bold text-neutral-300">
+                            {nostalgiaCampaigns.length} Active
+                          </span>
+                        )}
+                      </h3>
+                      <p className="text-xs text-neutral-400">
+                        Map entire series across upcoming years matching original 90s/00s broadcast rhythms.
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsNostalgiaModalOpen(true)}
+                    className="flex w-full sm:w-auto items-center justify-center gap-1.5 rounded-xl bg-white hover:bg-neutral-200 text-black px-4 py-2.5 sm:py-2 text-xs font-bold transition-all shadow-md active:scale-95 cursor-pointer min-h-[40px] sm:min-h-[36px]"
+                  >
+                    <Sparkles className="h-3.5 w-3.5" />
+                    <span>+ Plan Nostalgia Series Run</span>
+                  </button>
+                </div>
+
+                {/* Campaigns List */}
+                {isNostalgiaLoading ? (
+                  <div className="flex items-center justify-center py-6 text-neutral-500 gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin text-neutral-400" />
+                    <span className="text-xs">Loading series runs...</span>
+                  </div>
+                ) : nostalgiaCampaigns.length === 0 ? (
+                  <div className="py-5 text-center text-xs text-neutral-500">
+                    No multi-year series runs planned yet. Click <strong className="text-white font-semibold">+ Plan Nostalgia Series Run</strong> to schedule all seasons of a classic show across future years!
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 gap-3 pt-3">
+                    {nostalgiaCampaigns.map((camp) => {
+                      const dayName = DAYS_OF_WEEK.find((d) => d.day === camp.dayOfWeek)?.name || "Weekly";
+                      const timeStr = formatBlockTime(camp.blockStartMinutes);
+                      const isDeleting = deletingCampaignId === camp.tmdbId;
+                      const isConfirming = confirmDeleteCampaign?.tmdbId === camp.tmdbId;
+
+                      return (
+                        <div
+                          key={camp.tmdbId}
+                          className="group relative overflow-hidden rounded-xl border border-neutral-800/90 bg-neutral-950/80 p-4 transition-all hover:border-neutral-700 sm:p-4.5 shadow-sm"
+                        >
+                          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3.5">
+                            {/* Poster Thumbnail */}
+                            <div className="relative h-16 w-11 shrink-0 overflow-hidden rounded-lg border border-neutral-800 bg-neutral-900 shadow">
+                              {camp.posterPath ? (
+                                /* eslint-disable-next-line @next/next/no-img-element */
+                                <img src={camp.posterPath} alt={camp.title} className="h-full w-full object-cover" />
+                              ) : (
+                                <div className="flex h-full w-full items-center justify-center text-neutral-600">
+                                  <Tv className="h-4 w-4" />
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Campaign Details */}
+                            <div className="min-w-0 flex-1 space-y-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="inline-flex items-center rounded-md bg-neutral-900 px-2 py-0.5 font-mono text-[9px] font-bold tracking-widest text-neutral-300 border border-neutral-800">
+                                  VINTAGE RETRO RUN
+                                </span>
+                                <span className="rounded-md bg-neutral-900 border border-neutral-800 px-1.5 py-0.2 font-mono text-[9px] font-bold text-neutral-300">
+                                  {camp.totalSeasons} Seasons · {camp.totalEpisodes} Episodes
+                                </span>
+                                <h4 className="text-sm font-bold text-white truncate">{camp.title}</h4>
+                              </div>
+
+                              <div className="flex items-center gap-2 text-xs text-neutral-400 font-mono flex-wrap">
+                                <span className="text-amber-400 font-semibold">{dayName}s @ {timeStr}</span>
+                                <span className="text-neutral-600">·</span>
+                                <span>{camp.firstAirDate} ➔ {camp.lastAirDate}</span>
+                              </div>
+
+                              {camp.nextAiring && (
+                                <div className="flex items-center gap-1.5 text-[11px] text-emerald-400 font-mono pt-0.5">
+                                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                                  <span>
+                                    Next Airing: S{String(camp.nextAiring.season).padStart(2, "0")}:E{String(camp.nextAiring.episode).padStart(2, "0")} on {camp.nextAiring.scheduledDate}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Action Button */}
+                            {!isConfirming && (
+                              <button
+                                type="button"
+                                onClick={() => setConfirmDeleteCampaign({ tmdbId: camp.tmdbId, title: camp.title })}
+                                className="flex items-center gap-1.5 rounded-lg border border-neutral-800 bg-neutral-900/80 px-3 py-1.5 text-xs text-neutral-400 hover:border-red-800/60 hover:bg-red-950/20 hover:text-red-400 transition-colors self-end sm:self-center cursor-pointer shrink-0"
+                                title="Cancel multi-year run"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                                <span>Cancel Run</span>
+                              </button>
+                            )}
+                          </div>
+
+                          {/* Inline Confirmation Card */}
+                          {isConfirming && (
+                            <div className="mt-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 rounded-xl border border-red-900/60 bg-red-950/30 p-3 text-xs animate-in fade-in duration-150">
+                              <div className="flex items-center gap-2 text-red-300">
+                                <AlertTriangle className="h-4 w-4 shrink-0 text-red-400" />
+                                <span>
+                                  Cancel {camp.totalSeasons}-season run for <strong>{camp.title}</strong>? (Removes all {camp.totalEpisodes} episodes from calendar)
+                                </span>
+                              </div>
+
+                              <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+                                <button
+                                  type="button"
+                                  onClick={() => setConfirmDeleteCampaign(null)}
+                                  className="rounded-lg border border-neutral-800 bg-neutral-900 px-2.5 py-1 text-xs text-neutral-300 hover:bg-neutral-800 hover:text-white cursor-pointer"
+                                >
+                                  Keep Run
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={isDeleting}
+                                  onClick={() => executeDeleteNostalgiaCampaign(camp.tmdbId)}
+                                  className="flex items-center gap-1 rounded-lg border border-red-700 bg-red-600 px-3 py-1 text-xs font-bold text-white hover:bg-red-500 shadow-md cursor-pointer disabled:opacity-50"
+                                >
+                                  {isDeleting ? (
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin text-white" />
+                                  ) : (
+                                    <Trash2 className="h-3.5 w-3.5 text-white" />
+                                  )}
+                                  <span>Confirm Cancel</span>
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Individual Screenings Section */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-neutral-900 pb-3 pt-2">
                 <div>
                   <h3 className="text-sm font-bold uppercase tracking-wider text-white">
-                    Date-Specific Screenings
+                    Individual Calendar Screenings
                   </h3>
                   <p className="text-xs text-neutral-400">
                     One-time appointments scheduled for a specific calendar date, with automatic broadcast override.
@@ -1030,7 +1227,10 @@ export function PersonalBroadcastModal({
                 </div>
                 <button
                   type="button"
-                  onClick={fetchCalendarEntries}
+                  onClick={() => {
+                    void fetchCalendarEntries();
+                    void fetchNostalgiaCampaigns();
+                  }}
                   className="self-start sm:self-auto rounded-lg border border-neutral-800 bg-neutral-900/60 px-2.5 py-1 text-xs text-neutral-400 hover:text-white hover:border-neutral-700 cursor-pointer"
                 >
                   Refresh
@@ -1039,12 +1239,12 @@ export function PersonalBroadcastModal({
 
               {isCalendarLoading ? (
                 <div className="flex items-center justify-center py-16 text-neutral-500 gap-2">
-                  <Loader2 className="h-5 w-5 animate-spin text-fuchsia-400" />
+                  <Loader2 className="h-5 w-5 animate-spin text-amber-400" />
                   <span className="text-xs">Loading calendar entries...</span>
                 </div>
               ) : calendarEntries.length === 0 ? (
                 <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-neutral-800/80 bg-neutral-950/40 p-8 sm:p-12 text-center text-neutral-600 min-h-[220px]">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-neutral-800 bg-neutral-900 text-fuchsia-400 mb-3 shadow">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-neutral-800 bg-neutral-900 text-amber-400 mb-3 shadow">
                     <CalendarDays className="h-6 w-6" />
                   </div>
                   <p className="text-sm font-bold text-neutral-300">
@@ -1088,7 +1288,7 @@ export function PersonalBroadcastModal({
                             </div>
 
                             <div className="flex items-center gap-2 font-mono text-xs text-neutral-400">
-                              <span className="text-fuchsia-300 font-bold">{entry.scheduledDate}</span>
+                              <span className="text-amber-400 font-bold">{entry.scheduledDate}</span>
                               <span>·</span>
                               <span>{timeRange}</span>
                               <span>({entry.blockCount * 30}m)</span>
@@ -1164,6 +1364,16 @@ export function PersonalBroadcastModal({
           onClose={() => setIsShareModalOpen(false)}
           channelName={channelName}
           itemCount={schedule.length}
+        />
+
+        {/* Nostalgia Broadcast Series Scheduler Modal */}
+        <NostalgiaSchedulerModal
+          isOpen={isNostalgiaModalOpen}
+          onClose={() => setIsNostalgiaModalOpen(false)}
+          onScheduled={() => {
+            void fetchCalendarEntries();
+            void fetchNostalgiaCampaigns();
+          }}
         />
 
       </div>

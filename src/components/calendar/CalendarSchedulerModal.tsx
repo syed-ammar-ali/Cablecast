@@ -206,25 +206,25 @@ export function CalendarSchedulerModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="relative w-full max-w-lg rounded-2xl border border-neutral-800 bg-neutral-950 p-5 sm:p-6 shadow-2xl shadow-black overflow-y-auto max-h-[90vh] no-scrollbar">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
+      <div className="relative w-full max-w-lg h-[100dvh] sm:h-auto sm:max-h-[90vh] rounded-none sm:rounded-2xl border-0 sm:border border-neutral-800 bg-neutral-950 px-4 sm:px-6 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] shadow-2xl shadow-black overflow-y-auto no-scrollbar overscroll-contain flex flex-col justify-between">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-neutral-900 pb-4">
+        <div className="flex items-center justify-between border-b border-neutral-900 pb-3 sm:pb-4">
           <div className="flex items-center gap-2">
-            <CalendarIcon className="h-5 w-5 text-fuchsia-400" />
+            <CalendarIcon className="h-5 w-5 text-amber-400" />
             <h3 className="text-base font-bold text-white">Schedule to Date</h3>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="flex h-8 w-8 items-center justify-center rounded-lg border border-neutral-800 text-neutral-400 hover:text-white hover:border-neutral-700"
+            className="flex h-8 w-8 items-center justify-center rounded-lg border border-neutral-800 text-neutral-400 hover:text-white hover:border-neutral-700 active:scale-95 cursor-pointer"
           >
             <X className="h-4 w-4" />
           </button>
         </div>
 
         {/* Media Preview Banner */}
-        <div className="flex items-center gap-3 rounded-xl border border-neutral-800/80 bg-neutral-900/50 p-3 my-4">
+        <div className="flex items-center gap-3 rounded-xl border border-neutral-800/80 bg-neutral-900/50 p-3 my-3 sm:my-4">
           <div className="relative h-16 w-12 shrink-0 overflow-hidden rounded-md bg-neutral-800 border border-neutral-700/60">
             {media.posterUrl ? (
               <Image src={media.posterUrl} alt={media.title} fill className="object-cover" />
@@ -234,8 +234,8 @@ export function CalendarSchedulerModal({
               </div>
             )}
           </div>
-          <div className="space-y-0.5">
-            <h4 className="text-sm font-bold text-white line-clamp-1">{media.title}</h4>
+          <div className="space-y-0.5 min-w-0">
+            <h4 className="text-sm font-bold text-white truncate">{media.title}</h4>
             <p className="text-xs text-neutral-400">
               {isTv
                 ? `TV Series · Starting S${startSeason} · E${startEpisode}`
@@ -244,7 +244,7 @@ export function CalendarSchedulerModal({
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4 flex-1">
           {/* 1. Date Selection Horizon */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
@@ -256,12 +256,12 @@ export function CalendarSchedulerModal({
                 min={todayStr}
                 value={scheduledDate}
                 onChange={(e) => setScheduledDate(e.target.value)}
-                className="rounded-lg border border-neutral-800 bg-neutral-900 px-2.5 py-1 text-xs font-mono font-bold text-white focus:outline-none focus:border-fuchsia-500/60"
+                className="rounded-lg border border-neutral-800 bg-neutral-900 px-2.5 py-1 text-base sm:text-xs font-mono font-bold text-white focus:outline-none focus:border-neutral-500 min-h-[36px]"
               />
             </div>
 
             {/* Quick date jump pills */}
-            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1">
+            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1 touch-pan-x">
               {horizonDays.map((d) => {
                 const isSelected = scheduledDate === d.dateStr;
                 return (
@@ -271,7 +271,7 @@ export function CalendarSchedulerModal({
                     onClick={() => setScheduledDate(d.dateStr)}
                     className={`flex flex-col items-center justify-center shrink-0 rounded-xl px-3 py-1.5 text-center transition-all ${
                       isSelected
-                        ? "border border-fuchsia-500/60 bg-fuchsia-950/80 text-fuchsia-200 shadow-md ring-1 ring-fuchsia-500/30 font-bold"
+                        ? "border border-neutral-600 bg-neutral-800 text-white font-bold ring-1 ring-neutral-700 shadow-md"
                         : "border border-neutral-800 bg-neutral-900/60 text-neutral-400 hover:border-neutral-700 hover:text-white"
                     }`}
                   >
@@ -296,8 +296,8 @@ export function CalendarSchedulerModal({
                   onClick={() => setMeridiem("AM")}
                   className={`px-2.5 py-0.5 text-xs font-mono font-bold rounded-md transition-all ${
                     meridiem === "AM"
-                      ? "bg-fuchsia-500/30 text-fuchsia-300 border border-fuchsia-500/50"
-                      : "text-neutral-500 hover:text-neutral-300"
+                      ? "bg-white text-black shadow-sm"
+                      : "text-neutral-400 hover:text-neutral-200"
                   }`}
                 >
                   AM
@@ -307,8 +307,8 @@ export function CalendarSchedulerModal({
                   onClick={() => setMeridiem("PM")}
                   className={`px-2.5 py-0.5 text-xs font-mono font-bold rounded-md transition-all ${
                     meridiem === "PM"
-                      ? "bg-fuchsia-500/30 text-fuchsia-300 border border-fuchsia-500/50"
-                      : "text-neutral-500 hover:text-neutral-300"
+                      ? "bg-white text-black shadow-sm"
+                      : "text-neutral-400 hover:text-neutral-200"
                   }`}
                 >
                   PM
@@ -327,7 +327,7 @@ export function CalendarSchedulerModal({
                     onClick={() => setSelectedSlotIndex(idx)}
                     className={`rounded-xl py-1.5 text-center font-mono text-xs transition-all ${
                       isSelected
-                        ? "border border-fuchsia-500/60 bg-fuchsia-950/80 text-fuchsia-200 font-bold shadow-md ring-1 ring-fuchsia-500/30"
+                        ? "border border-neutral-600 bg-neutral-800 text-white font-bold shadow-md ring-1 ring-neutral-700"
                         : "border border-neutral-800 bg-neutral-900/60 text-neutral-400 hover:border-neutral-700 hover:text-white"
                     }`}
                   >
@@ -350,7 +350,7 @@ export function CalendarSchedulerModal({
                 <label className="text-xs font-mono font-bold uppercase tracking-wider text-neutral-300">
                   3. Start From
                 </label>
-                <span className="font-mono text-xs font-bold text-fuchsia-300">
+                <span className="font-mono text-xs font-bold text-amber-400">
                   Season {startSeason} · Episode {startEpisode}
                 </span>
               </div>
@@ -363,7 +363,7 @@ export function CalendarSchedulerModal({
                     max="50"
                     value={startSeason}
                     onChange={(e) => setStartSeason(Math.max(1, parseInt(e.target.value, 10) || 1))}
-                    className="w-16 bg-transparent text-right font-mono text-sm font-bold text-white focus:outline-none"
+                    className="w-16 bg-transparent text-right font-mono text-base sm:text-sm font-bold text-white focus:outline-none"
                   />
                 </div>
                 <div className="flex items-center justify-between rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2">
@@ -374,7 +374,7 @@ export function CalendarSchedulerModal({
                     max="100"
                     value={startEpisode}
                     onChange={(e) => setStartEpisode(Math.max(1, parseInt(e.target.value, 10) || 1))}
-                    className="w-16 bg-transparent text-right font-mono text-sm font-bold text-white focus:outline-none"
+                    className="w-16 bg-transparent text-right font-mono text-base sm:text-sm font-bold text-white focus:outline-none"
                   />
                 </div>
               </div>
@@ -394,16 +394,16 @@ export function CalendarSchedulerModal({
             <button
               type="submit"
               disabled={isSubmitting}
-              className="w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-fuchsia-600 to-purple-600 py-3 text-xs font-bold uppercase tracking-wider text-white shadow-lg shadow-fuchsia-600/30 hover:from-fuchsia-500 hover:to-purple-500 transition-all disabled:opacity-50 cursor-pointer"
+              className="w-full flex items-center justify-center gap-2 rounded-xl bg-white hover:bg-neutral-200 text-black py-3 text-xs font-bold uppercase tracking-wider shadow-lg active:scale-95 transition-all disabled:opacity-50 cursor-pointer min-h-[44px]"
             >
               {isSubmitting ? (
                 <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <Loader2 className="h-4 w-4 animate-spin text-black" />
                   <span>Locking Slot...</span>
                 </>
               ) : (
                 <>
-                  <Check className="h-4 w-4" />
+                  <Check className="h-4 w-4 stroke-[2.5]" />
                   <span>Confirm Calendar Airing</span>
                 </>
               )}

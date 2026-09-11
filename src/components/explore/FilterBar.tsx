@@ -129,11 +129,11 @@ export function FilterBar({
             onClick={() => setType("all")}
             className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
               filters.type === "all"
-                ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm"
+                ? "bg-neutral-800 text-white border border-neutral-700 shadow-sm"
                 : "text-neutral-400 hover:text-neutral-200"
             }`}
           >
-            <Sparkles className="h-3.5 w-3.5" />
+            <Sparkles className="h-3.5 w-3.5 text-purple-400" />
             All
           </button>
 
@@ -169,16 +169,16 @@ export function FilterBar({
           <button
             type="button"
             onClick={onOpenMoreFilters}
-            className={`flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-medium transition-all ${
+            className={`flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-medium transition-all cursor-pointer ${
               activeFilterCount > 0
-                ? "border-cyan-500/50 bg-cyan-950/40 text-cyan-300"
+                ? "border-purple-500/50 bg-purple-950/40 text-purple-300 shadow-sm shadow-purple-950/30"
                 : "border-neutral-800 bg-neutral-900/60 text-neutral-400 hover:border-neutral-700 hover:text-white"
             }`}
           >
             <SlidersHorizontal className="h-3.5 w-3.5" />
             <span>More Filters</span>
             {activeFilterCount > 0 && (
-              <span className="flex h-4 w-4 items-center justify-center rounded-full bg-cyan-500 text-[9px] font-bold text-black">
+              <span className="flex h-4 w-4 items-center justify-center rounded-full bg-purple-600 text-[9px] font-bold text-white shadow-sm">
                 {activeFilterCount}
               </span>
             )}
@@ -283,9 +283,9 @@ export function FilterBar({
                 key={genre.id}
                 type="button"
                 onClick={() => toggleGenre(genre.id)}
-                className={`shrink-0 rounded-lg px-2.5 py-1 text-xs font-medium transition-all ${
+                className={`shrink-0 rounded-lg px-2.5 py-1 text-xs font-medium transition-all cursor-pointer ${
                   isSelected
-                    ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/50 shadow-sm"
+                    ? "bg-purple-500/20 text-purple-300 border border-purple-500/50 shadow-sm"
                     : "bg-neutral-950/60 text-neutral-400 border border-neutral-800/80 hover:border-neutral-700 hover:text-white"
                 }`}
               >

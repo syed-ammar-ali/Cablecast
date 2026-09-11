@@ -496,14 +496,14 @@ export function ExploreView({
                 onClick={() => setIsMoreFiltersOpen(true)}
                 className={`flex items-center gap-2 rounded-xl border px-3.5 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
                   activeFilterCount > 0
-                    ? "border-cyan-500/60 bg-cyan-950/40 text-cyan-300 shadow-[0_0_15px_rgba(6,182,212,0.2)]"
+                    ? "border-purple-500/60 bg-purple-950/40 text-purple-300 shadow-[0_0_15px_rgba(168,85,247,0.2)]"
                     : "border-neutral-800 bg-neutral-900/60 text-neutral-300 hover:border-neutral-700 hover:text-white"
                 }`}
               >
-                <SlidersHorizontal className="h-3.5 w-3.5 text-cyan-400" />
+                <SlidersHorizontal className="h-3.5 w-3.5 text-purple-400" />
                 <span>Filters</span>
                 {activeFilterCount > 0 && (
-                  <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-cyan-500 px-1 text-[9px] font-bold text-black">
+                  <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-purple-600 px-1 text-[9px] font-bold text-white shadow-sm">
                     {activeFilterCount}
                   </span>
                 )}
@@ -542,7 +542,7 @@ export function ExploreView({
                   onClick={() => setLayoutMode("grid")}
                   className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-all cursor-pointer ${
                     layoutMode === "grid"
-                      ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm"
+                      ? "bg-purple-500/20 text-purple-300 border border-purple-500/40 shadow-sm"
                       : "text-neutral-500 hover:text-neutral-300"
                   }`}
                   title="Poster Grid View"
@@ -629,7 +629,7 @@ export function ExploreView({
                 return (
                   <span
                     key={gId}
-                    className="flex items-center gap-1 rounded-full bg-cyan-500/20 border border-cyan-500/40 px-2.5 py-0.5 text-cyan-300"
+                    className="flex items-center gap-1 rounded-full bg-purple-500/20 border border-purple-500/40 px-2.5 py-0.5 text-purple-300"
                   >
                     {label}
                     <button
@@ -698,7 +698,7 @@ export function ExploreView({
 
           {isLoading && (
             <div className="flex flex-col items-center justify-center py-20 text-neutral-500 space-y-3">
-              <Loader2 className="h-8 w-8 animate-spin text-cyan-400" />
+              <Loader2 className="h-8 w-8 animate-spin text-purple-400" />
               <p className="text-xs uppercase tracking-widest text-neutral-400">
                 Tuning Broadcast Catalog...
               </p>
@@ -772,11 +772,11 @@ export function ExploreView({
                 type="button"
                 onClick={handleLoadMore}
                 disabled={isLoadingMore}
-                className="flex items-center gap-2 rounded-xl border border-neutral-800 bg-neutral-900/90 px-6 py-2.5 text-xs font-bold text-neutral-200 hover:border-cyan-500/50 hover:text-white transition-all shadow-lg active:scale-95 disabled:opacity-50"
+                className="flex items-center gap-2 rounded-xl border border-neutral-800 bg-neutral-900/90 px-6 py-2.5 text-xs font-bold text-neutral-200 hover:border-purple-500/50 hover:text-white transition-all shadow-lg active:scale-95 disabled:opacity-50 cursor-pointer"
               >
                 {isLoadingMore ? (
                   <>
-                    <Loader2 className="h-4 w-4 animate-spin text-cyan-400" />
+                    <Loader2 className="h-4 w-4 animate-spin text-purple-400" />
                     <span>Loading Titles...</span>
                   </>
                 ) : (

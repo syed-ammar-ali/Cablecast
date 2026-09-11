@@ -120,7 +120,7 @@ export function EpisodeCard({
                   type="button"
                   onClick={() => onPlay(episode)}
                   title="Tune in now"
-                  className="flex items-center justify-center rounded-lg border border-cyan-500/40 bg-cyan-950/40 p-2 text-cyan-200 hover:bg-cyan-900/60 transition-all active:scale-95"
+                  className="flex items-center justify-center rounded-lg border border-neutral-700 bg-neutral-900/80 p-2 text-neutral-200 hover:border-purple-500/50 hover:bg-purple-950/40 hover:text-purple-300 transition-all active:scale-95 cursor-pointer"
                 >
                   <Play className="h-3.5 w-3.5 fill-current" />
                 </button>

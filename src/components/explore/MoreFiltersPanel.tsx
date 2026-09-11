@@ -141,7 +141,7 @@ export function MoreFiltersPanel({
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="relative flex max-h-[85vh] sm:max-h-[85vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-950 shadow-2xl shadow-cyan-950/20 animate-in zoom-in-95"
+        className="relative flex max-h-[85vh] sm:max-h-[85vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-950 shadow-2xl shadow-black animate-in zoom-in-95"
       >
         {/* Sticky Top Header - Unified Breadcrumb & Title */}
         <header className="sticky top-0 z-20 shrink-0 border-b border-neutral-800/80 bg-neutral-950/95 px-4 sm:px-6 pt-4 sm:pt-5 pb-3.5 backdrop-blur-md">
@@ -152,7 +152,7 @@ export function MoreFiltersPanel({
                 onClick={onClose}
                 className="group inline-flex items-center gap-1.5 text-[11px] sm:text-xs uppercase tracking-widest text-neutral-400 transition-colors hover:text-white shrink-0 cursor-pointer"
               >
-                <ArrowLeft className="h-3.5 w-3.5 transition-transform group-hover:-translate-x-0.5 text-cyan-400" />
+                <ArrowLeft className="h-3.5 w-3.5 transition-transform group-hover:-translate-x-0.5 text-neutral-400 group-hover:text-white" />
                 <span>Back to Explore</span>
               </button>
               <span className="text-neutral-700 leading-none select-none">/</span>
@@ -164,7 +164,7 @@ export function MoreFiltersPanel({
 
           <div className="flex items-center justify-between gap-2 border-t border-neutral-900/60 pt-2.5 sm:border-t-0 sm:pt-0">
             <div className="flex items-center gap-2.5 min-w-0">
-              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-cyan-500/30 bg-cyan-950/40 text-cyan-400 shadow-[0_0_10px_rgba(6,182,212,0.2)]">
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-neutral-800 bg-neutral-900 text-amber-400 shadow">
                 <SlidersHorizontal className="h-3.5 w-3.5" />
               </div>
               <h1
@@ -174,8 +174,8 @@ export function MoreFiltersPanel({
                 Refined Catalog Filters
               </h1>
               {activeCount > 0 && (
-                <span className="inline-flex items-center gap-1 rounded-full border border-cyan-500/40 bg-cyan-950/60 px-2 py-0.5 font-mono text-[9px] sm:text-[10px] font-bold uppercase tracking-wide text-cyan-300 shrink-0 shadow-[0_0_10px_rgba(6,182,212,0.25)]">
-                  <span className="h-1.5 w-1.5 rounded-full bg-cyan-400 animate-pulse" />
+                <span className="inline-flex items-center gap-1 rounded-full border border-neutral-800 bg-neutral-900 px-2.5 py-0.5 font-mono text-[9px] sm:text-[10px] font-bold uppercase tracking-wide text-neutral-300 shrink-0 shadow-sm">
+                  <span className="h-1.5 w-1.5 rounded-full bg-amber-400 animate-pulse" />
                   {activeCount} Active
                 </span>
               )}
@@ -200,7 +200,7 @@ export function MoreFiltersPanel({
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <label className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-neutral-300">
-                <ArrowUpDown className="h-3.5 w-3.5 text-purple-400" />
+                <ArrowUpDown className="h-3.5 w-3.5 text-amber-400" />
                 Sort Lineup
               </label>
             </div>
@@ -214,7 +214,7 @@ export function MoreFiltersPanel({
                     onClick={() => onChange((prev) => ({ ...prev, sortBy: item.id }))}
                     className={`flex items-start justify-between rounded-xl border p-3 text-left transition-all cursor-pointer ${
                       isSelected
-                        ? "border-purple-500/70 bg-purple-950/40 text-purple-100 shadow-[0_0_15px_rgba(168,85,247,0.25)] ring-1 ring-purple-500/50"
+                        ? "border-neutral-600 bg-neutral-800 text-white font-bold ring-1 ring-neutral-700 shadow-md"
                         : "border-neutral-800/90 bg-neutral-900/50 text-neutral-300 hover:border-neutral-700 hover:bg-neutral-900/80"
                     }`}
                   >
@@ -223,7 +223,7 @@ export function MoreFiltersPanel({
                       <div className="text-[10px] text-neutral-400 mt-0.5">{item.desc}</div>
                     </div>
                     {isSelected && (
-                      <span className="flex h-4 w-4 items-center justify-center rounded-full bg-purple-500 text-black">
+                      <span className="flex h-4 w-4 items-center justify-center rounded-full bg-white text-black">
                         <Check className="h-2.5 w-2.5 stroke-[3]" />
                       </span>
                     )}
@@ -283,14 +283,14 @@ export function MoreFiltersPanel({
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <label className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-neutral-300">
-                <Film className="h-3.5 w-3.5 text-cyan-400" />
+                <Film className="h-3.5 w-3.5 text-amber-400" />
                 Genres
               </label>
               {filters.genreIds.length > 0 && (
                 <button
                   type="button"
                   onClick={() => onChange((prev) => ({ ...prev, genreIds: [] }))}
-                  className="text-[10px] text-cyan-400 hover:text-cyan-300 underline underline-offset-2 cursor-pointer"
+                  className="text-[10px] text-amber-400 hover:text-amber-300 underline underline-offset-2 cursor-pointer"
                 >
                   Clear ({filters.genreIds.length})
                 </button>
@@ -306,11 +306,11 @@ export function MoreFiltersPanel({
                     onClick={() => toggleGenre(genre.id)}
                     className={`flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-medium transition-all cursor-pointer ${
                       isSelected
-                        ? "border-cyan-500/70 bg-cyan-950/40 text-cyan-200 shadow-[0_0_12px_rgba(6,182,212,0.25)] ring-1 ring-cyan-500/50"
+                        ? "border-neutral-600 bg-neutral-800 text-white font-bold ring-1 ring-neutral-700 shadow-md"
                         : "border-neutral-800 bg-neutral-900/60 text-neutral-400 hover:border-neutral-700 hover:text-neutral-200"
                     }`}
                   >
-                    {isSelected && <Check className="h-3 w-3 text-cyan-400 stroke-[2.5]" />}
+                    {isSelected && <Check className="h-3 w-3 text-amber-400 stroke-[2.5]" />}
                     <span>{genre.name}</span>
                   </button>
                 );
@@ -322,14 +322,14 @@ export function MoreFiltersPanel({
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <label className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-neutral-300">
-                <Calendar className="h-3.5 w-3.5 text-fuchsia-400" />
+                <Calendar className="h-3.5 w-3.5 text-amber-400" />
                 Decades &amp; Eras
               </label>
               {filters.eras.length > 0 && (
                 <button
                   type="button"
                   onClick={() => onChange((prev) => ({ ...prev, eras: [] }))}
-                  className="text-[10px] text-fuchsia-400 hover:text-fuchsia-300 underline underline-offset-2 cursor-pointer"
+                  className="text-[10px] text-amber-400 hover:text-amber-300 underline underline-offset-2 cursor-pointer"
                 >
                   Clear ({filters.eras.length})
                 </button>
@@ -345,12 +345,12 @@ export function MoreFiltersPanel({
                     onClick={() => toggleEra(era.id)}
                     className={`flex flex-col items-center justify-center rounded-xl border p-2.5 transition-all cursor-pointer ${
                       isSelected
-                        ? "border-fuchsia-500/70 bg-fuchsia-950/40 text-fuchsia-200 shadow-[0_0_14px_rgba(217,70,239,0.25)] ring-1 ring-fuchsia-500/50"
+                        ? "border-neutral-600 bg-neutral-800 text-white font-bold ring-1 ring-neutral-700 shadow-md"
                         : "border-neutral-800 bg-neutral-900/60 text-neutral-400 hover:border-neutral-700 hover:text-neutral-200"
                     }`}
                   >
                     <div className="font-mono text-sm font-bold flex items-center gap-1">
-                      {isSelected && <Check className="h-3 w-3 text-fuchsia-400" />}
+                      {isSelected && <Check className="h-3 w-3 text-amber-400" />}
                       {era.label}
                     </div>
                     <div className="font-mono text-[9px] text-neutral-500 mt-0.5">
@@ -469,7 +469,7 @@ export function MoreFiltersPanel({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-xl bg-gradient-to-r from-cyan-400 via-cyan-300 to-sky-400 hover:from-cyan-300 hover:to-sky-300 px-6 py-2.5 text-xs font-black tracking-wide text-neutral-950 transition-all shadow-[0_0_20px_rgba(34,211,238,0.35)] active:scale-95 cursor-pointer uppercase"
+            className="rounded-xl bg-white hover:bg-neutral-200 text-black px-6 py-2.5 text-xs font-bold tracking-wider transition-all shadow-md active:scale-95 cursor-pointer uppercase"
           >
             Apply &amp; View Catalog
           </button>
