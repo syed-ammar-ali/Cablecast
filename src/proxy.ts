@@ -67,7 +67,9 @@ function deny(request: NextRequest, status: 401 | 403, message: string): NextRes
   const { pathname } = request.nextUrl;
 
   if (pathname.startsWith("/api/")) {
-    return NextResponse.json({ error: message }, { status });
+    const response = NextResponse.json({ error: message }, { status });
+    if (status === 401) response.cookies.delete(SESSION_COOKIE_NAME);
+    return response;
   }
 
   const destination = new URL(status === 403 ? "/home" : "/gate", request.url);

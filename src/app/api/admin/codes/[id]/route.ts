@@ -35,6 +35,13 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   if (typeof body.revoked === "boolean") {
     updateData.revoked = body.revoked;
     updateData.revokedAt = body.revoked ? new Date() : null;
+
+    // Immediately cascade revocation to all sessions using this code so live devices
+    // are terminated on their very next request without requiring manual individual session disconnection.
+    await prisma.session.updateMany({
+      where: { accessCodeId: id },
+      data: { revokedAt: body.revoked ? new Date() : null },
+    });
   }
 
   if (typeof body.label === "string") {
@@ -72,7 +79,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   return NextResponse.json({ code: updated });
 }
 
-/** Permanently removes a revoked access code. Linked sessions keep their history but lose the code reference. */
+/** Permanently removes a revoked access code. Linked sessions are permanently revoked to prevent unauthenticated access. */
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     await requireAdmin();
@@ -92,7 +99,10 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
   }
 
   await prisma.$transaction([
-    prisma.session.updateMany({ where: { accessCodeId: id }, data: { accessCodeId: null } }),
+    prisma.session.updateMany({
+      where: { accessCodeId: id },
+      data: { accessCodeId: null, revokedAt: new Date() },
+    }),
     prisma.accessCode.delete({ where: { id } }),
   ]);
 

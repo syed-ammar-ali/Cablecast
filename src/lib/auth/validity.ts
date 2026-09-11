@@ -8,6 +8,7 @@
  */
 
 export interface SessionValidityInput {
+  role?: string;
   revokedAt: Date | null;
   expiresAt: Date | null;
   accessCode: { revoked: boolean; expiresAt: Date | null } | null;
@@ -23,6 +24,10 @@ export function isSessionActive(session: SessionValidityInput, now: Date = new D
   if (session.accessCode) {
     if (session.accessCode.revoked) return false;
     if (session.accessCode.expiresAt && session.accessCode.expiresAt.getTime() <= now.getTime()) return false;
+  } else if (session.role && session.role !== "admin") {
+    // Regular viewer sessions MUST be backed by a valid access code.
+    // If the access code was deleted or unlinked, the session is invalid.
+    return false;
   }
 
   return true;
