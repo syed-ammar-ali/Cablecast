@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import {
@@ -407,36 +406,8 @@ export function ExploreView({
         }`}
       >
         <div className="mx-auto max-w-7xl">
-          {/* Breadcrumb Navigation Row */}
-          <div className="flex items-center justify-between gap-3 mb-2.5">
-            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-              {onClose ? (
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="group inline-flex items-center gap-1.5 text-[11px] sm:text-xs uppercase tracking-widest text-neutral-400 transition-colors hover:text-white shrink-0 cursor-pointer"
-                >
-                  <ArrowLeft className="h-3.5 w-3.5 transition-transform group-hover:-translate-x-0.5" />
-                  <span>Back to Cablecast</span>
-                </button>
-              ) : (
-                <Link
-                  href="/home"
-                  className="group inline-flex items-center gap-1.5 text-[11px] sm:text-xs uppercase tracking-widest text-neutral-400 transition-colors hover:text-white shrink-0"
-                >
-                  <ArrowLeft className="h-3.5 w-3.5 transition-transform group-hover:-translate-x-0.5" />
-                  <span>Back to Cablecast</span>
-                </Link>
-              )}
-              <span className="text-neutral-700 leading-none select-none">/</span>
-              <span className="text-[11px] sm:text-xs uppercase tracking-widest font-bold text-neutral-300 truncate">
-                Explore Catalog
-              </span>
-            </div>
-          </div>
-
-          {/* Subtitle Row matching Broadcast Studio & VHS Vault */}
-          <div className="flex items-center justify-between gap-2 border-t border-neutral-900/60 pt-2.5 sm:border-t-0 sm:pt-0">
+          {/* Header Title Row matching Cablecast Design */}
+          <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 min-w-0">
               <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-neutral-800 bg-neutral-900 text-cyan-400 shadow">
                 <Compass className="h-3.5 w-3.5" />

@@ -3,7 +3,6 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { createPortal } from "react-dom";
 import {
-  X,
   SlidersHorizontal,
   Star,
   Globe,
@@ -161,16 +160,6 @@ export function MoreFiltersPanel({
                 Filter Control Room
               </span>
             </div>
-
-            {/* Top-Right Dedicated Cross Button */}
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label="Close filters modal"
-              className="flex h-7 w-7 items-center justify-center rounded-lg border border-neutral-800 bg-neutral-900 text-neutral-400 hover:text-white hover:border-neutral-600 transition-colors cursor-pointer"
-            >
-              <X className="h-4 w-4" />
-            </button>
           </div>
 
           <div className="flex items-center justify-between gap-2 border-t border-neutral-900/60 pt-2.5 sm:border-t-0 sm:pt-0">
@@ -212,9 +201,8 @@ export function MoreFiltersPanel({
             <div className="flex items-center justify-between">
               <label className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-neutral-300">
                 <ArrowUpDown className="h-3.5 w-3.5 text-purple-400" />
-                Sort Catalog Lineup
+                Sort Lineup
               </label>
-              <span className="text-[11px] text-neutral-500">Pick sorting priority</span>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
               {SORT_OPTIONS.map((item) => {
@@ -245,25 +233,22 @@ export function MoreFiltersPanel({
             </div>
           </div>
 
-          {/* 2. Seasonal & Holiday Themes (Single row 5-col on desktop) */}
+          {/* 2. Seasonal Themes (Single row 5-col on desktop) */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <label className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-neutral-300">
                 <Sparkles className="h-3.5 w-3.5 text-amber-400" />
-                Seasonal &amp; Holiday Themes (Select Multiple)
+                Seasonal Themes
               </label>
-              <div className="flex items-center gap-2">
-                {filters.seasons.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => onChange((prev) => ({ ...prev, seasons: [] }))}
-                    className="text-[10px] text-amber-400 hover:text-amber-300 underline underline-offset-2"
-                  >
-                    Clear ({filters.seasons.length})
-                  </button>
-                )}
-                <span className="text-[11px] text-neutral-500">Pick vibes</span>
-              </div>
+              {filters.seasons.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => onChange((prev) => ({ ...prev, seasons: [] }))}
+                  className="text-[10px] text-amber-400 hover:text-amber-300 underline underline-offset-2 cursor-pointer"
+                >
+                  Clear ({filters.seasons.length})
+                </button>
+              )}
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
               {SEASON_OPTIONS.map((season) => {
@@ -294,25 +279,22 @@ export function MoreFiltersPanel({
             </div>
           </div>
 
-          {/* 3. Genres (Multi-Select) */}
+          {/* 3. Genres */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <label className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-neutral-300">
                 <Film className="h-3.5 w-3.5 text-cyan-400" />
-                Genres (Select Multiple)
+                Genres
               </label>
-              <div className="flex items-center gap-2">
-                {filters.genreIds.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => onChange((prev) => ({ ...prev, genreIds: [] }))}
-                    className="text-[10px] text-cyan-400 hover:text-cyan-300 underline underline-offset-2"
-                  >
-                    Clear ({filters.genreIds.length})
-                  </button>
-                )}
-                <span className="text-[11px] text-neutral-500">Combine genres</span>
-              </div>
+              {filters.genreIds.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => onChange((prev) => ({ ...prev, genreIds: [] }))}
+                  className="text-[10px] text-cyan-400 hover:text-cyan-300 underline underline-offset-2 cursor-pointer"
+                >
+                  Clear ({filters.genreIds.length})
+                </button>
+              )}
             </div>
             <div className="flex flex-wrap gap-2">
               {GENRE_OPTIONS.map((genre) => {
@@ -336,25 +318,22 @@ export function MoreFiltersPanel({
             </div>
           </div>
 
-          {/* 4. Eras & Decades (Multi-Select) */}
+          {/* 4. Eras & Decades */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <label className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-neutral-300">
                 <Calendar className="h-3.5 w-3.5 text-fuchsia-400" />
-                Decades &amp; Eras (Select Multiple)
+                Decades &amp; Eras
               </label>
-              <div className="flex items-center gap-2">
-                {filters.eras.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => onChange((prev) => ({ ...prev, eras: [] }))}
-                    className="text-[10px] text-fuchsia-400 hover:text-fuchsia-300 underline underline-offset-2"
-                  >
-                    Clear ({filters.eras.length})
-                  </button>
-                )}
-                <span className="text-[11px] text-neutral-500">Combine eras</span>
-              </div>
+              {filters.eras.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => onChange((prev) => ({ ...prev, eras: [] }))}
+                  className="text-[10px] text-fuchsia-400 hover:text-fuchsia-300 underline underline-offset-2 cursor-pointer"
+                >
+                  Clear ({filters.eras.length})
+                </button>
+              )}
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2">
               {ERA_OPTIONS.map((era) => {
@@ -383,25 +362,22 @@ export function MoreFiltersPanel({
             </div>
           </div>
 
-          {/* 5. Original Languages (Multi-Select) */}
+          {/* 5. Original Languages */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <label className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-neutral-300">
                 <Globe className="h-3.5 w-3.5 text-blue-400" />
-                Original Language (Select Multiple)
+                Original Languages
               </label>
-              <div className="flex items-center gap-2">
-                {filters.languages.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => onChange((prev) => ({ ...prev, languages: [] }))}
-                    className="text-[10px] text-blue-400 hover:text-blue-300 underline underline-offset-2"
-                  >
-                    Clear ({filters.languages.length})
-                  </button>
-                )}
-                <span className="text-[11px] text-neutral-500">Audio / Origin</span>
-              </div>
+              {filters.languages.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => onChange((prev) => ({ ...prev, languages: [] }))}
+                  className="text-[10px] text-blue-400 hover:text-blue-300 underline underline-offset-2 cursor-pointer"
+                >
+                  Clear ({filters.languages.length})
+                </button>
+              )}
             </div>
             <div className="flex flex-wrap gap-2">
               {LANGUAGE_OPTIONS.map((lang) => {
@@ -490,20 +466,13 @@ export function MoreFiltersPanel({
             <span>Reset to Defaults</span>
           </button>
 
-          <div className="flex items-center gap-3">
-            {activeCount > 0 && (
-              <span className="hidden sm:inline-block font-mono text-[11px] text-neutral-400">
-                {activeCount} {activeCount === 1 ? "filter" : "filters"} applied
-              </span>
-            )}
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-xl bg-gradient-to-r from-cyan-400 via-cyan-300 to-sky-400 hover:from-cyan-300 hover:to-sky-300 px-6 py-2.5 text-xs font-black tracking-wide text-neutral-950 transition-all shadow-[0_0_20px_rgba(34,211,238,0.35)] active:scale-95 cursor-pointer uppercase"
-            >
-              Apply &amp; View Catalog
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-xl bg-gradient-to-r from-cyan-400 via-cyan-300 to-sky-400 hover:from-cyan-300 hover:to-sky-300 px-6 py-2.5 text-xs font-black tracking-wide text-neutral-950 transition-all shadow-[0_0_20px_rgba(34,211,238,0.35)] active:scale-95 cursor-pointer uppercase"
+          >
+            Apply &amp; View Catalog
+          </button>
         </footer>
       </div>
     </div>
