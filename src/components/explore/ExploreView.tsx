@@ -66,23 +66,43 @@ export interface ExploreViewProps {
   isOpen?: boolean;
   onClose?: () => void;
   initialQuery?: string;
+  searchQuery?: string;
+  onSearchQueryChange?: (query: string) => void;
+  onLoadingChange?: (isLoading: boolean) => void;
+  isEmbedded?: boolean;
 }
 
 export function ExploreView({
   isOpen = true,
   onClose,
   initialQuery = "",
+  searchQuery,
+  onSearchQueryChange,
+  onLoadingChange,
+  isEmbedded = false,
 }: ExploreViewProps = {}) {
   const router = useRouter();
   const library = useLibrary();
   const personalBroadcast = usePersonalBroadcast();
 
   // Search & Filter state
-  const [query, setQuery] = useState(initialQuery);
-  const [debouncedQuery, setDebouncedQuery] = useState(initialQuery);
+  const [query, setQuery] = useState(searchQuery !== undefined ? searchQuery : initialQuery);
+  const [debouncedQuery, setDebouncedQuery] = useState(searchQuery !== undefined ? searchQuery : initialQuery);
   const [filters, setFilters] = useState<FilterState>(INITIAL_FILTERS);
   const [isMoreFiltersOpen, setIsMoreFiltersOpen] = useState(false);
   const [layoutMode, setLayoutMode] = useState<"shelf" | "grid">("shelf");
+
+  // Keep internal query state synced when parent searchQuery changes
+  useEffect(() => {
+    if (searchQuery !== undefined && searchQuery !== query) {
+      setQuery(searchQuery);
+    }
+  }, [searchQuery, query]);
+
+  const updateQuery = (val: string) => {
+    setQuery(val);
+    onSearchQueryChange?.(val);
+  };
 
   // Results state
   const [results, setResults] = useState<MediaSearchResult[]>([]);
@@ -365,18 +385,30 @@ export function ExploreView({
   const activeEraLabel = ERA_OPTIONS.find((e) => e.id === filters.era)?.label;
   const activeGenreLabel = GENRE_OPTIONS.find((g) => g.id === filters.genreId)?.name;
 
+  useEffect(() => {
+    onLoadingChange?.(isLoading);
+  }, [isLoading, onLoadingChange]);
+
   if (!isOpen) return null;
 
   return (
     <main
       className={
-        onClose
+        isEmbedded
+          ? "w-full min-h-[calc(100vh-5rem)] bg-black text-neutral-100 pb-[max(6rem,env(safe-area-inset-bottom)+5rem)] sm:pb-12 animate-in fade-in duration-150"
+          : onClose
           ? "fixed inset-0 z-50 overflow-y-auto bg-black text-neutral-100 pb-[max(6rem,env(safe-area-inset-bottom)+5rem)] sm:pb-12 animate-in fade-in"
           : "min-h-screen bg-black text-neutral-100 pb-[max(6rem,env(safe-area-inset-bottom)+5rem)] sm:pb-12"
       }
     >
       {/* ── Top Header - Unified Breadcrumb & Subtitle matching Cablecast Admin & Broadcast Studio ── */}
-      <header className="sticky top-0 z-40 border-b border-neutral-900 bg-neutral-950/90 backdrop-blur-xl px-4 sm:px-6 pt-[max(0.75rem,env(safe-area-inset-top))] pb-3 sm:py-4 shrink-0">
+      <header
+        className={`border-b border-neutral-900 bg-neutral-950/90 backdrop-blur-xl px-4 sm:px-6 shrink-0 ${
+          isEmbedded
+            ? "py-3 sm:py-4"
+            : "sticky top-0 z-40 pt-[max(0.75rem,env(safe-area-inset-top))] pb-3 sm:py-4"
+        }`}
+      >
         <div className="mx-auto max-w-7xl">
           {/* Breadcrumb Navigation Row */}
           <div className="flex items-center justify-between gap-3 mb-2.5">
@@ -455,20 +487,20 @@ export function ExploreView({
             )}
           </div>
 
-          {/* Search Input with Auto-Dismiss Keyboard on Enter */}
+          {/* Search Input with Auto-Dismiss Keyboard on Enter (Desktop: search is driven from AppHeader when embedded; on mobile or standalone page, show search input) */}
           <form
             onSubmit={(e) => {
               e.preventDefault();
               (document.activeElement as HTMLElement)?.blur();
             }}
-            className="relative mt-2.5"
+            className={`relative mt-2.5 ${isEmbedded ? "md:hidden" : ""}`}
           >
             <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-500" />
             <input
               type="search"
               enterKeyHint="search"
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(e) => updateQuery(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
                   e.currentTarget.blur();
@@ -480,7 +512,7 @@ export function ExploreView({
             {query ? (
               <button
                 type="button"
-                onClick={() => setQuery("")}
+                onClick={() => updateQuery("")}
                 className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1 text-neutral-400 hover:text-white cursor-pointer"
                 title="Clear search"
               >

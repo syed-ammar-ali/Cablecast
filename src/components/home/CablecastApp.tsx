@@ -5,7 +5,6 @@ import dynamic from "next/dynamic";
 import { AppHeader } from "@/components/home/AppHeader";
 import { HeroBanner } from "@/components/home/HeroBanner";
 import type { EpisodeSelection } from "@/components/media/MediaDetailsModal";
-import { VhsShelf } from "@/components/vhs/VhsShelf";
 import type { DirectBroadcast } from "@/components/player/PlayerModal";
 import { TvGrid } from "@/components/schedule/TvGrid";
 import { BottomNav } from "@/components/navigation/BottomNav";
@@ -57,7 +56,6 @@ const DontDeleteModal = dynamic(
   { ssr: false }
 );
 
-const SEARCH_DEBOUNCE_MS = 400;
 const CLOCK_TICK_MS = 20_000;
 
 export type AppView = "home" | "explore" | "broadcast" | "library";
@@ -108,11 +106,8 @@ export function CablecastApp({ initialView = "home" }: CablecastAppProps) {
 
   // Search / Explore states
   const [query, setQuery] = useState("");
-  const [debouncedQuery, setDebouncedQuery] = useState("");
   const [isExploreOpen, setIsExploreOpen] = useState(initialView === "explore");
-  const [results, setResults] = useState<MediaSearchResult[]>([]);
   const [isSearchLoading, setIsSearchLoading] = useState(false);
-  const [searchError, setSearchError] = useState<string | null>(null);
 
   const [playerTarget, setPlayerTarget] = useState<PlayerTarget | null>(null);
   const [directBroadcastTarget, setDirectBroadcastTarget] = useState<DirectBroadcast | null>(null);
@@ -158,9 +153,6 @@ export function CablecastApp({ initialView = "home" }: CablecastAppProps) {
         setIsLibraryOpen(false);
         setIsExploreOpen(false);
         setQuery("");
-        setDebouncedQuery("");
-        setResults([]);
-        setSearchError(null);
         setIsSearchLoading(false);
       }
     },
@@ -251,68 +243,21 @@ export function CablecastApp({ initialView = "home" }: CablecastAppProps) {
     [schedule, now],
   );
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      const trimmed = query.trim();
-      setDebouncedQuery(trimmed);
-    }, SEARCH_DEBOUNCE_MS);
-    return () => clearTimeout(timer);
-  }, [query]);
-
-  useEffect(() => {
-    if (!debouncedQuery) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setResults([]);
-      setSearchError(null);
-      setIsSearchLoading(false);
-      return;
+  const handleOpenExplore = useCallback(() => {
+    if (!isExploreOpen) {
+      navigateTo("explore");
     }
+  }, [isExploreOpen, navigateTo]);
 
-    const controller = new AbortController();
-    setIsSearchLoading(true);
-    setSearchError(null);
-
-    fetch(`/api/tmdb/search?query=${encodeURIComponent(debouncedQuery)}`, {
-      signal: controller.signal,
-    })
-      .then(async (res) => {
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error ?? "Search failed.");
-        return data;
-      })
-      .then((data: { results: MediaSearchResult[] }) => {
-        setResults(data.results);
-      })
-      .catch((err: Error) => {
-        if (err.name !== "AbortError") {
-          setSearchError(err.message);
-          setResults([]);
-        }
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) {
-          setIsSearchLoading(false);
-        }
-      });
-
-    return () => {
-      controller.abort();
-    };
-  }, [debouncedQuery]);
-
-  const handleSearchCardClick = (media: MediaSearchResult) => {
-    setIsLibraryOpen(false);
-    setIsBroadcastStudioOpen(false);
-    setIsExploreOpen(false);
-    setDetailsTarget(null);
-    setSchedulingTarget(null);
-    setSelectedMedia({
-      id: media.tmdbId,
-      type: media.mediaType.toUpperCase() as "MOVIE" | "TV",
-      title: media.title,
-    });
-    setIsModalOpen(true);
-  };
+  const handleSearchQueryChange = useCallback(
+    (newQuery: string) => {
+      setQuery(newQuery);
+      if (newQuery.trim() && !isExploreOpen) {
+        navigateTo("explore");
+      }
+    },
+    [isExploreOpen, navigateTo],
+  );
 
   const handleHeroRent = useCallback((media: MediaSearchResult) => {
     setIsLibraryOpen(false);
@@ -395,10 +340,9 @@ export function CablecastApp({ initialView = "home" }: CablecastAppProps) {
     setIsModalOpen(false);
     setDetailsTarget(null);
     setSchedulingTarget(null);
+    setQuery("");
     navigateTo("home");
   }, [navigateTo]);
-
-  const isSearching = Boolean(debouncedQuery);
 
   return (
     <main className="min-h-screen bg-black pb-0">
@@ -406,7 +350,7 @@ export function CablecastApp({ initialView = "home" }: CablecastAppProps) {
       <div className="sticky top-0 md:relative md:top-auto z-50 bg-black">
         <AppHeader
           searchQuery={query}
-          onSearchQueryChange={setQuery}
+          onSearchQueryChange={handleSearchQueryChange}
           isSearchLoading={isSearchLoading}
           selectedDate={selectedDate}
           onDateChange={setSelectedDate}
@@ -415,35 +359,24 @@ export function CablecastApp({ initialView = "home" }: CablecastAppProps) {
           now={now}
           onOpenLibrary={() => navigateTo("library")}
           onOpenBroadcastStudio={() => navigateTo("broadcast")}
+          onOpenExplore={handleOpenExplore}
+          isExploreActive={isExploreOpen}
           missedBroadcastCount={personalBroadcast.missed.length}
           onHomeClick={handleHomeClick}
           onAuthLoaded={(role) => setIsAdmin(role === "admin")}
         />
       </div>
 
-      {isSearching ? (
-        <div key="search-view" className="hidden md:block px-3 py-4 sm:px-4 pb-24 sm:pb-8 animate-in fade-in duration-150">
-          <section className="min-h-[60vh]">
-            {searchError && (
-              <p className="mx-auto max-w-md rounded-md border border-red-500/40 bg-red-950/40 px-4 py-3 text-center text-sm text-red-300">
-                {searchError}
-              </p>
-            )}
-
-            {!searchError && !isSearchLoading && results.length === 0 && (
-              <p className="text-center text-sm uppercase tracking-widest text-neutral-600">
-                No results for &ldquo;{debouncedQuery}&rdquo;.
-              </p>
-            )}
-
-            {results.length > 0 && (
-              <VhsShelf
-                results={results}
-                onSelect={handleSearchCardClick}
-                query={debouncedQuery}
-              />
-            )}
-          </section>
+      {isExploreOpen ? (
+        <div key="explore-view" className="animate-in fade-in duration-150">
+          <ExploreView
+            isEmbedded
+            isOpen={isExploreOpen}
+            searchQuery={query}
+            onSearchQueryChange={setQuery}
+            onClose={() => navigateTo("home")}
+            onLoadingChange={setIsSearchLoading}
+          />
         </div>
       ) : (
         <div key="home-view" className="animate-in fade-in duration-150">
@@ -616,15 +549,6 @@ export function CablecastApp({ initialView = "home" }: CablecastAppProps) {
         <PlayerModal
           directBroadcast={directBroadcastTarget}
           onClose={() => setDirectBroadcastTarget(null)}
-        />
-      )}
-
-      {/* Dedicated Rich Explore & Discover Catalog Overlay */}
-      {isExploreOpen && (
-        <ExploreView
-          isOpen={isExploreOpen}
-          onClose={() => navigateTo("home")}
-          initialQuery={query}
         />
       )}
 

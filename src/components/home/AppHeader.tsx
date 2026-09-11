@@ -15,6 +15,7 @@ import {
   Radio,
   Search,
   ShieldCheck,
+  X,
 } from "lucide-react";
 import { COUNTRY_OPTIONS } from "@/config/countries";
 import { triggerHaptic } from "@/lib/haptics";
@@ -31,6 +32,8 @@ interface AppHeaderProps {
   onHomeClick?: () => void;
   onOpenLibrary?: () => void;
   onOpenBroadcastStudio?: () => void;
+  onOpenExplore?: () => void;
+  isExploreActive?: boolean;
   missedBroadcastCount?: number;
   onAuthLoaded?: (role: "admin" | "user" | null) => void;
 }
@@ -179,6 +182,8 @@ export function AppHeader({
   onHomeClick,
   onOpenLibrary,
   onOpenBroadcastStudio,
+  onOpenExplore,
+  isExploreActive,
   missedBroadcastCount,
   onAuthLoaded,
 }: AppHeaderProps) {
@@ -287,17 +292,32 @@ export function AppHeader({
               enterKeyHint="search"
               value={searchQuery}
               onChange={(event) => onSearchQueryChange(event.target.value)}
+              onClick={onOpenExplore}
+              onFocus={onOpenExplore}
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
                   e.currentTarget.blur();
                 }
               }}
               placeholder="Search movies & TV shows..."
-              className="w-full rounded-full border border-neutral-700 bg-transparent py-2.5 pl-10 pr-4 text-base text-neutral-200 placeholder:text-neutral-500 transition-colors hover:border-sky-500/40 focus:border-sky-500/60 focus:outline-none"
+              className={`w-full rounded-full border bg-transparent py-2.5 pl-10 pr-9 text-base text-neutral-200 placeholder:text-neutral-500 transition-colors ${
+                isExploreActive
+                  ? "border-sky-500/60 shadow-[0_0_15px_rgba(14,165,233,0.15)]"
+                  : "border-neutral-700 hover:border-sky-500/40 focus:border-sky-500/60"
+              } focus:outline-none`}
             />
-            {isSearchLoading && (
+            {searchQuery ? (
+              <button
+                type="button"
+                onClick={() => onSearchQueryChange("")}
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 rounded-full p-0.5 text-neutral-400 hover:text-white transition-colors cursor-pointer"
+                title="Clear search"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            ) : isSearchLoading ? (
               <Loader2 className="pointer-events-none absolute right-3.5 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-neutral-500" />
-            )}
+            ) : null}
           </form>
 
           {onOpenLibrary && (
