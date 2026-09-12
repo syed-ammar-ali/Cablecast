@@ -60,6 +60,7 @@ export interface ExploreViewProps {
   onClose?: () => void;
   initialQuery?: string;
   searchQuery?: string;
+  selectedCountry?: string;
   onSearchQueryChange?: (query: string) => void;
   onLoadingChange?: (isLoading: boolean) => void;
   isEmbedded?: boolean;
@@ -70,6 +71,7 @@ export function ExploreView({
   onClose,
   initialQuery = "",
   searchQuery,
+  selectedCountry,
   onSearchQueryChange,
   onLoadingChange,
   isEmbedded = false,
@@ -800,6 +802,14 @@ export function ExploreView({
           initialSeason={selectedMedia.initialSeason}
           initialAction={selectedMedia.initialAction}
           initialPosterUrl={selectedMedia.posterUrl}
+          onPlayEpisode={(media, season, episode) => {
+            setSelectedMedia(null);
+            setPlayerTarget({
+              media,
+              season,
+              episode,
+            });
+          }}
         />
       )}
 
@@ -822,6 +832,7 @@ export function ExploreView({
           media={playerTarget.media}
           initialSeason={playerTarget.season}
           initialEpisode={playerTarget.episode}
+          country={selectedCountry}
           onClose={() => setPlayerTarget(null)}
         />
       )}

@@ -30,7 +30,8 @@ export async function GET(request: NextRequest) {
       ? Array.from(new Set([userId, session.id, session.accessCodeId])).filter(Boolean) as string[]
       : [userId];
 
-    const [ownership, ownedItems] = await Promise.all([
+    const now = new Date();
+    const [ownership, ownedItems, rentedItems] = await Promise.all([
       checkMediaOwnership(
         userId,
         mediaId,
@@ -43,9 +44,22 @@ export async function GET(request: NextRequest) {
         },
         select: { seasonNumber: true },
       }),
+      prisma.rental.findMany({
+        where: {
+          userId: { in: userKeys },
+          mediaId,
+          expiresAt: { gt: now },
+        },
+        select: { seasonNumber: true },
+      }),
     ]);
 
-    const ownedSeasons = Array.from(new Set(ownedItems.map((item) => item.seasonNumber)));
+    const ownedSeasons = Array.from(
+      new Set([
+        ...ownedItems.map((item) => item.seasonNumber),
+        ...rentedItems.map((item) => item.seasonNumber),
+      ])
+    );
 
     return NextResponse.json({ ...ownership, ownedSeasons }, { status: 200 });
   } catch (error) {

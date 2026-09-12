@@ -411,7 +411,7 @@ export function BroadcastSchedulerModal({
         const data = await res.json();
         if (Array.isArray(data?.ownedSeasons)) {
           setOwnedSeasons(data.ownedSeasons);
-        } else if (data?.isOwned) {
+        } else if (data?.isOwned || data?.isRented || data?.isValid) {
           setOwnedSeasons([0]);
         } else {
           setOwnedSeasons([]);

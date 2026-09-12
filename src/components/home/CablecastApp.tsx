@@ -379,6 +379,7 @@ export function CablecastApp({ initialView = "home" }: CablecastAppProps) {
             isEmbedded
             isOpen={isExploreOpen}
             searchQuery={query}
+            selectedCountry={selectedCountry}
             onSearchQueryChange={setQuery}
             onClose={() => navigateTo("home")}
             onLoadingChange={setIsSearchLoading}
@@ -549,6 +550,7 @@ export function CablecastApp({ initialView = "home" }: CablecastAppProps) {
           startOffsetSeconds={playerTarget.startOffsetSeconds}
           startTime={playerTarget.startTime}
           initialLiveEntry={playerTarget.initialLiveEntry}
+          country={selectedCountry}
           onClose={() => setPlayerTarget(null)}
         />
       )}
@@ -573,6 +575,16 @@ export function CablecastApp({ initialView = "home" }: CablecastAppProps) {
           title={selectedMedia.title}
           initialAction={selectedMedia.initialAction}
           initialPosterUrl={selectedMedia.posterUrl}
+          onPlayEpisode={(media, season, episode) => {
+            setIsModalOpen(false);
+            setSelectedMedia(null);
+            setPlayerTarget({
+              media,
+              initialSeason: season,
+              initialEpisode: episode,
+              startOffsetSeconds: 0,
+            });
+          }}
         />
       )}
 

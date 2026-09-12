@@ -36,6 +36,7 @@ interface PlayerModalProps {
   initialLiveEntry?: ScheduleEntry;
   /** When set, renders this single resolved source directly instead of `media`. */
   directBroadcast?: DirectBroadcast;
+  country?: string;
 }
 
 export function PlayerModal({
@@ -47,6 +48,7 @@ export function PlayerModal({
   startTime,
   initialLiveEntry,
   directBroadcast,
+  country,
 }: PlayerModalProps) {
   const isTv = !directBroadcast && media?.mediaType === "tv";
 
@@ -227,7 +229,7 @@ export function PlayerModal({
       .then((res) => res.json())
       .then((data) => {
         if (cancelled) return;
-        setIsSeasonOwned(Boolean(data?.isOwned));
+        setIsSeasonOwned(Boolean(data?.isValid || data?.isOwned || data?.isRented));
       })
       .catch(() => {
         if (!cancelled) setIsSeasonOwned(true);
@@ -415,6 +417,7 @@ export function PlayerModal({
           startOffsetSeconds={startOffsetSeconds}
           startTime={startTime}
           initialLiveEntry={initialLiveEntry}
+          country={country}
           title={isTv ? `${media.title} · S${season}E${episode}` : media.title}
           onClose={onClose}
         />

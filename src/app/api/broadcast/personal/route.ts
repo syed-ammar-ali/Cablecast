@@ -535,42 +535,29 @@ export async function POST(request: NextRequest) {
     const seasonNumber = input.mediaType === "tv" ? (input.startSeason ?? 1) : 0;
     const ownership = await checkMediaOwnership(userId, input.tmdbId, seasonNumber, now);
 
-    if (ownership.isRented && ownership.expiresAt) {
-      const runtimeMinutes = input.runtimeMinutes ?? (input.mediaType === "movie" ? 120 : 30);
-
-      for (const day of input.daysOfWeek) {
-        const airDate = getNextAirDate(day, input.blockStartMinutes, now);
-        const broadcastEndTime = new Date(airDate.getTime() + runtimeMinutes * 60 * 1000);
-
-        if (broadcastEndTime.getTime() > ownership.expiresAt.getTime()) {
-          const formattedAirDate = airDate.toLocaleDateString([], {
+    // If the rental pass has already expired, prompt for renewal
+    if (ownership.status === "EXPIRED") {
+      const formattedExpires = ownership.expiresAt
+        ? ownership.expiresAt.toLocaleDateString([], {
             weekday: "short",
             month: "short",
             day: "numeric",
             hour: "2-digit",
             minute: "2-digit",
-          });
-          const formattedExpires = ownership.expiresAt.toLocaleDateString([], {
-            weekday: "short",
-            month: "short",
-            day: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
-          });
+          })
+        : "recently";
 
-          return NextResponse.json(
-            {
-              error: `Rental duration guardrail: This VHS tape rental expires on ${formattedExpires}, which is before the scheduled air time (${formattedAirDate}). Extend your rental or buy the tape to program this slot.`,
-              needsRentalExtension: true,
-              expiresAt: ownership.expiresAt.toISOString(),
-              mediaId: input.tmdbId,
-              mediaType: input.mediaType,
-              seasonNumber,
-            },
-            { status: 400 },
-          );
-        }
-      }
+      return NextResponse.json(
+        {
+          error: `Your VHS rental pass expired on ${formattedExpires}. Renew your rental or buy the tape to program this slot.`,
+          needsRentalExtension: true,
+          expiresAt: ownership.expiresAt?.toISOString() ?? null,
+          mediaId: input.tmdbId,
+          mediaType: input.mediaType,
+          seasonNumber,
+        },
+        { status: 400 },
+      );
     }
 
     // Resolve accurate runtime and season total episodes

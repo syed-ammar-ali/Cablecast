@@ -13,8 +13,11 @@ import {
   Layers,
   Calendar,
   ArrowLeft,
+  Play,
+  Lock,
 } from "lucide-react";
 import type { VhsMetadata } from "@/types/vhs";
+import type { MediaSearchResult } from "@/types/media";
 import { useToast } from "@/components/ui/ToastProvider";
 import { notifyLibraryMutation, notifyBroadcastMutation } from "@/lib/syncEvents";
 import { triggerHaptic } from "@/lib/haptics";
@@ -29,6 +32,7 @@ interface VhsModalProps {
   title?: string;
   initialAction?: "RENT" | "BUY";
   initialPosterUrl?: string | null;
+  onPlayEpisode?: (media: MediaSearchResult, season: number, episode: number) => void;
 }
 
 /**
@@ -166,6 +170,7 @@ export function VhsModal({
   title,
   initialAction,
   initialPosterUrl,
+  onPlayEpisode,
 }: VhsModalProps) {
   const { toast } = useToast();
   const [mounted, setMounted] = useState(false);
@@ -547,16 +552,39 @@ export function VhsModal({
     }
   }
 
-  if (!isOpen || !mounted) return null;
-
   const displayTitle = title || (isTv ? `Series #${mediaId}` : `Movie #${mediaId}`);
   const allSeasons = Array.from({ length: numSeasons }, (_, i) => i);
   const activeSeasonData = seasonCache[selectedSeason] || metadata;
+  const isAccessible = ownershipStatus === "OWNED" || ownershipStatus === "RENTED";
+
+  const handleEpisodeClick = useCallback(
+    (episodeNumber: number) => {
+      if (!isAccessible) {
+        toast.info("Rent or Buy this VHS tape to watch its episodes.", "Vault Access Required");
+        return;
+      }
+      triggerHaptic(20);
+      const poster = metadata?.frontPosterPath || (typeof initialPosterUrl === "string" ? initialPosterUrl : null);
+      const mediaObj: MediaSearchResult = {
+        tmdbId: Number(mediaId),
+        title: title || displayTitle,
+        mediaType: normalizedType === "TV" ? "tv" : "movie",
+        posterPath: poster,
+        posterUrl: poster,
+        backdropUrl: null,
+        overview: metadata?.synopsis || "",
+        releaseYear: metadata?.releaseYear ?? null,
+        voteAverage: metadata?.voteAverage ?? 0,
+      };
+      onClose();
+      onPlayEpisode?.(mediaObj, selectedSeason, episodeNumber);
+    },
+    [isAccessible, mediaId, title, metadata, displayTitle, normalizedType, initialPosterUrl, onClose, onPlayEpisode, selectedSeason, toast],
+  );
 
   // Single-card accurate poster resolution & image readiness
   const singlePosterSrc =
     metadata?.frontPosterPath || (hasInitialMetadataLoaded ? initialPosterUrl : null);
-  const isSinglePosterLoaded = Boolean(singlePosterSrc && loadedImages[singlePosterSrc]);
 
   // Calculate formatted time remaining for active rental
   let timeRemainingStr: string | null = null;
@@ -929,25 +957,49 @@ export function VhsModal({
                   </div>
 
                   <div className="grid grid-cols-2 gap-2.5 w-full">
-                    <button
-                      type="button"
-                      disabled={isMutating || ownershipStatus === "OWNED"}
-                      onClick={() => setIsRentalModalOpen(true)}
-                      className="bg-amber-950/80 hover:bg-amber-900/90 text-amber-300 border border-amber-500/50 shadow-md rounded-xl py-2.5 px-3 text-xs font-bold whitespace-nowrap flex items-center justify-center gap-1.5 transition-all disabled:opacity-40 cursor-pointer active:scale-95"
-                    >
-                      {isMutating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Clock className="h-3.5 w-3.5 text-amber-400" />}
-                      <span>{ownershipStatus === "RENTED" ? "✓ Rented" : "Rent Tape"}</span>
-                    </button>
+                    {isAccessible ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => handleEpisodeClick(1)}
+                          className="bg-amber-500 hover:bg-amber-400 text-black shadow-lg rounded-xl py-2.5 px-3 text-xs font-bold whitespace-nowrap flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95"
+                        >
+                          <Play className="h-3.5 w-3.5 fill-black text-black" />
+                          <span>Watch Now</span>
+                        </button>
 
-                    <button
-                      type="button"
-                      disabled={isMutating || ownershipStatus === "OWNED"}
-                      onClick={handleBuy}
-                      className="bg-white hover:bg-neutral-200 text-black font-bold rounded-xl py-2.5 px-3 text-xs whitespace-nowrap flex items-center justify-center gap-1.5 shadow-lg transition-all disabled:opacity-40 cursor-pointer active:scale-95"
-                    >
-                      {isMutating ? <Loader2 className="h-3.5 w-3.5 animate-spin text-black" /> : <ShoppingBag className="h-3.5 w-3.5" />}
-                      <span>{ownershipStatus === "OWNED" ? "✓ Owned" : "Buy Tape"}</span>
-                    </button>
+                        <button
+                          type="button"
+                          onClick={() => setIsFlipped(true)}
+                          className="bg-neutral-900 hover:bg-neutral-800 text-amber-300 border border-amber-500/40 rounded-xl py-2.5 px-3 text-xs font-bold font-mono whitespace-nowrap flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95"
+                        >
+                          <RotateCw className="h-3.5 w-3.5 text-amber-400" />
+                          <span>{isTv ? "Episodes" : "Back Sleeve"}</span>
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          disabled={isMutating}
+                          onClick={() => setIsRentalModalOpen(true)}
+                          className="bg-amber-950/80 hover:bg-amber-900/90 text-amber-300 border border-amber-500/50 shadow-md rounded-xl py-2.5 px-3 text-xs font-bold whitespace-nowrap flex items-center justify-center gap-1.5 transition-all disabled:opacity-40 cursor-pointer active:scale-95"
+                        >
+                          {isMutating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Clock className="h-3.5 w-3.5 text-amber-400" />}
+                          <span>Rent Tape</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          disabled={isMutating}
+                          onClick={handleBuy}
+                          className="bg-white hover:bg-neutral-200 text-black font-bold rounded-xl py-2.5 px-3 text-xs whitespace-nowrap flex items-center justify-center gap-1.5 shadow-lg transition-all disabled:opacity-40 cursor-pointer active:scale-95"
+                        >
+                          {isMutating ? <Loader2 className="h-3.5 w-3.5 animate-spin text-black" /> : <ShoppingBag className="h-3.5 w-3.5" />}
+                          <span>Buy Tape</span>
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
@@ -984,6 +1036,77 @@ export function VhsModal({
                       {metadata?.synopsis || "No program synopsis provided on sleeve jacket."}
                     </p>
                   </div>
+
+                  {isTv && metadata?.episodes && metadata.episodes.length > 0 && (
+                    <div className="flex-1 min-h-0 flex flex-col space-y-1 overflow-hidden">
+                      <div className="flex items-center justify-between text-[9px] font-mono font-bold uppercase tracking-wider text-neutral-400 border-b border-neutral-900 pb-0.5 shrink-0">
+                        {isAccessible ? (
+                          <span className="text-amber-400 flex items-center gap-1">
+                            <Play className="h-2.5 w-2.5 fill-amber-400 text-amber-400" />
+                            {"// EPISODE DIRECTORY · CLICK TO PLAY"}
+                          </span>
+                        ) : (
+                          <span>{"// EPISODE DIRECTORY"}</span>
+                        )}
+                        {isAccessible ? (
+                          <span className="text-emerald-400 font-mono text-[8px] bg-emerald-950/80 px-1.5 py-0.5 rounded border border-emerald-500/40">
+                            UNLOCKED
+                          </span>
+                        ) : (
+                          <span className="text-neutral-500 flex items-center gap-1 text-[8px]">
+                            <Lock className="h-2.5 w-2.5 text-neutral-500" />
+                            RENT/BUY TO PLAY
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex-1 min-h-[90px] overflow-y-auto pr-1 grid grid-cols-1 sm:grid-cols-2 gap-1 font-mono text-[11px] scrollbar-none [&::-webkit-scrollbar]:hidden">
+                        {metadata.episodes.map((ep) => {
+                          if (isAccessible) {
+                            return (
+                              <button
+                                key={ep.episodeNumber}
+                                type="button"
+                                onClick={() => handleEpisodeClick(ep.episodeNumber)}
+                                title={`Play Episode ${ep.episodeNumber}: ${ep.name}`}
+                                className="group/ep flex items-center justify-between gap-1.5 rounded bg-neutral-900/90 hover:bg-amber-950/60 py-1.5 px-2 border border-neutral-800 hover:border-amber-500/60 text-[11px] transition-all cursor-pointer text-left active:scale-[0.98]"
+                              >
+                                <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                                  <Play className="h-2.5 w-2.5 text-amber-400 shrink-0 fill-transparent group-hover/ep:fill-amber-400 transition-colors" />
+                                  <span className="text-amber-400 font-bold shrink-0 font-mono">
+                                    {String(ep.episodeNumber).padStart(2, "0")}.
+                                  </span>
+                                  <span className="text-neutral-200 truncate font-sans text-[11px] group-hover/ep:text-white">
+                                    {ep.name}
+                                  </span>
+                                </div>
+                                <span className="text-neutral-500 text-[9px] shrink-0 font-mono group-hover/ep:text-neutral-300">
+                                  {ep.runtime}m
+                                </span>
+                              </button>
+                            );
+                          }
+                          return (
+                            <div
+                              key={ep.episodeNumber}
+                              title="Rent or buy this tape to watch"
+                              className="flex items-center justify-between gap-1.5 rounded bg-neutral-900/40 py-1 px-2 border border-neutral-800/40 text-[11px] opacity-75 select-none"
+                            >
+                              <span className="text-neutral-500 font-bold shrink-0 font-mono">
+                                {String(ep.episodeNumber).padStart(2, "0")}.
+                              </span>
+                              <span className="text-neutral-400 truncate font-sans text-[11px] flex-1">
+                                {ep.name}
+                              </span>
+                              <span className="text-neutral-600 text-[9px] shrink-0 font-mono">
+                                {ep.runtime}m
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
 
                   <div className="shrink-0 pt-2 border-t border-neutral-800/80 text-[10.5px] font-mono text-neutral-400 leading-snug space-y-0.5">
                     <p className="flex items-center gap-1 truncate">
@@ -1142,37 +1265,57 @@ export function VhsModal({
                           </div>
 
                           <div className="grid grid-cols-2 gap-2.5 w-full">
-                            <button
-                              type="button"
-                              disabled={isMutating || ownershipStatus === "OWNED"}
-                              onClick={() => setIsRentalModalOpen(true)}
-                              className="bg-amber-950/80 hover:bg-amber-900/90 text-amber-300 border border-amber-500/50 shadow-md rounded-xl py-2.5 px-3 text-xs font-bold whitespace-nowrap flex items-center justify-center gap-1.5 transition-all disabled:opacity-40 cursor-pointer active:scale-95"
-                            >
-                              {isMutating ? (
-                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                              ) : (
-                                <Clock className="h-3.5 w-3.5 text-amber-400" />
-                              )}
-                              <span>
-                                {ownershipStatus === "RENTED"
-                                  ? "✓ Rented"
-                                  : "Rent Season"}
-                              </span>
-                            </button>
+                            {isAccessible ? (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => handleEpisodeClick(1)}
+                                  className="bg-amber-500 hover:bg-amber-400 text-black shadow-lg rounded-xl py-2.5 px-3 text-xs font-bold whitespace-nowrap flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95"
+                                >
+                                  <Play className="h-3.5 w-3.5 fill-black text-black" />
+                                  <span>Watch S{selectedSeason}</span>
+                                </button>
 
-                            <button
-                              type="button"
-                              disabled={isMutating || ownershipStatus === "OWNED"}
-                              onClick={handleBuy}
-                              className="bg-white hover:bg-neutral-200 text-black font-bold rounded-xl py-2.5 px-3 text-xs whitespace-nowrap flex items-center justify-center gap-1.5 shadow-lg transition-all disabled:opacity-40 cursor-pointer active:scale-95"
-                            >
-                              {isMutating ? (
-                                <Loader2 className="h-3.5 w-3.5 animate-spin text-black" />
-                              ) : (
-                                <ShoppingBag className="h-3.5 w-3.5" />
-                              )}
-                              <span>{ownershipStatus === "OWNED" ? "✓ Owned" : "Buy Season"}</span>
-                            </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setIsFlipped(true)}
+                                  className="bg-neutral-900 hover:bg-neutral-800 text-amber-300 border border-amber-500/40 rounded-xl py-2.5 px-3 text-xs font-bold font-mono whitespace-nowrap flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95"
+                                >
+                                  <RotateCw className="h-3.5 w-3.5 text-amber-400" />
+                                  <span>Episode List</span>
+                                </button>
+                              </>
+                            ) : (
+                              <>
+                                <button
+                                  type="button"
+                                  disabled={isMutating}
+                                  onClick={() => setIsRentalModalOpen(true)}
+                                  className="bg-amber-950/80 hover:bg-amber-900/90 text-amber-300 border border-amber-500/50 shadow-md rounded-xl py-2.5 px-3 text-xs font-bold whitespace-nowrap flex items-center justify-center gap-1.5 transition-all disabled:opacity-40 cursor-pointer active:scale-95"
+                                >
+                                  {isMutating ? (
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                  ) : (
+                                    <Clock className="h-3.5 w-3.5 text-amber-400" />
+                                  )}
+                                  <span>Rent Season</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  disabled={isMutating}
+                                  onClick={handleBuy}
+                                  className="bg-white hover:bg-neutral-200 text-black font-bold rounded-xl py-2.5 px-3 text-xs whitespace-nowrap flex items-center justify-center gap-1.5 shadow-lg transition-all disabled:opacity-40 cursor-pointer active:scale-95"
+                                >
+                                  {isMutating ? (
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin text-black" />
+                                  ) : (
+                                    <ShoppingBag className="h-3.5 w-3.5" />
+                                  )}
+                                  <span>Buy Season</span>
+                                </button>
+                              </>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -1224,27 +1367,70 @@ export function VhsModal({
 
                           <div className="flex-1 min-h-0 flex flex-col space-y-1 overflow-hidden">
                             <div className="flex items-center justify-between text-[9px] font-mono font-bold uppercase tracking-wider text-neutral-400 border-b border-neutral-900 pb-0.5 shrink-0">
-                              <span>{"// EPISODE DIRECTORY"}</span>
-                              <span className="text-neutral-500">{activeSeasonData?.episodes?.length || 1} Item(s)</span>
+                              {isAccessible ? (
+                                <span className="text-amber-400 flex items-center gap-1">
+                                  <Play className="h-2.5 w-2.5 fill-amber-400 text-amber-400" />
+                                  {"// EPISODE DIRECTORY · CLICK TO PLAY"}
+                                </span>
+                              ) : (
+                                <span>{"// EPISODE DIRECTORY"}</span>
+                              )}
+                              {isAccessible ? (
+                                <span className="text-emerald-400 font-mono text-[8px] bg-emerald-950/80 px-1.5 py-0.5 rounded border border-emerald-500/40">
+                                  UNLOCKED
+                                </span>
+                              ) : (
+                                <span className="text-neutral-500 flex items-center gap-1 text-[8px]">
+                                  <Lock className="h-2.5 w-2.5 text-neutral-500" />
+                                  RENT/BUY TO PLAY
+                                </span>
+                              )}
                             </div>
 
                             <div className="flex-1 min-h-[100px] overflow-y-auto pr-1 grid grid-cols-1 sm:grid-cols-2 gap-1 font-mono text-[11px] scrollbar-none [&::-webkit-scrollbar]:hidden">
-                              {activeSeasonData?.episodes?.map((ep) => (
-                                <div
-                                  key={ep.episodeNumber}
-                                  className="flex items-center justify-between gap-1.5 rounded bg-neutral-900/80 py-1 px-2 border border-neutral-800/80 text-[11px]"
-                                >
-                                  <span className="text-amber-400/90 font-bold shrink-0">
-                                    {String(ep.episodeNumber).padStart(2, "0")}.
-                                  </span>
-                                  <span className="text-neutral-200 truncate font-sans text-[11px] flex-1">
-                                    {ep.name}
-                                  </span>
-                                  <span className="text-neutral-500 text-[9px] shrink-0 font-mono">
-                                    {ep.runtime}m
-                                  </span>
-                                </div>
-                              ))}
+                              {activeSeasonData?.episodes?.map((ep) => {
+                                if (isAccessible) {
+                                  return (
+                                    <button
+                                      key={ep.episodeNumber}
+                                      type="button"
+                                      onClick={() => handleEpisodeClick(ep.episodeNumber)}
+                                      title={`Play Episode ${ep.episodeNumber}: ${ep.name}`}
+                                      className="group/ep flex items-center justify-between gap-1.5 rounded bg-neutral-900/90 hover:bg-amber-950/60 py-1.5 px-2 border border-neutral-800 hover:border-amber-500/60 text-[11px] transition-all cursor-pointer text-left active:scale-[0.98]"
+                                    >
+                                      <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                                        <Play className="h-2.5 w-2.5 text-amber-400 shrink-0 fill-transparent group-hover/ep:fill-amber-400 transition-colors" />
+                                        <span className="text-amber-400 font-bold shrink-0 font-mono">
+                                          {String(ep.episodeNumber).padStart(2, "0")}.
+                                        </span>
+                                        <span className="text-neutral-200 truncate font-sans text-[11px] group-hover/ep:text-white">
+                                          {ep.name}
+                                        </span>
+                                      </div>
+                                      <span className="text-neutral-500 text-[9px] shrink-0 font-mono group-hover/ep:text-neutral-300">
+                                        {ep.runtime}m
+                                      </span>
+                                    </button>
+                                  );
+                                }
+                                return (
+                                  <div
+                                    key={ep.episodeNumber}
+                                    title="Rent or buy this tape to watch"
+                                    className="flex items-center justify-between gap-1.5 rounded bg-neutral-900/40 py-1 px-2 border border-neutral-800/40 text-[11px] opacity-75 select-none"
+                                  >
+                                    <span className="text-neutral-500 font-bold shrink-0 font-mono">
+                                      {String(ep.episodeNumber).padStart(2, "0")}.
+                                    </span>
+                                    <span className="text-neutral-400 truncate font-sans text-[11px] flex-1">
+                                      {ep.name}
+                                    </span>
+                                    <span className="text-neutral-600 text-[9px] shrink-0 font-mono">
+                                      {ep.runtime}m
+                                    </span>
+                                  </div>
+                                );
+                              })}
                             </div>
                           </div>
 
@@ -1336,6 +1522,8 @@ export function VhsModal({
       )}
     </div>
   );
+
+  if (!isOpen || !mounted) return null;
 
   return createPortal(modalContent, document.body);
 }

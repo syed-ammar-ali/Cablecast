@@ -15,10 +15,12 @@ import {
 } from "lucide-react";
 import {
   buildPlayerSource,
+  inferRegionFromCountry,
   isDynamicProvider,
   listProviders,
   PROVIDER_COUNT,
 } from "@/lib/providers";
+import { REGION_OPTIONS, type StreamRegion } from "@/config/providers";
 import { CHANNELS } from "@/config/channels";
 import { BLOCK_MINUTES } from "@/lib/runtime";
 import {
@@ -46,6 +48,8 @@ interface VideoPlayerProps {
   episode?: number;
   mediaType: MediaType;
   startOffsetSeconds?: number;
+  country?: string;
+  initialRegion?: StreamRegion;
   startTime?: number | string | Date;
   title?: string;
   /**
@@ -74,6 +78,8 @@ export function VideoPlayer({
   startOffsetSeconds = 0,
   title,
   initialLiveEntry,
+  country,
+  initialRegion,
   onClose,
 }: VideoPlayerProps) {
   const [currentSeason, setCurrentSeason] = useState(season);
@@ -97,10 +103,30 @@ export function VideoPlayer({
   const [dynamicEmbedUrl, setDynamicEmbedUrl] = useState<string | null>(null);
   const dynamicRequestIdRef = useRef(0);
 
+  const effectiveInitialRegion: StreamRegion = useMemo(() => {
+    if (initialRegion) return initialRegion;
+    if (country) return inferRegionFromCountry(country);
+    return "ALL";
+  }, [initialRegion, country]);
+
   // --- Manual provider picker (the dropdown next to "Swap Stream") -------
   const [isProviderMenuOpen, setIsProviderMenuOpen] = useState(false);
+  const [selectedRegion, setSelectedRegion] = useState<StreamRegion>(effectiveInitialRegion);
   const providerMenuRef = useRef<HTMLDivElement | null>(null);
-  const providerList = useMemo(() => listProviders(), []);
+  const providerList = useMemo(() => listProviders(selectedRegion), [selectedRegion]);
+
+  useEffect(() => {
+    if (country) {
+      setSelectedRegion(inferRegionFromCountry(country));
+    }
+  }, [country]);
+
+  useEffect(() => {
+    setCurrentProviderIndex(0);
+    setExhausted(false);
+    setIsLoading(true);
+    setReloadTick((t) => t + 1);
+  }, [selectedRegion]);
 
   const containerRef = useRef<HTMLDivElement | null>(null);
 
@@ -173,7 +199,7 @@ export function VideoPlayer({
   const contentIdentity = `${activePlayback.tmdbId}-${activePlayback.mediaType}-${activePlayback.season}-${activePlayback.episode}`;
 
   const currentProvider = providerList[currentProviderIndex] ?? providerList[0];
-  const isDynamic = isDynamicProvider(currentProviderIndex);
+  const isDynamic = Boolean(currentProvider?.isDynamic);
   // The display title carries a " · S1E1" suffix for TV — strip it so the
   // search query is just the clean show/movie title.
   const searchTitle = (activePlayback.title ?? "").replace(/\s*·\s*S\d+E\d+$/i, "").trim();
@@ -182,21 +208,22 @@ export function VideoPlayer({
   const source = useMemo(() => {
     if (isDynamic) {
       return {
-        providerIndex: currentProviderIndex,
+        providerIndex: currentProvider?.index ?? currentProviderIndex,
         providerId: currentProvider?.id ?? "dynamic",
         providerName: currentProvider?.name ?? "Dynamic Source",
         url: dynamicEmbedUrl ?? "",
-        isLastProvider: currentProviderIndex === PROVIDER_COUNT - 1,
+        isLastProvider: currentProviderIndex === providerList.length - 1,
       };
     }
     return buildPlayerSource({
-      providerIndex: currentProviderIndex,
+      providerIndex: currentProvider?.index ?? currentProviderIndex,
       tmdbId: activePlayback.tmdbId,
       mediaType: activePlayback.mediaType,
       season: activePlayback.season,
       episode: activePlayback.episode,
+      startOffsetSeconds,
     });
-  }, [currentProviderIndex, activePlayback, isDynamic, dynamicEmbedUrl, currentProvider]);
+  }, [currentProvider, currentProviderIndex, activePlayback, isDynamic, dynamicEmbedUrl, providerList.length, startOffsetSeconds]);
 
   const iframeKey = `${contentIdentity}-${source.providerIndex}-${reloadTick}-${dynamicEmbedUrl ?? "x"}`;
 
@@ -211,14 +238,14 @@ export function VideoPlayer({
     clearLoadTimeout();
     setCurrentProviderIndex((index) => {
       const next = index + 1;
-      if (next >= PROVIDER_COUNT) {
+      if (next >= providerList.length) {
         setExhausted(true);
         return index;
       }
       setIsLoading(true);
       return next;
     });
-  }, [clearLoadTimeout]);
+  }, [clearLoadTimeout, providerList.length]);
 
   const retryFromTop = useCallback(() => {
     clearLoadTimeout();
@@ -356,13 +383,15 @@ export function VideoPlayer({
     } else if (providerId === "kisskh-asian") {
       const params = new URLSearchParams({
         title: cleanTitle,
+        provider: "kisskh",
+        mediaType: activePlayback.mediaType,
       });
       if (activePlayback.mediaType === "tv") {
         params.set("season", String(activePlayback.season));
         params.set("episode", String(activePlayback.episode));
       }
 
-      fetch(`/api/kisskh/search?${params.toString()}`)
+      fetch(`/api/asian/search?${params.toString()}`)
         .then((res) => res.json())
         .then((data: { match: { embedUrl: string } | null }) => {
           if (dynamicRequestIdRef.current !== requestId) return;
@@ -379,12 +408,15 @@ export function VideoPlayer({
     } else if (providerId === "dramacool-asian") {
       const params = new URLSearchParams({
         title: cleanTitle,
+        provider: "dramacool",
+        mediaType: activePlayback.mediaType,
       });
       if (activePlayback.mediaType === "tv") {
+        params.set("season", String(activePlayback.season));
         params.set("episode", String(activePlayback.episode));
       }
 
-      fetch(`/api/dramacool/search?${params.toString()}`)
+      fetch(`/api/asian/search?${params.toString()}`)
         .then((res) => res.json())
         .then((data: { match: { embedUrl: string } | null }) => {
           if (dynamicRequestIdRef.current !== requestId) return;
@@ -399,10 +431,35 @@ export function VideoPlayer({
           advanceProvider();
         });
     } else if (providerId === "kartoons-direct") {
-      const providerSlug = activePlayback.mediaType === "movie" ? "kisscartoon" : "supercartoons";
       const params = new URLSearchParams({
         title: cleanTitle,
-        provider: providerSlug,
+        provider: "kartoons",
+        mediaType: activePlayback.mediaType,
+      });
+      if (activePlayback.mediaType === "tv") {
+        params.set("season", String(activePlayback.season));
+        params.set("episode", String(activePlayback.episode));
+      }
+
+      fetch(`/api/cartoons/search?${params.toString()}`)
+        .then((res) => res.json())
+        .then((data: { match: { embedUrl: string } | null }) => {
+          if (dynamicRequestIdRef.current !== requestId) return;
+          if (data.match?.embedUrl) {
+            setDynamicEmbedUrl(data.match.embedUrl);
+          } else {
+            advanceProvider();
+          }
+        })
+        .catch(() => {
+          if (dynamicRequestIdRef.current !== requestId) return;
+          advanceProvider();
+        });
+    } else if (providerId === "gogoanime") {
+      const params = new URLSearchParams({
+        title: cleanTitle,
+        provider: "gogoanime",
+        mediaType: activePlayback.mediaType,
       });
       if (activePlayback.mediaType === "tv") {
         params.set("season", String(activePlayback.season));
@@ -541,10 +598,27 @@ export function VideoPlayer({
     return () => clearInterval(interval);
   }, [screenMode, nextProgramTargetTimeMs]);
 
-  // The dynamic broadcast clock:
-  // 1. Plays the entire episode from 00:00 without skipping or cutting content.
-  // 2. Automatically rolls retro commercials only after the episode completes.
-  // 3. Hands off to the next program when its scheduled airtime arrives.
+  // Dynamic broadcast clock & Next program handoff:
+  // 1. Plays the entire program without automatic interruptions (ads only roll on user request).
+  // 2. When rolling ads in bumper mode, hands off to the next program the moment its start time arrives!
+  useEffect(() => {
+    if (screenMode !== "bumper" || !nextProgramTargetTimeMs) return;
+
+    const remainingMs = nextProgramTargetTimeMs - Date.now();
+    // If the next program's start time has arrived (or is past), transition immediately!
+    if (remainingMs <= 0) {
+      handleAdvanceToNextProgram();
+      return;
+    }
+
+    // Schedule exact handoff to the next video (even if only 2 seconds away)
+    const timer = setTimeout(() => {
+      handleAdvanceToNextProgram();
+    }, remainingMs);
+
+    return () => clearTimeout(timer);
+  }, [screenMode, nextProgramTargetTimeMs, handleAdvanceToNextProgram]);
+
   useEffect(() => {
     const timers: ReturnType<typeof setTimeout>[] = [];
 
@@ -563,23 +637,6 @@ export function VideoPlayer({
       }
 
       if (liveEntry) {
-        // Episode content duration based on TMDB runtime
-        const effectiveRuntimeMinutes =
-          liveEntry.runtimeMinutes && liveEntry.runtimeMinutes > 0
-            ? liveEntry.runtimeMinutes
-            : liveEntry.mediaType === "movie"
-            ? 105
-            : liveEntry.blockCount
-            ? Math.min(liveEntry.blockCount * 30 - 6, 24)
-            : 22;
-        const contentDurationMs = effectiveRuntimeMinutes * 60 * 1000;
-
-        // Commercial break trigger: only fires after the viewer has completed watching the full show.
-        // Anchored to active playback (does not count loader / provider search time against runtime).
-        if (!isLoading && !exhausted && screenMode === "content") {
-          timers.push(setTimeout(enterBumperPhase, contentDurationMs));
-        }
-
         // Block end trigger: when the block officially ends, if we are in commercial break, roll to next show
         const blockEndMs = Math.max(0, getAppointmentEndDate(liveEntry).getTime() - Date.now());
         if (blockEndMs > 0) {
@@ -598,18 +655,11 @@ export function VideoPlayer({
           );
         }
       }
-    } else {
-      // On-demand playback: roll retro commercial break when episode runtime elapses
-      if (!isLoading && !exhausted && screenMode === "content") {
-        const estimatedMinutes = mediaType === "movie" ? 105 : 24;
-        const contentDurationMs = estimatedMinutes * 60 * 1000;
-        timers.push(setTimeout(enterBumperPhase, contentDurationMs));
-      }
     }
 
     return () => timers.forEach(clearTimeout);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLiveMode, isOffAir, liveEntry?.id, activeChannel.number, mediaType, enterBumperPhase, tuneToChannel, isLoading, exhausted, screenMode]);
+  }, [isLiveMode, isOffAir, liveEntry?.id, activeChannel.number, mediaType, tuneToChannel, isLoading, exhausted, screenMode]);
 
   const displayTitle = !isLiveMode
     ? title ?? "Now Playing"
@@ -870,7 +920,7 @@ export function VideoPlayer({
               {screenMode === "content" && (
                 <span className="flex h-8 sm:h-9 items-center gap-1 rounded-l-lg border-r border-neutral-800/80 px-2 sm:px-2.5 text-[10px] font-mono uppercase tracking-wider text-neutral-400">
                   <SatelliteDish className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0" />
-                  <span>{String(currentProviderIndex + 1).padStart(2, "0")}/{String(PROVIDER_COUNT).padStart(2, "0")}</span>
+                  <span>{String(currentProviderIndex + 1).padStart(2, "0")}/{String(providerList.length).padStart(2, "0")}</span>
                 </span>
               )}
 
@@ -899,18 +949,40 @@ export function VideoPlayer({
                 </button>
 
                 {isProviderMenuOpen && (
-                  <div className="absolute right-0 top-full mt-2 w-52 sm:w-56 max-h-[50vh] sm:max-h-[60vh] overflow-hidden flex flex-col rounded-xl border border-neutral-800 bg-neutral-950/95 shadow-2xl shadow-black backdrop-blur-xl z-40">
-                    <p className="border-b border-neutral-800/80 bg-white/5 px-3 py-1.5 text-[10px] uppercase tracking-widest text-neutral-400 shrink-0 font-medium">
-                      Select Stream ({currentProviderIndex + 1}/{PROVIDER_COUNT})
-                    </p>
+                  <div className="absolute right-0 top-full mt-2 w-64 sm:w-72 max-h-[55vh] sm:max-h-[65vh] overflow-hidden flex flex-col rounded-xl border border-neutral-800 bg-neutral-950/95 shadow-2xl shadow-black backdrop-blur-xl z-40">
+                    <div className="border-b border-neutral-800/80 bg-white/5 px-3 py-1.5 flex items-center justify-between gap-1 shrink-0">
+                      <span className="text-[10px] uppercase tracking-widest text-neutral-400 font-medium">
+                        Region & Streams ({providerList.length})
+                      </span>
+                    </div>
+
+                    {/* Regional Category Filter Tabs */}
+                    <div className="flex items-center gap-1 overflow-x-auto p-1.5 border-b border-neutral-800/80 bg-neutral-900/60 no-scrollbar shrink-0">
+                      {REGION_OPTIONS.map((r) => (
+                        <button
+                          key={r.id}
+                          type="button"
+                          onClick={() => setSelectedRegion(r.id)}
+                          className={`flex items-center gap-1 rounded px-1.5 py-0.5 text-[9.5px] font-mono whitespace-nowrap transition-colors cursor-pointer ${
+                            selectedRegion === r.id
+                              ? "bg-amber-500 text-black font-bold shadow-sm"
+                              : "text-neutral-400 hover:text-white hover:bg-white/10"
+                          }`}
+                        >
+                          <span>{r.flag}</span>
+                          <span>{r.label}</span>
+                        </button>
+                      ))}
+                    </div>
+
                     <ul className="flex-1 overflow-y-auto no-scrollbar">
-                      {providerList.map((provider) => {
-                        const isActive = provider.index === currentProviderIndex;
+                      {providerList.map((provider, idx) => {
+                        const isActive = idx === currentProviderIndex;
                         return (
                           <li key={provider.id}>
                             <button
                               type="button"
-                              onClick={() => jumpToProvider(provider.index)}
+                              onClick={() => jumpToProvider(idx)}
                               className={`flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-[11px] uppercase tracking-wide transition-colors hover:bg-white/10 active:bg-white/15 cursor-pointer touch-manipulation ${
                                 isActive ? "bg-white/10 font-semibold text-white" : "text-neutral-300"
                               }`}
@@ -923,7 +995,14 @@ export function VideoPlayer({
                                 />
                                 <span className="truncate">{provider.name}</span>
                               </span>
-                              {isActive && <Check className="h-3 w-3 shrink-0 text-emerald-400" />}
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                {provider.benchmarkLatencyMs && (
+                                  <span className="text-[8.5px] font-mono text-emerald-400/90 bg-emerald-950/60 px-1 py-0.5 rounded border border-emerald-500/30">
+                                    ~{provider.benchmarkLatencyMs}ms
+                                  </span>
+                                )}
+                                {isActive && <Check className="h-3 w-3 shrink-0 text-emerald-400" />}
+                              </div>
                             </button>
                           </li>
                         );

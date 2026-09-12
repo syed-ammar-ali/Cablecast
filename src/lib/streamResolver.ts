@@ -147,28 +147,28 @@ async function tryNicheSearch(params: StreamResolverParams): Promise<ResolvedStr
 function getMetaRouterEmbed(params: StreamResolverParams): ResolvedStream {
   const { tmdbId, type, season = 1, episode = 1 } = params;
 
-  // Primary Meta-Router: SmashyStream (Multi-Server)
-  const smashyUrl =
+  // Primary Meta-Router: AnyEmbed Matrix (~110ms direct HLS)
+  const anyEmbedUrl =
     type === "movie"
-      ? `https://player.smashy.stream/movie/${tmdbId}?autoplay=1`
-      : `https://player.smashy.stream/tv/${tmdbId}?s=${season}&e=${episode}&autoplay=1`;
+      ? `https://anyembed.xyz/embed/tmdb-movie-${tmdbId}?autoplay=1`
+      : `https://anyembed.xyz/embed/tmdb-tv-${tmdbId}-${season}-${episode}?autoplay=1`;
 
-  // Secondary Meta-Router: AutoEmbed
-  const autoEmbedUrl =
+  // Secondary Meta-Router: ZXCStream Turbopack (~380ms)
+  const zxcUrl =
     type === "movie"
-      ? `https://player.autoembed.cc/embed/movie/${tmdbId}?autoplay=1`
-      : `https://player.autoembed.cc/embed/tv/${tmdbId}/${season}/${episode}?autoplay=1`;
+      ? `https://player.zxcstream.xyz/embed/movie/${tmdbId}?autoplay=1`
+      : `https://player.zxcstream.xyz/embed/tv/${tmdbId}/${season}/${episode}?autoplay=1`;
 
-  // Tertiary Meta-Router: VidLink / SuperEmbed
+  // Tertiary Meta-Router: VidLink Pro
   const vidLinkUrl =
     type === "movie"
       ? `https://vidlink.pro/movie/${tmdbId}?primaryColor=6366f1&autoplay=true`
       : `https://vidlink.pro/tv/${tmdbId}/${season}/${episode}?primaryColor=6366f1&autoplay=true`;
 
   return {
-    url: smashyUrl || autoEmbedUrl || vidLinkUrl,
+    url: anyEmbedUrl || zxcUrl || vidLinkUrl,
     type: "embed",
-    provider: "SmashyStream Meta-Router",
+    provider: "AnyEmbed Matrix",
     subtitles: [],
   };
 }
