@@ -245,13 +245,37 @@ export function VhsModal({
   useEffect(() => {
     if (metadata?.seasons && Array.isArray(metadata.seasons)) {
       metadata.seasons.forEach((s) => {
-        if (s.posterPath) {
+        const posterUrl = s.posterPath;
+        if (posterUrl) {
           const img = new Image();
-          img.src = s.posterPath;
+          img.src = posterUrl;
+          if (img.complete) {
+            setLoadedImages((prev) => ({ ...prev, [posterUrl]: true }));
+          } else {
+            img.onload = () => {
+              setLoadedImages((prev) => ({ ...prev, [posterUrl]: true }));
+            };
+          }
         }
       });
     }
   }, [metadata?.seasons]);
+
+  // Preload initial poster if available
+  useEffect(() => {
+    const posterUrl = initialPosterUrl;
+    if (posterUrl) {
+      const img = new Image();
+      img.src = posterUrl;
+      if (img.complete) {
+        setLoadedImages((prev) => ({ ...prev, [posterUrl]: true }));
+      } else {
+        img.onload = () => {
+          setLoadedImages((prev) => ({ ...prev, [posterUrl]: true }));
+        };
+      }
+    }
+  }, [initialPosterUrl]);
 
   // Lock document body scroll when modal is open to eliminate all page-level scrollbars
   useEffect(() => {
@@ -267,6 +291,8 @@ export function VhsModal({
   useEffect(() => {
     setActiveSeasonIndex(Math.max(0, (initialSeason || 1) - 1));
     setIsFlipped(false);
+    setMetadata(null);
+    setSeasonCache({});
     setIsLoadingMetadata(true);
   }, [initialSeason, isOpen, mediaId]);
 
@@ -523,12 +549,7 @@ export function VhsModal({
   const activeSeasonData = seasonCache[selectedSeason] || metadata;
 
   // Single-card accurate poster resolution & image readiness
-  const isSinglePosterReady = Boolean(
-    (metadata?.frontPosterPath || (!isTv && initialPosterUrl)) && !isLoadingMetadata
-  );
-  const singlePosterSrc = isSinglePosterReady
-    ? metadata?.frontPosterPath || (!isTv ? initialPosterUrl : null)
-    : null;
+  const singlePosterSrc = metadata?.frontPosterPath || initialPosterUrl || null;
   const isSinglePosterLoaded = Boolean(singlePosterSrc && loadedImages[singlePosterSrc]);
 
   // Calculate formatted time remaining for active rental
@@ -843,10 +864,10 @@ export function VhsModal({
                 </div>
 
                 <div className="absolute inset-0 pt-7 bg-neutral-900 overflow-hidden flex items-center justify-center">
-                  {/* Retro VHS Loading Skeleton - active while metadata or poster image is loading */}
-                  {(!isSinglePosterReady || !isSinglePosterLoaded) && (
+                  {/* Retro VHS Loading Skeleton - active while initial poster is loading */}
+                  {(!singlePosterSrc && isLoadingMetadata) || (!isSinglePosterLoaded && !singlePosterSrc) ? (
                     <VhsSleeveSkeleton isTv={isTv} seasonNumber={selectedSeason} />
-                  )}
+                  ) : null}
 
                   {singlePosterSrc && (
                     // eslint-disable-next-line @next/next/no-img-element
@@ -856,9 +877,7 @@ export function VhsModal({
                       onLoad={() =>
                         setLoadedImages((prev) => ({ ...prev, [singlePosterSrc]: true }))
                       }
-                      className={`w-full h-full object-cover object-center transition-opacity duration-300 ${
-                        isSinglePosterLoaded ? "opacity-100" : "opacity-0"
-                      }`}
+                      className="w-full h-full object-cover object-center"
                       loading="eager"
                     />
                   )}
@@ -997,10 +1016,8 @@ export function VhsModal({
               const seasonPoster =
                 metadata?.seasons?.find((s) => s.seasonNumber === seasonNum)?.posterPath ||
                 seasonCache[seasonNum]?.frontPosterPath ||
-                (metadata?.frontPosterPath && !isMultiSeason ? metadata.frontPosterPath : null);
-
-              const isSeasonPosterReady = Boolean(seasonPoster && !isLoadingMetadata);
-              const isSeasonImageLoaded = Boolean(seasonPoster && loadedImages[seasonPoster]);
+                (seasonNum === 1 ? metadata?.frontPosterPath || initialPosterUrl : null) ||
+                (!isMultiSeason ? metadata?.frontPosterPath || initialPosterUrl : null);
 
               if (isSelected) {
                 // ── ACTIVE FLIPPABLE 3D CARD ──
@@ -1046,8 +1063,8 @@ export function VhsModal({
                         </div>
 
                         <div className="absolute inset-0 pt-7 bg-neutral-900 overflow-hidden flex items-center justify-center">
-                          {/* Retro VHS Loading Skeleton */}
-                          {(!isSeasonPosterReady || !isSeasonImageLoaded) && (
+                          {/* Retro VHS Loading Skeleton - ONLY show if no season poster is available yet on initial load */}
+                          {!seasonPoster && isLoadingMetadata && (
                             <VhsSleeveSkeleton seasonNumber={seasonNum} isTv={isTv} />
                           )}
 
@@ -1062,9 +1079,7 @@ export function VhsModal({
                                   [seasonPoster]: true,
                                 }))
                               }
-                              className={`w-full h-full object-cover object-center transition-opacity duration-300 ${
-                                isSeasonImageLoaded ? "opacity-100" : "opacity-0"
-                              }`}
+                              className="w-full h-full object-cover object-center"
                               loading="eager"
                             />
                           )}
@@ -1285,7 +1300,14 @@ export function VhsModal({
                       <img
                         src={seasonPoster}
                         alt={`Season ${seasonNum}`}
+                        onLoad={() =>
+                          setLoadedImages((prev) => ({
+                            ...prev,
+                            [seasonPoster]: true,
+                          }))
+                        }
                         className="w-full h-full object-cover object-center opacity-40 group-hover:opacity-75 transition-opacity duration-300 pointer-events-none"
+                        loading="eager"
                       />
                     ) : (
                       <div className="flex flex-col items-center justify-center p-4 text-neutral-600">
