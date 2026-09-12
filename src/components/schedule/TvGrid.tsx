@@ -102,6 +102,33 @@ export function TvGrid({
 
   const lastSnappedDateRef = useRef<string | null>(null);
 
+  const checkLiveDistance = useCallback(() => {
+    if (!gridScrollRef.current) return;
+    if (!isToday) {
+      setIsAwayFromLive(true);
+      return;
+    }
+    const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
+    const pxPerMin = isMobile ? 4 : 6;
+    const channelColWidth = isMobile ? 96 : 208;
+    const d = new Date();
+    const currentMin = d.getHours() * 60 + d.getMinutes() + d.getSeconds() / 60;
+    const liveLineAbsoluteX = channelColWidth + currentMin * pxPerMin;
+    const containerWidth = gridScrollRef.current.clientWidth || 800;
+    const targetScroll = Math.max(0, liveLineAbsoluteX - channelColWidth - (containerWidth - channelColWidth) * 0.35);
+    const scrollLeft = gridScrollRef.current.scrollLeft;
+    const scrollDiff = Math.abs(scrollLeft - targetScroll);
+
+    // Sticky channel column occupies [scrollLeft, scrollLeft + channelColWidth]
+    const minVisibleX = scrollLeft + channelColWidth + 30;
+    const maxVisibleX = scrollLeft + containerWidth - 30;
+    const isLiveLineVisible = liveLineAbsoluteX >= minVisibleX && liveLineAbsoluteX <= maxVisibleX;
+
+    // Trigger whenever scrolled away from centered live head or when line is off-screen
+    const driftThreshold = isMobile ? 100 : 180;
+    setIsAwayFromLive(!isLiveLineVisible || scrollDiff > driftThreshold);
+  }, [isToday]);
+
   // Snap the unified timeline to "now" ONLY on initial mount or when date changes manually
   useEffect(() => {
     if (!schedule.length) return;
@@ -119,6 +146,7 @@ export function TvGrid({
       const targetScroll = Math.max(0, liveLineLeftPx - channelColWidth - (containerWidth - channelColWidth) * 0.35);
       gridScrollRef.current.scrollLeft = targetScroll;
       lastSnappedDateRef.current = selectedDate;
+      checkLiveDistance();
     };
 
     // Ensure DOM paint/layout cycle has resolved after loading state unmount
@@ -128,30 +156,7 @@ export function TvGrid({
     });
 
     return () => cancelAnimationFrame(rafId);
-  }, [schedule.length, selectedDate]);
-
-  const checkLiveDistance = useCallback(() => {
-    if (!gridScrollRef.current) return;
-    if (!isToday) {
-      setIsAwayFromLive(true);
-      return;
-    }
-    const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
-    const pxPerMin = isMobile ? 4 : 6;
-    const channelColWidth = isMobile ? 96 : 208;
-    const d = new Date();
-    const currentMin = d.getHours() * 60 + d.getMinutes() + d.getSeconds() / 60;
-    const liveLineAbsoluteX = channelColWidth + currentMin * pxPerMin;
-    const scrollLeft = gridScrollRef.current.scrollLeft;
-    const containerWidth = gridScrollRef.current.clientWidth || 800;
-
-    // Sticky channel column occupies [scrollLeft, scrollLeft + channelColWidth]
-    const minVisibleX = scrollLeft + channelColWidth + 20;
-    const maxVisibleX = scrollLeft + containerWidth - 20;
-    const isLiveLineVisible = liveLineAbsoluteX >= minVisibleX && liveLineAbsoluteX <= maxVisibleX;
-
-    setIsAwayFromLive(!isLiveLineVisible);
-  }, [isToday]);
+  }, [schedule.length, selectedDate, checkLiveDistance]);
 
   useEffect(() => {
     const el = gridScrollRef.current;
@@ -166,7 +171,7 @@ export function TvGrid({
       el.removeEventListener("scroll", handleScroll);
       window.removeEventListener("resize", checkLiveDistance);
     };
-  }, [checkLiveDistance]);
+  }, [schedule.length, checkLiveDistance]);
 
   const handleJumpToLive = useCallback(() => {
     triggerHaptic(15);
@@ -254,14 +259,14 @@ export function TvGrid({
         <button
           type="button"
           onClick={handleJumpToLive}
-          className="fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom,0px))] md:bottom-8 left-1/2 -translate-x-1/2 z-[70] flex items-center gap-2 rounded-full border border-red-500/60 bg-neutral-950/95 px-3.5 py-1.5 text-xs font-bold uppercase tracking-wider text-white shadow-2xl shadow-red-950/80 backdrop-blur-md transition-all hover:bg-red-950/70 hover:border-red-400 active:scale-95 animate-in fade-in slide-in-from-bottom-3 duration-200 cursor-pointer"
+          className="fixed bottom-[max(4.75rem,calc(env(safe-area-inset-bottom)+4.25rem))] md:bottom-8 left-1/2 -translate-x-1/2 z-[70] flex items-center gap-2 rounded-full border border-red-500/60 bg-neutral-950/95 px-3.5 py-1.5 text-xs font-bold uppercase tracking-wider text-white shadow-2xl shadow-red-950/80 backdrop-blur-md transition-all hover:bg-red-950/70 hover:border-red-400 active:scale-95 animate-in fade-in slide-in-from-bottom-3 duration-200 cursor-pointer whitespace-nowrap select-none"
           title="Jump to current live time on schedule"
         >
-          <span className="relative flex h-2 w-2">
+          <span className="relative flex h-2 w-2 shrink-0">
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
             <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500" />
           </span>
-          <span>Jump to Live</span>
+          <span className="whitespace-nowrap font-bold">Jump to Live</span>
         </button>
       )}
 
@@ -284,6 +289,7 @@ export function TvGrid({
       {/* ── Single Unified Horizontal Scroll Container (100% Native, Identical Touch Momentum & Physics Across Whole Grid) ── */}
       <div
         ref={gridScrollRef}
+        onScroll={checkLiveDistance}
         className="no-scrollbar relative h-auto overflow-x-auto border-b border-neutral-900 bg-neutral-950/40 pb-20 md:pb-0 overscroll-x-contain"
         style={{ WebkitOverflowScrolling: "touch" }}
       >
