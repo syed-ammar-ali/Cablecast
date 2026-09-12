@@ -390,7 +390,7 @@ export function PlayerModal({
                 ) : (
                   <>
                     <ShoppingBag className="h-4 w-4 text-purple-300" />
-                    <span>Acquire Season {season} Master Tape ($4.99)</span>
+                    <span>Acquire Season {season} Master Tape</span>
                   </>
                 )}
               </button>

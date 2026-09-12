@@ -73,7 +73,12 @@ function deny(request: NextRequest, status: 401 | 403, message: string): NextRes
   }
 
   const destination = new URL(status === 403 ? "/home" : "/gate", request.url);
-  if (status === 401) destination.searchParams.set("next", pathname);
+  if (status === 401) {
+    destination.searchParams.set("next", pathname);
+    if (request.cookies.has(SESSION_COOKIE_NAME)) {
+      destination.searchParams.set("error", "revoked");
+    }
+  }
 
   const response = NextResponse.redirect(destination);
   if (status === 401) response.cookies.delete(SESSION_COOKIE_NAME);

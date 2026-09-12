@@ -58,14 +58,20 @@ function GateForm() {
       localStorage.removeItem("cablecast_user_name");
       localStorage.removeItem("cablecast_last_code");
 
-      const storedViewer = localStorage.getItem("cablecast_viewer_name");
-      const storedAdmin = localStorage.getItem("cablecast_admin_name");
-
-      if (storedViewer) {
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-        setSavedViewerName(storedViewer);
-        setViewerName(storedViewer);
+      if (isRevoked) {
+        // If revoked, unconditionally wipe cached device viewer name so re-auth always prompts for name
+        localStorage.removeItem("cablecast_viewer_name");
+        setSavedViewerName("");
+        setViewerName("");
+      } else {
+        const storedViewer = localStorage.getItem("cablecast_viewer_name");
+        if (storedViewer) {
+          setSavedViewerName(storedViewer);
+          setViewerName(storedViewer);
+        }
       }
+
+      const storedAdmin = localStorage.getItem("cablecast_admin_name");
       if (storedAdmin) {
         setSavedAdminName(storedAdmin);
         setAdminName(storedAdmin);
@@ -73,7 +79,7 @@ function GateForm() {
     } catch {
       // non-critical if storage is disabled
     }
-  }, []);
+  }, [isRevoked]);
 
   async function handleRedeem(event: React.FormEvent) {
     event.preventDefault();
@@ -88,7 +94,7 @@ function GateForm() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           code,
-          displayName: savedViewerName || undefined,
+          displayName: isRevoked ? undefined : (savedViewerName || undefined),
         }),
       });
       const data = await response.json().catch(() => ({}));
@@ -108,8 +114,8 @@ function GateForm() {
         return;
       }
 
-      // If the code has a server-assigned label or device remembered viewer name, bypass step 2
-      if (data.hasName && data.displayName) {
+      // If code was revoked or user has no confirmed name, ALWAYS show name prompt step
+      if (!isRevoked && data.hasName && data.displayName) {
         try {
           localStorage.setItem("cablecast_viewer_name", data.displayName);
         } catch {
@@ -120,7 +126,7 @@ function GateForm() {
         return;
       }
 
-      // Fallback: First time without a name — ask once
+      // First time or re-authenticating after revocation — prompt for device name
       setIsSubmitting(false);
       setTargetRedirect(next);
       setStep("name");
@@ -141,7 +147,7 @@ function GateForm() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           code,
-          displayName: savedViewerName || undefined,
+          displayName: isRevoked ? undefined : (savedViewerName || undefined),
           disconnectSessionId: sessionIdToDisconnect,
         }),
       });
@@ -153,7 +159,7 @@ function GateForm() {
         return;
       }
 
-      if (data.hasName && data.displayName) {
+      if (!isRevoked && data.hasName && data.displayName) {
         try {
           localStorage.setItem("cablecast_viewer_name", data.displayName);
         } catch {}

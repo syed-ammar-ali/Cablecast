@@ -478,7 +478,9 @@ export function VideoPlayer({
       const delay = msUntilNextBlockBoundary();
       timers.push(
         setTimeout(() => {
-          void tuneToChannel(channelNumber);
+          if (activeChannel.number === channelNumber) {
+            void tuneToChannel(channelNumber);
+          }
         }, delay),
       );
     }
@@ -500,7 +502,9 @@ export function VideoPlayer({
 
       timers.push(
         setTimeout(() => {
-          void tuneToChannel(channelNumber);
+          if (activeChannel.number === channelNumber) {
+            void tuneToChannel(channelNumber);
+          }
         }, blockEndMs),
       );
     }

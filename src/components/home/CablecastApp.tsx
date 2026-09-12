@@ -398,9 +398,7 @@ export function CablecastApp({ initialView = "home" }: CablecastAppProps) {
           </div>
 
           <div className="relative z-20 h-auto">
-            <div className="pointer-events-none h-16 sm:h-20 bg-gradient-to-b from-transparent via-black/80 to-black" />
-
-            <div id="broadcast-schedule-grid" className="scroll-mt-14 sm:scroll-mt-16 md:scroll-mt-0 bg-black px-0 md:px-4 pb-0 pt-2 h-auto">
+            <div id="broadcast-schedule-grid" className="scroll-mt-14 sm:scroll-mt-16 md:scroll-mt-0 bg-black px-0 md:px-4 pb-0 pt-2 h-auto shadow-[0_-8px_20px_rgba(0,0,0,0.9)]">
               <TvGrid
                 schedule={schedule}
                 isLoading={isGuideLoading}

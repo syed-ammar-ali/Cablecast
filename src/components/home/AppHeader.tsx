@@ -457,13 +457,17 @@ function CountryPicker({
 
   useEffect(() => {
     if (!isOpen) return;
-    function handlePointerDown(event: MouseEvent) {
+    function handlePointerDown(event: MouseEvent | TouchEvent) {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
         setIsOpen(false);
       }
     }
     document.addEventListener("mousedown", handlePointerDown);
-    return () => document.removeEventListener("mousedown", handlePointerDown);
+    document.addEventListener("touchstart", handlePointerDown, { passive: true });
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("touchstart", handlePointerDown);
+    };
   }, [isOpen]);
 
   return (
@@ -572,13 +576,17 @@ function DatePicker({
 
   useEffect(() => {
     if (!isOpen) return;
-    function handlePointerDown(event: MouseEvent) {
+    function handlePointerDown(event: MouseEvent | TouchEvent) {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
         setIsOpen(false);
       }
     }
     document.addEventListener("mousedown", handlePointerDown);
-    return () => document.removeEventListener("mousedown", handlePointerDown);
+    document.addEventListener("touchstart", handlePointerDown, { passive: true });
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("touchstart", handlePointerDown);
+    };
   }, [isOpen]);
 
   const days = useMemo(() => getCalendarDays(viewDate), [viewDate]);

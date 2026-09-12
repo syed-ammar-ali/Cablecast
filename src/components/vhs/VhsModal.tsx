@@ -1012,11 +1012,11 @@ export function VhsModal({
                     className="shrink-0 snap-center w-[86vw] max-w-[320px] sm:w-[360px] aspect-[2/3] max-h-[70vh] sm:max-h-[76vh] relative [perspective:1400px] transition-transform transition-opacity duration-300 transform-gpu will-change-transform z-30 scale-100 opacity-100 outline-none focus:outline-none focus-visible:outline-none [-webkit-tap-highlight-color:transparent] cursor-grab active:cursor-grabbing"
                   >
                     <div
-                      className={`h-full w-full transition-transform duration-500 ease-[cubic-bezier(0.2,0.8,0.2,1)] [transform-style:preserve-3d] relative ${isFlipped ? "[transform:rotateY(180deg)]" : ""
+                      className={`h-full w-full transition-transform duration-500 ease-[cubic-bezier(0.2,0.8,0.2,1)] [transform-style:preserve-3d] transform-gpu will-change-transform relative ${isFlipped ? "[transform:rotateY(180deg)]" : ""
                         }`}
                     >
                       {/* Front Face */}
-                      <div className="h-full w-full [backface-visibility:hidden] [-webkit-backface-visibility:hidden] rounded-2xl border border-neutral-800 bg-neutral-950 shadow-2xl overflow-hidden absolute inset-0 flex flex-col justify-between outline-none focus:outline-none focus-visible:outline-none [-webkit-tap-highlight-color:transparent]">
+                      <div className="h-full w-full [backface-visibility:hidden] [-webkit-backface-visibility:hidden] transform-gpu will-change-transform rounded-2xl border border-neutral-800 bg-neutral-950 shadow-2xl overflow-hidden absolute inset-0 flex flex-col justify-between outline-none focus:outline-none focus-visible:outline-none [-webkit-tap-highlight-color:transparent]">
                         <div className="bg-gradient-to-r from-red-900/90 via-amber-900/90 to-blue-900/90 border-b border-neutral-800 px-3 py-1.5 flex items-center justify-between text-[9px] font-black uppercase tracking-widest text-neutral-200 shrink-0 z-10">
                           <div className="flex items-center gap-2">
                             <span className="font-mono text-amber-400 font-bold">VHS</span>
@@ -1142,7 +1142,7 @@ export function VhsModal({
                       </div>
 
                       {/* Back Face */}
-                      <div className="h-full w-full [transform:rotateY(180deg)] [backface-visibility:hidden] [-webkit-backface-visibility:hidden] absolute inset-0 rounded-2xl border border-neutral-800 bg-neutral-950 p-4 sm:p-5 pb-12 sm:pb-14 shadow-2xl overflow-hidden flex flex-col justify-start gap-2.5 outline-none focus:outline-none focus-visible:outline-none [-webkit-tap-highlight-color:transparent]">
+                      <div className="h-full w-full [transform:rotateY(180deg)] [backface-visibility:hidden] [-webkit-backface-visibility:hidden] transform-gpu will-change-transform absolute inset-0 rounded-2xl border border-neutral-800 bg-neutral-950 p-4 sm:p-5 pb-12 sm:pb-14 shadow-2xl overflow-hidden flex flex-col justify-start gap-2.5 outline-none focus:outline-none focus-visible:outline-none [-webkit-tap-highlight-color:transparent]">
                         <div className="flex items-center justify-between border-b border-neutral-800 pb-2 shrink-0">
                           <div className="flex items-center gap-2">
                             <Film className="h-4 w-4 text-amber-400" />

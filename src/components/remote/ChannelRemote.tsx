@@ -470,7 +470,7 @@ export function ChannelRemote({ onTuneIn, onNavigateDate, onLongPress }: Channel
             setIsOpen(true);
             reset();
           }}
-          className="fixed bottom-20 sm:bottom-6 right-4 sm:right-6 z-40 sm:z-50 flex h-12 w-12 sm:h-13 sm:w-13 items-center justify-center rounded-full border border-neutral-700 bg-neutral-900/90 text-neutral-200 shadow-2xl shadow-black/80 backdrop-blur-md transition-all hover:border-cyan-500/50 hover:bg-neutral-800 hover:text-white hover:scale-105 active:scale-95 group cursor-pointer select-none"
+          className="fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] sm:bottom-6 right-4 sm:right-6 z-40 sm:z-50 flex h-12 w-12 sm:h-13 sm:w-13 items-center justify-center rounded-full border border-neutral-700 bg-neutral-900/90 text-neutral-200 shadow-2xl shadow-black/80 backdrop-blur-md transition-all hover:border-cyan-500/50 hover:bg-neutral-800 hover:text-white hover:scale-105 active:scale-95 group cursor-pointer select-none"
           title="Open Remote Control (Long-press for surprise!)"
           aria-label="Open Channel Remote"
         >
@@ -482,7 +482,7 @@ export function ChannelRemote({ onTuneIn, onNavigateDate, onLongPress }: Channel
       {isOpen && (
         <div
           ref={remoteRef}
-          className="fixed bottom-20 sm:bottom-6 right-4 sm:right-6 z-50 w-64 max-w-[calc(100vw-2rem)] select-none overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-950 shadow-2xl shadow-black/90 backdrop-blur-xl animate-slide-up-remote"
+          className="fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] sm:bottom-6 right-4 sm:right-6 z-50 w-64 max-w-[calc(100vw-2rem)] select-none overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-950 shadow-2xl shadow-black/90 backdrop-blur-xl animate-slide-up-remote"
         >
           {/* Top Bar: IR LED Indicator & Close Button */}
           <div className="flex h-9 items-center justify-between border-b border-neutral-900 px-3.5">

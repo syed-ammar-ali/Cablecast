@@ -300,7 +300,6 @@ export function BroadcastSchedulerModal({
 
   // Commit / Submission state
   const [isCommitting, setIsCommitting] = useState(false);
-  const [pendingPromptSeason, setPendingPromptSeason] = useState<number | null>(null);
 
   // Notification reminder toggle for weekly mode
   const { isSupported: isPushSupported, isSubscribed, needsHomeScreenInstall, subscribe } =
@@ -320,9 +319,28 @@ export function BroadcastSchedulerModal({
       if (initialDate) setScreeningDate(initialDate);
       setPreviewResult(null);
       setSeasonOverrides({});
-      setPendingPromptSeason(null);
     }
   }, [isOpen, initialMedia, initialMode, initialSeason, initialEpisode, initialDate]);
+
+  // Lock document body scroll when modal is open to eliminate background rubber-banding
+  useEffect(() => {
+    if (!isOpen) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [isOpen]);
+
+  // Keyboard Escape listener
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, onClose]);
 
   // Adjust mode if movie is selected (movie cannot do nostalgia run)
   useEffect(() => {
@@ -762,18 +780,8 @@ export function BroadcastSchedulerModal({
   );
 
   // Final Commit Router
-  const executeCommit = async (skipPrompt: boolean = false) => {
+  const executeCommit = async () => {
     if (!selectedMedia) return;
-
-    // Check Vault tape gate for TV season
-    const targetSeason = mode === "nostalgia" ? startSeason : isTv ? startSeason : 0;
-    const isTargetSeasonOwned = isTv ? ownedSeasons.includes(targetSeason) : ownedSeasons.length > 0;
-
-    if (!skipPrompt && isTv && !isTargetSeasonOwned) {
-      // Prompt user to buy tape for this year or schedule anyway
-      setPendingPromptSeason(targetSeason);
-      return;
-    }
 
     setIsCommitting(true);
     triggerHaptic(20);
@@ -894,7 +902,6 @@ export function BroadcastSchedulerModal({
       toast.error((err as Error).message || "Scheduling error", "Booking Failed");
     } finally {
       setIsCommitting(false);
-      setPendingPromptSeason(null);
     }
   };
 
@@ -1166,7 +1173,7 @@ export function BroadcastSchedulerModal({
                   ) : (
                     <ShoppingBag className="h-3.5 w-3.5 text-purple-300" />
                   )}
-                  <span>Buy Tape $4.99</span>
+                  <span>Acquire Tape</span>
                 </button>
               )}
             </div>
@@ -1681,7 +1688,7 @@ export function BroadcastSchedulerModal({
                               className="inline-flex items-center gap-1 rounded border border-purple-500/40 bg-purple-950/60 hover:bg-purple-900 px-2 py-1 text-[10px] font-mono font-bold text-purple-200 cursor-pointer shrink-0"
                             >
                               <ShoppingBag className="h-3 w-3" />
-                              <span className="hidden sm:inline">Buy Tape</span>
+                              <span className="hidden sm:inline">Acquire Tape</span>
                             </div>
                           )}
 
@@ -1832,7 +1839,7 @@ export function BroadcastSchedulerModal({
           ) : (
             <button
               type="button"
-              onClick={() => executeCommit(false)}
+              onClick={() => executeCommit()}
               disabled={!selectedMedia || isCommitting || Boolean(intraSlotOverlapError)}
               className="flex-1 sm:flex-initial flex items-center justify-center gap-2 rounded-xl border border-purple-500/50 bg-purple-950/60 hover:bg-purple-900/80 text-purple-200 hover:text-white px-5 py-2.5 sm:py-2 text-xs font-bold uppercase tracking-wider shadow-lg active:scale-95 cursor-pointer disabled:opacity-40 min-h-[40px] sm:min-h-[36px]"
             >
@@ -1851,57 +1858,6 @@ export function BroadcastSchedulerModal({
             </button>
           )}
         </footer>
-
-        {/* Pre-Commit Year 1 Season Vault Gate Prompt Modal */}
-        {pendingPromptSeason !== null && (
-          <div
-            className="absolute inset-0 z-50 flex items-center justify-center bg-black/90 p-4 animate-in fade-in"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="w-full max-w-md rounded-2xl border border-amber-500/50 bg-neutral-950 p-5 shadow-2xl space-y-4 text-left">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-950/80 border border-amber-500/40 text-amber-400">
-                  <Zap className="h-5 w-5" />
-                </div>
-                <div>
-                  <h4 className="text-sm font-bold text-white">Season {pendingPromptSeason} Tape Required</h4>
-                  <p className="text-[11px] font-mono text-amber-300">
-                    {mode === "nostalgia" ? `${startYear} Broadcast Launch Year` : "Broadcast Lineup Premiere"}
-                  </p>
-                </div>
-              </div>
-
-              <p className="text-xs text-neutral-300 font-mono leading-relaxed">
-                You are scheduling <strong className="text-white">{selectedMedia?.title}</strong> (Season {pendingPromptSeason}), but the physical VHS master tape is not in your vault.
-              </p>
-              <p className="text-xs text-neutral-400 font-mono leading-relaxed">
-                You can acquire the tape now to ensure uninterrupted playback, or schedule anyway. Unlicensed seasons will show a test pattern on air until acquired.
-              </p>
-
-              <div className="space-y-2 pt-2">
-                <button
-                  type="button"
-                  onClick={async () => {
-                    await handleBuySeasonTape(pendingPromptSeason);
-                    await executeCommit(true);
-                  }}
-                  className="w-full flex items-center justify-center gap-2 rounded-xl border border-purple-500/60 bg-purple-950/80 hover:bg-purple-900 text-purple-200 hover:text-white py-3 text-xs font-bold font-mono uppercase tracking-wider shadow-lg transition-all cursor-pointer min-h-[42px]"
-                >
-                  <ShoppingBag className="h-4 w-4 text-purple-300" />
-                  <span>Acquire Season {pendingPromptSeason} Tape ($4.99) & Lock In</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => executeCommit(true)}
-                  className="w-full flex items-center justify-center gap-2 rounded-xl border border-neutral-800 bg-neutral-900 hover:bg-neutral-800 text-neutral-400 hover:text-white py-2.5 text-xs font-mono font-semibold transition-all cursor-pointer min-h-[40px]"
-                >
-                  <span>Schedule Anyway (License Later)</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );

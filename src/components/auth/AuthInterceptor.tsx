@@ -17,7 +17,15 @@ export function AuthInterceptor() {
     if (pathname === "/gate") return;
 
     function handleUnauthorized() {
-      // 1. Immediately terminate any active HTML5 audio or video playback
+      // 1. Clear cached device viewer name and session identity so name prompt is triggered on re-auth
+      try {
+        localStorage.removeItem("cablecast_viewer_name");
+        localStorage.removeItem("cablecast_user_name");
+        localStorage.removeItem("cablecast_last_code");
+        sessionStorage.clear();
+      } catch {}
+
+      // 2. Immediately terminate any active HTML5 audio or video playback
       if (typeof document !== "undefined") {
         document.querySelectorAll<HTMLMediaElement>("video, audio").forEach((el) => {
           try {
@@ -28,7 +36,7 @@ export function AuthInterceptor() {
         });
       }
 
-      // 2. Perform safe redirect to the access gate with error notice
+      // 3. Perform safe redirect to the access gate with error notice
       if (typeof window !== "undefined" && window.location.pathname !== "/gate") {
         window.location.replace("/gate?error=revoked");
       }

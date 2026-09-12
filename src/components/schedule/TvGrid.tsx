@@ -111,11 +111,12 @@ export function TvGrid({
       if (!gridScrollRef.current) return;
       const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
       const pxPerMin = isMobile ? 4 : 6;
+      const channelColWidth = isMobile ? 96 : 208;
       const d = new Date();
       const currentMin = d.getHours() * 60 + d.getMinutes() + d.getSeconds() / 60;
-      const liveLineLeftPx = currentMin * pxPerMin;
+      const liveLineLeftPx = channelColWidth + currentMin * pxPerMin;
       const containerWidth = gridScrollRef.current.clientWidth || 800;
-      const targetScroll = Math.max(0, liveLineLeftPx - containerWidth * 0.3);
+      const targetScroll = Math.max(0, liveLineLeftPx - channelColWidth - (containerWidth - channelColWidth) * 0.35);
       gridScrollRef.current.scrollLeft = targetScroll;
       lastSnappedDateRef.current = selectedDate;
     };
@@ -137,13 +138,19 @@ export function TvGrid({
     }
     const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
     const pxPerMin = isMobile ? 4 : 6;
+    const channelColWidth = isMobile ? 96 : 208;
     const d = new Date();
     const currentMin = d.getHours() * 60 + d.getMinutes() + d.getSeconds() / 60;
-    const liveLineLeftPx = currentMin * pxPerMin;
+    const liveLineAbsoluteX = channelColWidth + currentMin * pxPerMin;
+    const scrollLeft = gridScrollRef.current.scrollLeft;
     const containerWidth = gridScrollRef.current.clientWidth || 800;
-    const targetScroll = Math.max(0, liveLineLeftPx - containerWidth * 0.3);
-    const scrollDiff = Math.abs(gridScrollRef.current.scrollLeft - targetScroll);
-    setIsAwayFromLive(scrollDiff > 350);
+
+    // Sticky channel column occupies [scrollLeft, scrollLeft + channelColWidth]
+    const minVisibleX = scrollLeft + channelColWidth + 20;
+    const maxVisibleX = scrollLeft + containerWidth - 20;
+    const isLiveLineVisible = liveLineAbsoluteX >= minVisibleX && liveLineAbsoluteX <= maxVisibleX;
+
+    setIsAwayFromLive(!isLiveLineVisible);
   }, [isToday]);
 
   useEffect(() => {
@@ -152,8 +159,13 @@ export function TvGrid({
     const handleScroll = () => {
       checkLiveDistance();
     };
+    checkLiveDistance();
     el.addEventListener("scroll", handleScroll, { passive: true });
-    return () => el.removeEventListener("scroll", handleScroll);
+    window.addEventListener("resize", checkLiveDistance, { passive: true });
+    return () => {
+      el.removeEventListener("scroll", handleScroll);
+      window.removeEventListener("resize", checkLiveDistance);
+    };
   }, [checkLiveDistance]);
 
   const handleJumpToLive = useCallback(() => {
@@ -166,11 +178,12 @@ export function TvGrid({
     if (!gridScrollRef.current) return;
     const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
     const pxPerMin = isMobile ? 4 : 6;
+    const channelColWidth = isMobile ? 96 : 208;
     const d = new Date();
     const currentMin = d.getHours() * 60 + d.getMinutes() + d.getSeconds() / 60;
-    const liveLineLeftPx = currentMin * pxPerMin;
+    const liveLineLeftPx = channelColWidth + currentMin * pxPerMin;
     const containerWidth = gridScrollRef.current.clientWidth || 800;
-    const targetScroll = Math.max(0, liveLineLeftPx - containerWidth * 0.3);
+    const targetScroll = Math.max(0, liveLineLeftPx - channelColWidth - (containerWidth - channelColWidth) * 0.35);
     gridScrollRef.current.scrollTo({ left: targetScroll, behavior: "smooth" });
     setIsAwayFromLive(false);
   }, [now, selectedDate, onDateChange]);
@@ -241,7 +254,7 @@ export function TvGrid({
         <button
           type="button"
           onClick={handleJumpToLive}
-          className="fixed bottom-20 md:bottom-8 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 rounded-full border border-red-500/60 bg-neutral-950/95 px-3.5 py-1.5 text-xs font-bold uppercase tracking-wider text-white shadow-2xl shadow-red-950/80 backdrop-blur-md transition-all hover:bg-red-950/70 hover:border-red-400 active:scale-95 animate-in fade-in slide-in-from-bottom-3 duration-200 cursor-pointer"
+          className="fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom,0px))] md:bottom-8 left-1/2 -translate-x-1/2 z-[70] flex items-center gap-2 rounded-full border border-red-500/60 bg-neutral-950/95 px-3.5 py-1.5 text-xs font-bold uppercase tracking-wider text-white shadow-2xl shadow-red-950/80 backdrop-blur-md transition-all hover:bg-red-950/70 hover:border-red-400 active:scale-95 animate-in fade-in slide-in-from-bottom-3 duration-200 cursor-pointer"
           title="Jump to current live time on schedule"
         >
           <span className="relative flex h-2 w-2">

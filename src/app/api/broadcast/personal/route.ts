@@ -92,9 +92,20 @@ export async function GET() {
         if (item.isRerun) {
           // One-off rerun has completed its airing window!
           // Remove it from the schedule so it doesn't repeat weekly.
-          await prisma.userPersonalSchedule.delete({
+          await prisma.userPersonalSchedule.deleteMany({
             where: { id: item.id },
           }).catch(() => {});
+          continue;
+        }
+
+        // Atomic lock: Only the first concurrent worker to mark lastAiredDate proceeds with advancing & alerts
+        const lockUpdate = await prisma.userPersonalSchedule.updateMany({
+          where: { id: item.id, NOT: { lastAiredDate: todayIsoDate } },
+          data: { lastAiredDate: todayIsoDate },
+        });
+
+        if (lockUpdate.count === 0) {
+          // Concurrently already claimed and processed by another request
           continue;
         }
 
