@@ -270,23 +270,6 @@ export function VhsModal({
     setIsLoadingMetadata(true);
   }, [initialSeason, isOpen, mediaId]);
 
-  // Touch swipe to flip tape on mobile
-  const touchStartXRef = useRef<number | null>(null);
-
-  const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    touchStartXRef.current = e.touches[0].clientX;
-  }, []);
-
-  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
-    if (touchStartXRef.current === null) return;
-    const diff = e.changedTouches[0].clientX - touchStartXRef.current;
-    if (Math.abs(diff) > 45) {
-      triggerHaptic(12);
-      setIsFlipped((prev) => !prev);
-    }
-    touchStartXRef.current = null;
-  }, []);
-
   // Smoothly scroll active card into center of horizontal carousel without scrolling outer page
   const scrollToActiveCard = useCallback((index: number) => {
     const cardEl = cardRefs.current[index];
@@ -825,16 +808,28 @@ export function VhsModal({
           // ── SINGLE CARD (Movie or Single Season TV) ──
           <div
             data-interactive="true"
-            onTouchStart={handleTouchStart}
-            onTouchEnd={handleTouchEnd}
-            className="w-[86vw] max-w-[320px] sm:w-[360px] aspect-[2/3] max-h-[70vh] sm:max-h-[76vh] relative [perspective:1400px] mx-auto cursor-grab active:cursor-grabbing"
+            className="w-[86vw] max-w-[320px] sm:w-[360px] aspect-[2/3] max-h-[70vh] sm:max-h-[76vh] relative [perspective:1400px] mx-auto select-none"
           >
             <div
-              className={`h-full w-full transition-transform duration-500 ease-[cubic-bezier(0.2,0.8,0.2,1)] [transform-style:preserve-3d] relative ${isFlipped ? "[transform:rotateY(180deg)]" : ""
-                }`}
+              style={{
+                transformStyle: "preserve-3d",
+                WebkitTransformStyle: "preserve-3d",
+                transform: isFlipped ? "rotateY(180deg)" : "rotateY(0deg)",
+                transition: "transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1)",
+              }}
+              className="h-full w-full relative"
             >
               {/* Front Cover View */}
-              <div className="h-full w-full [backface-visibility:hidden] [-webkit-backface-visibility:hidden] rounded-2xl border border-neutral-800 bg-neutral-950 shadow-2xl overflow-hidden absolute inset-0 flex flex-col justify-between">
+              <div
+                style={{
+                  backfaceVisibility: "hidden",
+                  WebkitBackfaceVisibility: "hidden",
+                  transform: "rotateY(0deg)",
+                  zIndex: isFlipped ? 1 : 2,
+                  pointerEvents: isFlipped ? "none" : "auto",
+                }}
+                className="h-full w-full rounded-2xl border border-neutral-800 bg-neutral-950 shadow-2xl overflow-hidden absolute inset-0 flex flex-col justify-between"
+              >
                 <div className="bg-gradient-to-r from-red-900/90 via-amber-900/90 to-blue-900/90 border-b border-neutral-800 px-3 py-1.5 flex items-center justify-between text-[9px] font-black uppercase tracking-widest text-neutral-200 shrink-0 z-10">
                   <div className="flex items-center gap-2">
                     <span className="font-mono text-amber-400 font-bold">VHS</span>
@@ -933,7 +928,16 @@ export function VhsModal({
               </div>
 
               {/* Back Cover View */}
-              <div className="h-full w-full [transform:rotateY(180deg)] [backface-visibility:hidden] [-webkit-backface-visibility:hidden] absolute inset-0 rounded-2xl border border-neutral-800 bg-neutral-950 p-4 sm:p-5 pb-12 sm:pb-14 shadow-2xl overflow-hidden flex flex-col justify-start gap-2.5">
+              <div
+                style={{
+                  backfaceVisibility: "hidden",
+                  WebkitBackfaceVisibility: "hidden",
+                  transform: "rotateY(180deg)",
+                  zIndex: isFlipped ? 2 : 1,
+                  pointerEvents: isFlipped ? "auto" : "none",
+                }}
+                className="h-full w-full absolute inset-0 rounded-2xl border border-neutral-800 bg-neutral-950 p-4 sm:p-5 pb-12 sm:pb-14 shadow-2xl overflow-hidden flex flex-col justify-start gap-2.5"
+              >
                 <div className="flex items-center justify-between border-b border-neutral-800 pb-2 shrink-0">
                   <div className="flex items-center gap-2">
                     <Film className="h-4 w-4 text-amber-400" />
@@ -1004,19 +1008,31 @@ export function VhsModal({
                   <div
                     key={seasonNum}
                     data-interactive="true"
-                    onTouchStart={handleTouchStart}
-                    onTouchEnd={handleTouchEnd}
                     ref={(el) => {
                       cardRefs.current[seasonIndex] = el;
                     }}
-                    className="shrink-0 snap-center w-[86vw] max-w-[320px] sm:w-[360px] aspect-[2/3] max-h-[70vh] sm:max-h-[76vh] relative [perspective:1400px] transition-transform transition-opacity duration-300 transform-gpu will-change-transform z-30 scale-100 opacity-100 outline-none focus:outline-none focus-visible:outline-none [-webkit-tap-highlight-color:transparent] cursor-grab active:cursor-grabbing"
+                    className="shrink-0 snap-center w-[86vw] max-w-[320px] sm:w-[360px] aspect-[2/3] max-h-[70vh] sm:max-h-[76vh] relative [perspective:1400px] transition-transform transition-opacity duration-300 z-30 scale-100 opacity-100 outline-none focus:outline-none focus-visible:outline-none [-webkit-tap-highlight-color:transparent] select-none"
                   >
                     <div
-                      className={`h-full w-full transition-transform duration-500 ease-[cubic-bezier(0.2,0.8,0.2,1)] [transform-style:preserve-3d] transform-gpu will-change-transform relative ${isFlipped ? "[transform:rotateY(180deg)]" : ""
-                        }`}
+                      style={{
+                        transformStyle: "preserve-3d",
+                        WebkitTransformStyle: "preserve-3d",
+                        transform: isFlipped ? "rotateY(180deg)" : "rotateY(0deg)",
+                        transition: "transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1)",
+                      }}
+                      className="h-full w-full relative"
                     >
                       {/* Front Face */}
-                      <div className="h-full w-full [backface-visibility:hidden] [-webkit-backface-visibility:hidden] transform-gpu will-change-transform rounded-2xl border border-neutral-800 bg-neutral-950 shadow-2xl overflow-hidden absolute inset-0 flex flex-col justify-between outline-none focus:outline-none focus-visible:outline-none [-webkit-tap-highlight-color:transparent]">
+                      <div
+                        style={{
+                          backfaceVisibility: "hidden",
+                          WebkitBackfaceVisibility: "hidden",
+                          transform: "rotateY(0deg)",
+                          zIndex: isFlipped ? 1 : 2,
+                          pointerEvents: isFlipped ? "none" : "auto",
+                        }}
+                        className="h-full w-full rounded-2xl border border-neutral-800 bg-neutral-950 shadow-2xl overflow-hidden absolute inset-0 flex flex-col justify-between outline-none focus:outline-none focus-visible:outline-none [-webkit-tap-highlight-color:transparent]"
+                      >
                         <div className="bg-gradient-to-r from-red-900/90 via-amber-900/90 to-blue-900/90 border-b border-neutral-800 px-3 py-1.5 flex items-center justify-between text-[9px] font-black uppercase tracking-widest text-neutral-200 shrink-0 z-10">
                           <div className="flex items-center gap-2">
                             <span className="font-mono text-amber-400 font-bold">VHS</span>
@@ -1142,7 +1158,16 @@ export function VhsModal({
                       </div>
 
                       {/* Back Face */}
-                      <div className="h-full w-full [transform:rotateY(180deg)] [backface-visibility:hidden] [-webkit-backface-visibility:hidden] transform-gpu will-change-transform absolute inset-0 rounded-2xl border border-neutral-800 bg-neutral-950 p-4 sm:p-5 pb-12 sm:pb-14 shadow-2xl overflow-hidden flex flex-col justify-start gap-2.5 outline-none focus:outline-none focus-visible:outline-none [-webkit-tap-highlight-color:transparent]">
+                      <div
+                        style={{
+                          backfaceVisibility: "hidden",
+                          WebkitBackfaceVisibility: "hidden",
+                          transform: "rotateY(180deg)",
+                          zIndex: isFlipped ? 2 : 1,
+                          pointerEvents: isFlipped ? "auto" : "none",
+                        }}
+                        className="h-full w-full absolute inset-0 rounded-2xl border border-neutral-800 bg-neutral-950 p-4 sm:p-5 pb-12 sm:pb-14 shadow-2xl overflow-hidden flex flex-col justify-start gap-2.5 outline-none focus:outline-none focus-visible:outline-none [-webkit-tap-highlight-color:transparent]"
+                      >
                         <div className="flex items-center justify-between border-b border-neutral-800 pb-2 shrink-0">
                           <div className="flex items-center gap-2">
                             <Film className="h-4 w-4 text-amber-400" />
