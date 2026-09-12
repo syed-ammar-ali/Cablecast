@@ -117,10 +117,10 @@ export async function POST(request: NextRequest) {
           resolvedRuntime = movie?.defaultRuntime?.exactMinutes && movie.defaultRuntime.exactMinutes > 0 ? movie.defaultRuntime.exactMinutes : 105;
         } else {
           const show = await getShowDetails(Number(tmdbId));
-          resolvedRuntime = show?.defaultRuntime?.exactMinutes && show.defaultRuntime.exactMinutes > 0 ? show.defaultRuntime.exactMinutes : 45;
+          resolvedRuntime = show?.defaultRuntime?.exactMinutes && show.defaultRuntime.exactMinutes > 0 ? show.defaultRuntime.exactMinutes : 25;
         }
       } catch {
-        resolvedRuntime = mediaType === "movie" ? 105 : 45;
+        resolvedRuntime = mediaType === "movie" ? 105 : 25;
       }
     }
     const normRuntime = resolvedRuntime ? normalizeRuntime(resolvedRuntime) : null;

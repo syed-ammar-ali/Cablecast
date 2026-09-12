@@ -279,29 +279,59 @@ export async function getShowDetails(tmdbId: number | string): Promise<ShowDetai
     append_to_response: "credits,content_ratings",
   });
 
-  let defaultMinutes = raw.episode_run_time?.[0] ?? 0;
-  if (!defaultMinutes && raw.last_episode_to_air?.runtime) {
-    defaultMinutes = raw.last_episode_to_air.runtime;
+  let defaultMinutes = 0;
+
+  // 1. If TMDB provides explicit episode_run_time array
+  if (Array.isArray(raw.episode_run_time) && raw.episode_run_time.length > 0) {
+    const valid = raw.episode_run_time
+      .filter((r): r is number => typeof r === "number" && r > 0)
+      .sort((a, b) => a - b);
+    if (valid.length > 0) {
+      defaultMinutes = valid[Math.floor(valid.length / 2)];
+    }
   }
-  if (!defaultMinutes && raw.next_episode_to_air?.runtime) {
-    defaultMinutes = raw.next_episode_to_air.runtime;
-  }
+
+  // 2. Fetch Season 1 episodes to determine the true typical episode runtime (median).
+  // This avoids double-length series/season finales (like Friends 48m finale) corrupting 30m sitcoms into 60m blocks.
   if (!defaultMinutes) {
     try {
       const s1Raw = await tmdbFetch<TmdbSeasonDetailsRaw>(`/tv/${tmdbId}/season/1`);
-      const s1EpRuntime = s1Raw.episodes?.find((e) => e.runtime && e.runtime > 0)?.runtime;
-      if (s1EpRuntime) {
-        defaultMinutes = s1EpRuntime;
+      const validRuntimes = (s1Raw.episodes ?? [])
+        .map((e) => e.runtime)
+        .filter((r): r is number => typeof r === "number" && r > 0)
+        .sort((a, b) => a - b);
+      if (validRuntimes.length > 0) {
+        defaultMinutes = validRuntimes[Math.floor(validRuntimes.length / 2)];
       }
     } catch {
       // ignore
     }
   }
-  // If still zero, fallback based on genre (comedies/animation ~24m, dramas ~45m)
+
+  // 3. Check next or last episode to air (with double-length finale guard for comedies/animations)
   if (!defaultMinutes) {
-    const genres = (raw.genres ?? []).map((g) => g.name.toLowerCase());
-    const isShortForm = genres.some((g) => g.includes("comedy") || g.includes("animation"));
-    defaultMinutes = isShortForm ? 24 : 45;
+    const genres = (raw.genres ?? []).map((g) => (g.name || "").toLowerCase());
+    const isComedyOrAnim = genres.some(
+      (g) => g.includes("comedy") || g.includes("animation") || g.includes("kids"),
+    );
+
+    let candidate = raw.next_episode_to_air?.runtime || raw.last_episode_to_air?.runtime || 0;
+    if (candidate > 0) {
+      // If a comedy/sitcom finale is ~40-55m, it was a 2-part double episode broadcast
+      if (isComedyOrAnim && candidate >= 40 && candidate <= 55) {
+        candidate = Math.round(candidate / 2);
+      }
+      defaultMinutes = candidate;
+    }
+  }
+
+  // 4. Fallback based on genre (comedies/animation/kids ~22m, dramas ~45m)
+  if (!defaultMinutes) {
+    const genres = (raw.genres ?? []).map((g) => (g.name || "").toLowerCase());
+    const isShortForm = genres.some(
+      (g) => g.includes("comedy") || g.includes("animation") || g.includes("kids") || g.includes("news"),
+    );
+    defaultMinutes = isShortForm ? 22 : 45;
   }
 
   const { cast, producers } = normalizeCredits(raw.credits);

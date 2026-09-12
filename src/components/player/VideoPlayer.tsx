@@ -569,7 +569,9 @@ export function VideoPlayer({
             ? liveEntry.runtimeMinutes
             : liveEntry.mediaType === "movie"
             ? 105
-            : 45;
+            : liveEntry.blockCount
+            ? Math.min(liveEntry.blockCount * 30 - 6, 24)
+            : 22;
         const contentDurationMs = effectiveRuntimeMinutes * 60 * 1000;
 
         // Commercial break trigger: only fires after the viewer has completed watching the full show.
@@ -599,7 +601,7 @@ export function VideoPlayer({
     } else {
       // On-demand playback: roll retro commercial break when episode runtime elapses
       if (!isLoading && !exhausted && screenMode === "content") {
-        const estimatedMinutes = mediaType === "movie" ? 105 : 45;
+        const estimatedMinutes = mediaType === "movie" ? 105 : 24;
         const contentDurationMs = estimatedMinutes * 60 * 1000;
         timers.push(setTimeout(enterBumperPhase, contentDurationMs));
       }

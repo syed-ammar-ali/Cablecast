@@ -6,7 +6,7 @@ import { DAYS_OF_WEEK, formatBlockTime } from "@/types/broadcast";
 import type { CreatePersonalScheduleInput, PersonalScheduleItem } from "@/types/broadcast";
 import type { MediaType } from "@/types/media";
 import { checkMediaOwnership, getBroadcastSlotStatus } from "@/lib/mediaOwnership";
-import { getShowDetails } from "@/lib/tmdb";
+import { getShowDetails, getMovieDetails } from "@/lib/tmdb";
 
 /**
  * Calculates whether an appointment is live at the current second and its elapsed offset.
@@ -227,35 +227,48 @@ export async function GET() {
       orderBy: [{ dayOfWeek: "asc" }, { blockStartMinutes: "asc" }],
     });
 
-    // Self-healing check for existing items that were created with legacy 24-episode or 30-minute block defaults
-    const legacyTvItems = updatedItems.filter(
-      (it) => it.mediaType === "tv" && (it.totalEpisodes === 24 || it.runtimeMinutes === 30),
-    );
-    if (legacyTvItems.length > 0) {
-      const uniqueTmdbIds = Array.from(new Set(legacyTvItems.map((it) => it.tmdbId)));
+    // Self-healing check for items with missing/inaccurate runtime or blockCount (e.g. corrupted by old finale runtimes)
+    // or placeholder totalEpisodes (e.g. default 24).
+    const itemsNeedingSync = updatedItems.filter((it) => {
+      if (it.mediaType !== "tv") return false;
+      // Total episode placeholder check
+      if (it.totalEpisodes === 24 || !it.totalEpisodes) return true;
+      // Inaccurate block count check: e.g. 48m runtime on a sitcom that should be 1 block
+      if (it.runtimeMinutes && it.runtimeMinutes > 30 && it.blockCount > 1) return true;
+      return false;
+    });
+
+    if (itemsNeedingSync.length > 0) {
+      const uniqueTmdbIds = Array.from(new Set(itemsNeedingSync.map((it) => it.tmdbId)));
       await Promise.allSettled(
         uniqueTmdbIds.map(async (tmdbId) => {
           try {
             const details = await getShowDetails(tmdbId);
-            const epRuntime = details.defaultRuntime?.exactMinutes || 45;
-            const newBlockCount = Math.max(1, Math.ceil(epRuntime / BLOCK_MINUTES));
-            const relevantItems = legacyTvItems.filter((it) => it.tmdbId === tmdbId);
+            const epRuntime = details.defaultRuntime?.exactMinutes || 25;
+            const newBlockCount = details.defaultRuntime?.blockCount ?? Math.max(1, Math.ceil(epRuntime / BLOCK_MINUTES));
+            const relevantItems = itemsNeedingSync.filter((it) => it.tmdbId === tmdbId);
 
             for (const relItem of relevantItems) {
               const sMatch = details.seasons?.find((s) => s.seasonNumber === relItem.currentSeason);
               const realTotalEpisodes = sMatch?.episodeCount || details.numberOfEpisodes || relItem.totalEpisodes;
 
-              await prisma.userPersonalSchedule.update({
-                where: { id: relItem.id },
-                data: {
-                  totalEpisodes: realTotalEpisodes,
-                  runtimeMinutes: epRuntime,
-                  blockCount: newBlockCount,
-                },
-              });
-              relItem.totalEpisodes = realTotalEpisodes;
-              relItem.runtimeMinutes = epRuntime;
-              relItem.blockCount = newBlockCount;
+              if (
+                relItem.runtimeMinutes !== epRuntime ||
+                relItem.blockCount !== newBlockCount ||
+                relItem.totalEpisodes !== realTotalEpisodes
+              ) {
+                await prisma.userPersonalSchedule.update({
+                  where: { id: relItem.id },
+                  data: {
+                    totalEpisodes: realTotalEpisodes,
+                    runtimeMinutes: epRuntime,
+                    blockCount: newBlockCount,
+                  },
+                });
+                relItem.totalEpisodes = realTotalEpisodes;
+                relItem.runtimeMinutes = epRuntime;
+                relItem.blockCount = newBlockCount;
+              }
             }
           } catch (err) {
             console.debug?.("[api/broadcast/personal] Self-healing skipped for show:", tmdbId, err);
@@ -565,13 +578,16 @@ export async function POST(request: NextRequest) {
     let totalEpisodes = input.totalEpisodes && input.totalEpisodes > 0 ? Number(input.totalEpisodes) : null;
     const targetSeason = input.mediaType === "tv" ? (input.startSeason ?? 1) : 1;
 
-    if (!runtimeMinutes || (input.mediaType === "tv" && (!totalEpisodes || totalEpisodes === 24))) {
-      try {
+    try {
+      if (input.mediaType === "tv") {
         const details = await getShowDetails(input.tmdbId);
-        if (!runtimeMinutes && details.defaultRuntime?.exactMinutes) {
-          runtimeMinutes = details.defaultRuntime.exactMinutes;
+        // Canonical runtime check: prevent inflated runtimes (like a 48m finale) from forcing a 30m show into 60m
+        if (details.defaultRuntime?.exactMinutes) {
+          if (!runtimeMinutes || runtimeMinutes > details.defaultRuntime.exactMinutes) {
+            runtimeMinutes = details.defaultRuntime.exactMinutes;
+          }
         }
-        if (input.mediaType === "tv" && (!totalEpisodes || totalEpisodes === 24)) {
+        if (!totalEpisodes || totalEpisodes === 24) {
           const sMatch = details.seasons?.find((s) => s.seasonNumber === targetSeason);
           if (sMatch?.episodeCount) {
             totalEpisodes = sMatch.episodeCount;
@@ -579,13 +595,20 @@ export async function POST(request: NextRequest) {
             totalEpisodes = details.numberOfEpisodes;
           }
         }
-      } catch (err) {
-        console.warn("[api/broadcast/personal] Failed to fetch TMDB details for fallback:", err);
+      } else {
+        if (!runtimeMinutes) {
+          const details = await getMovieDetails(input.tmdbId);
+          if (details.defaultRuntime?.exactMinutes) {
+            runtimeMinutes = details.defaultRuntime.exactMinutes;
+          }
+        }
       }
+    } catch (err) {
+      console.warn("[api/broadcast/personal] Failed to fetch TMDB details for fallback:", err);
     }
 
     if (!runtimeMinutes) {
-      runtimeMinutes = input.mediaType === "movie" ? 120 : 45;
+      runtimeMinutes = input.mediaType === "movie" ? 120 : 25;
     }
 
     const blockCount = Math.max(1, Math.ceil(runtimeMinutes / BLOCK_MINUTES));

@@ -500,12 +500,51 @@ export function BroadcastSchedulerModal({
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
+  // Season-specific runtime resolver: ensures accurate episode length per season
+  useEffect(() => {
+    if (!isTv || !selectedMedia?.tmdbId || !startSeason) return;
+
+    let isMounted = true;
+    fetch(`/api/tmdb/season?tmdbId=${selectedMedia.tmdbId}&season=${startSeason}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (!isMounted) return;
+        const episodes = Array.isArray(data?.episodes) ? data.episodes : [];
+        const runtimes = episodes
+          .map((ep: { runtime?: { exactMinutes?: number } | number | null }) => {
+            if (typeof ep.runtime === "number") return ep.runtime;
+            if (ep.runtime && typeof ep.runtime.exactMinutes === "number") return ep.runtime.exactMinutes;
+            return null;
+          })
+          .filter((r: number | null): r is number => typeof r === "number" && r > 0)
+          .sort((a: number, b: number) => a - b);
+
+        if (runtimes.length > 0) {
+          const median = runtimes[Math.floor(runtimes.length / 2)];
+          setMediaRuntime(median);
+        }
+      })
+      .catch(() => {
+        // ignore, keep show defaultRuntime
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isTv, selectedMedia?.tmdbId, startSeason]);
+
   const effectiveRuntime = useMemo(() => {
     if (mediaRuntime && mediaRuntime > 0) return mediaRuntime;
     if ((selectedMedia as { runtimeMinutes?: number })?.runtimeMinutes) {
       return (selectedMedia as { runtimeMinutes?: number }).runtimeMinutes!;
     }
-    return isTv ? 45 : 120;
+    const genres = (selectedMedia as { genres?: string[] })?.genres ?? [];
+    const isComedyOrAnim = genres.some((g) => {
+      const gl = (g || "").toLowerCase();
+      return gl.includes("comedy") || gl.includes("animation") || gl.includes("kids");
+    });
+    if (isTv) return isComedyOrAnim ? 22 : 25;
+    return 120;
   }, [mediaRuntime, selectedMedia, isTv]);
 
   const effectiveBlockCount = useMemo(() => {

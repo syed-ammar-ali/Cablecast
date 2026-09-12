@@ -83,14 +83,14 @@ export async function POST(request: NextRequest) {
             runtimeMinutes = details.defaultRuntime?.exactMinutes ?? 105;
           } else {
             const details = await getShowDetails(missedItem.tmdbId);
-            runtimeMinutes = details.defaultRuntime?.exactMinutes ?? 45;
+            runtimeMinutes = details.defaultRuntime?.exactMinutes ?? 25;
           }
         } catch {
-          runtimeMinutes = missedItem.mediaType === "movie" ? 105 : 45;
+          runtimeMinutes = missedItem.mediaType === "movie" ? 105 : 25;
         }
       }
 
-      const safeRuntimeMinutes = runtimeMinutes ?? (missedItem.mediaType === "movie" ? 105 : 45);
+      const safeRuntimeMinutes = runtimeMinutes ?? (missedItem.mediaType === "movie" ? 105 : 25);
 
       const blockCount =
         missedItem.blockCount && missedItem.blockCount > 0

@@ -104,10 +104,8 @@ export function formatBlockTime(blockStartMinutes: number): string {
 
 export function formatBlockTimeRange(blockStartMinutes: number, blockCount: number = 1): string {
   const startStr = formatBlockTime(blockStartMinutes);
-  if (blockCount <= 1) {
-    return startStr;
-  }
-  const endMinutes = blockStartMinutes + blockCount * 30;
+  const safeBlocks = Math.max(1, blockCount || 1);
+  const endMinutes = blockStartMinutes + safeBlocks * 30;
   const endStr = formatBlockTime(endMinutes);
   return `${startStr} – ${endStr}`;
 }
