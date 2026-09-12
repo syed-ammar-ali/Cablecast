@@ -12,10 +12,20 @@ export async function GET() {
     throw error;
   }
 
+  const now = new Date();
   const codes = await prisma.accessCode.findMany({
     orderBy: { createdAt: "desc" },
     include: {
-      _count: { select: { sessions: true } },
+      _count: {
+        select: {
+          sessions: {
+            where: {
+              revokedAt: null,
+              OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+            },
+          },
+        },
+      },
       assignedShows: {
         select: {
           id: true,
@@ -69,7 +79,16 @@ export async function POST(request: NextRequest) {
           assignedShows: showIds.length > 0 ? { connect: showIds.map((id) => ({ id })) } : undefined,
         },
         include: {
-          _count: { select: { sessions: true } },
+          _count: {
+            select: {
+              sessions: {
+                where: {
+                  revokedAt: null,
+                  OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+                },
+              },
+            },
+          },
           assignedShows: {
             select: {
               id: true,

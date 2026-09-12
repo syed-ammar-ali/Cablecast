@@ -59,7 +59,16 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       where: { id },
       data: updateData,
       include: {
-        _count: { select: { sessions: true } },
+        _count: {
+          select: {
+            sessions: {
+              where: {
+                revokedAt: null,
+                OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+              },
+            },
+          },
+        },
         assignedShows: {
           select: {
             id: true,

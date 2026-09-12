@@ -252,6 +252,7 @@ export function AdminDashboard() {
         setSessions((current) =>
           current.map((s) => (s.id === session.id ? { ...s, isActive: false, revokedAt: new Date().toISOString() } : s)),
         );
+        void loadData();
         toast.warning("Session has been disconnected.", "Session Terminated");
       }
     } finally {
@@ -277,6 +278,7 @@ export function AdminDashboard() {
       const response = await fetch(`/api/admin/sessions/${session.id}`, { method: "DELETE" });
       if (response.ok) {
         setSessions((current) => current.filter((s) => s.id !== session.id));
+        void loadData();
         toast.success("Session record deleted.", "Purged");
       }
     } finally {
@@ -303,6 +305,7 @@ export function AdminDashboard() {
       if (response.ok) {
         const data = await response.json();
         setSessions((current) => current.filter((s) => s.isActive));
+        void loadData();
         toast.success(`Purged ${data.deletedCount ?? 0} inactive session records.`, "Cleaned Up");
       }
     } finally {
