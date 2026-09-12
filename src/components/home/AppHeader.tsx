@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -189,7 +189,20 @@ export function AppHeader({
   onAuthLoaded,
 }: AppHeaderProps) {
   const isSearching = searchQuery.trim().length > 0;
-  const [displayName, setDisplayName] = useState<string | null>(null);
+  const [displayName, setDisplayName] = useState<string | null>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        return (
+          localStorage.getItem("cablecast_viewer_name") ||
+          localStorage.getItem("cablecast_admin_name") ||
+          null
+        );
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  });
   const [role, setRole] = useState<"admin" | "user" | null>(null);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
 
@@ -198,7 +211,7 @@ export function AppHeader({
 
   useEffect(() => {
     let cancelled = false;
-    fetch("/api/auth/me")
+    fetch("/api/auth/me", { cache: "no-store" })
       .then((res) => res.json())
       .then((data: { role: "admin" | "user" | null; displayName: string | null }) => {
         if (cancelled) return;
@@ -206,8 +219,15 @@ export function AppHeader({
         onAuthLoadedRef.current?.(data.role);
         if (data.displayName) {
           setDisplayName(data.displayName);
+          try {
+            if (data.role === "admin") {
+              localStorage.setItem("cablecast_admin_name", data.displayName);
+            } else {
+              localStorage.setItem("cablecast_viewer_name", data.displayName);
+            }
+          } catch {}
         } else if (data.role) {
-          setDisplayName(data.role === "admin" ? "Admin" : "Viewer");
+          setDisplayName((prev) => prev || (data.role === "admin" ? "Admin" : "Viewer"));
         }
       })
       .catch(() => { })
@@ -219,6 +239,32 @@ export function AppHeader({
     };
   }, []);
 
+  const router = useRouter();
+
+  const handleSignOut = useCallback(async () => {
+    try {
+      localStorage.removeItem("cablecast_viewer_name");
+      localStorage.removeItem("cablecast_admin_name");
+      localStorage.removeItem("cablecast_user_name");
+      localStorage.removeItem("cablecast_last_code");
+      sessionStorage.clear();
+    } catch {
+      // ignore
+    }
+    if (typeof document !== "undefined") {
+      document.querySelectorAll<HTMLMediaElement>("video, audio").forEach((el) => {
+        try {
+          el.pause();
+          el.removeAttribute("src");
+          el.load();
+        } catch {}
+      });
+    }
+    await fetch("/api/auth/logout", { method: "POST" });
+    router.push("/gate");
+    router.refresh();
+  }, [router]);
+
   const handleHomeClick = () => {
     onSearchQueryChange("");
     onDateChange(formatIsoDate(now));
@@ -227,26 +273,48 @@ export function AppHeader({
 
   return (
     <header className="border-b border-neutral-900 bg-black">
-      {/* ── Mobile Viewport Header (< md): Left = Pure Name Text only, Right = Region & Calendar Icon ── */}
+      {/* ── Mobile Viewport Header (< md): Left = Name + Admin Badge + Sign Out Icon, Right = Region & Calendar Icon ── */}
       <div className="flex items-center justify-between px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-2.5 sm:px-6 sm:py-3 md:hidden">
-        {/* Left: User's Name — Pure text without any icon */}
-        <button
-          type="button"
-          onClick={handleHomeClick}
-          className="text-left cursor-pointer transition-colors active:scale-95"
-          title="Home"
-        >
-          {isLoadingAuth ? (
-            <span className="inline-block h-6 w-24 animate-pulse rounded bg-neutral-800" />
-          ) : (
-            <span className="text-xl font-bold tracking-tight text-white transition-colors hover:text-neutral-300">
-              {displayName || (role === "admin" ? "Admin" : "Viewer")}
-            </span>
+        {/* Left: User's Name and Action Badge / Sign Out Icon */}
+        <div className="flex items-center gap-2 min-w-0">
+          <button
+            type="button"
+            onClick={handleHomeClick}
+            className="text-left cursor-pointer transition-colors active:scale-95 truncate max-w-[150px] sm:max-w-[200px]"
+            title="Home"
+          >
+            {isLoadingAuth && !displayName ? (
+              <span className="inline-block h-6 w-24 animate-pulse rounded bg-neutral-800" />
+            ) : (
+              <span className="text-lg sm:text-xl font-bold tracking-tight text-white transition-colors hover:text-neutral-300 truncate block">
+                {displayName || (role === "admin" ? "Admin" : "Viewer")}
+              </span>
+            )}
+          </button>
+
+          {role === "admin" && (
+            <Link
+              href="/admin"
+              className="flex items-center gap-1 rounded-full border border-neutral-700 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-neutral-400 transition-colors hover:border-emerald-500/50 hover:text-emerald-400 shrink-0"
+            >
+              <ShieldCheck className="h-2.5 w-2.5" />
+              Admin
+            </Link>
           )}
-        </button>
+
+          <button
+            type="button"
+            onClick={handleSignOut}
+            aria-label="Sign out"
+            title="Sign out"
+            className="flex items-center justify-center rounded-full border border-neutral-800 p-1.5 text-neutral-500 transition-colors hover:border-red-500/50 hover:text-red-400 cursor-pointer active:scale-95 shrink-0"
+          >
+            <LogOut className="h-3.5 w-3.5" />
+          </button>
+        </div>
 
         {/* Right: Region / Country Picker & Calendar Icon triggers */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           <CountryPicker selectedCountry={selectedCountry} onCountryChange={onCountryChange} isMobile />
           <DatePicker selectedDate={selectedDate} onDateChange={onDateChange} isMobileIconOnly />
         </div>
@@ -260,6 +328,7 @@ export function AppHeader({
             displayName={displayName}
             role={role}
             isLoading={isLoadingAuth}
+            onSignOut={handleSignOut}
           />
         </div>
 
@@ -377,26 +446,14 @@ function IdentityControls({
   displayName,
   role,
   isLoading,
+  onSignOut,
 }: {
   onHomeClick?: () => void;
   displayName?: string | null;
   role?: "admin" | "user" | null;
   isLoading?: boolean;
+  onSignOut?: () => void;
 }) {
-  const router = useRouter();
-
-  async function signOut() {
-    try {
-      localStorage.removeItem("cablecast_viewer_name");
-      localStorage.removeItem("cablecast_admin_name");
-    } catch {
-      // ignore
-    }
-    await fetch("/api/auth/logout", { method: "POST" });
-    router.push("/gate");
-    router.refresh();
-  }
-
   const name = displayName || (role === "admin" ? "Admin" : "Viewer");
 
   return (
@@ -409,7 +466,7 @@ function IdentityControls({
         className="text-left cursor-pointer transition-colors active:scale-95"
         title="Home"
       >
-        {isLoading ? (
+        {isLoading && !displayName ? (
           <span className="inline-block h-7 w-28 animate-pulse rounded bg-neutral-800" />
         ) : (
           <span className="text-xl font-bold tracking-tight text-white transition-colors hover:text-neutral-300 sm:text-2xl">
@@ -430,10 +487,10 @@ function IdentityControls({
         )}
         <button
           type="button"
-          onClick={signOut}
+          onClick={onSignOut}
           aria-label="Sign out"
           title="Sign out"
-          className="flex items-center justify-center rounded-full border border-neutral-800 p-1.5 text-neutral-500 transition-colors hover:border-red-500/50 hover:text-red-400"
+          className="flex items-center justify-center rounded-full border border-neutral-800 p-1.5 text-neutral-500 transition-colors hover:border-red-500/50 hover:text-red-400 cursor-pointer active:scale-95"
         >
           <LogOut className="h-3.5 w-3.5" />
         </button>

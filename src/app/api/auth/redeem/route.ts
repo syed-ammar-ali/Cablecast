@@ -53,11 +53,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Priority: 1. Client-remembered viewer name (if this device has one saved)
-  let clientName = typeof displayName === "string" ? sanitizeDisplayName(displayName) : null;
-  // If clientName matches the access code label, it was saved under the old bug — discard it
-  if (clientName && accessCode.label && clientName.toLowerCase() === accessCode.label.toLowerCase()) {
-    clientName = null;
-  }
+  const clientName = typeof displayName === "string" ? sanitizeDisplayName(displayName) : null;
   const initialName = clientName || null;
 
   const sessionResult = await createUserSessionWithDeviceLimit(

@@ -55,18 +55,11 @@ export async function getSession(): Promise<CurrentSession | null> {
   });
   if (!session || !isSessionActive(session)) return null;
 
-  // Filter out any legacy display names that were set to the access code's internal label
-  const isLabelAsName = Boolean(
-    session.displayName &&
-    session.accessCode?.label &&
-    session.displayName.toLowerCase() === session.accessCode.label.toLowerCase(),
-  );
-
   return {
     id: session.id,
     role: session.role as Role,
     accessCodeId: session.accessCodeId,
-    displayName: isLabelAsName ? null : session.displayName,
+    displayName: session.displayName,
   };
 }
 

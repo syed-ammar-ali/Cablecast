@@ -228,16 +228,16 @@ function GateForm() {
     const cleanName = nameToSave.trim().replace(/[^a-zA-Z0-9 _.-]/g, "").slice(0, 30);
     try {
       if (cleanName) {
-        await fetch("/api/auth/me", {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ displayName: cleanName }),
-        });
         if (mode === "admin") {
           localStorage.setItem("cablecast_admin_name", cleanName);
         } else {
           localStorage.setItem("cablecast_viewer_name", cleanName);
         }
+        await fetch("/api/auth/me", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ displayName: cleanName }),
+        });
       }
     } catch {
       // Cosmetic fallback

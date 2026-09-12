@@ -1,9 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession, setSessionDisplayName } from "@/lib/auth/server";
 
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   const session = await getSession();
-  return NextResponse.json({ role: session?.role ?? null, displayName: session?.displayName ?? null });
+  return NextResponse.json(
+    { role: session?.role ?? null, displayName: session?.displayName ?? null },
+    {
+      headers: {
+        "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+        Pragma: "no-cache",
+        Expires: "0",
+      },
+    }
+  );
 }
 
 /** Lets the current session (admin or user) set/clear its own header display name. */
@@ -28,5 +39,14 @@ export async function PATCH(request: NextRequest) {
   const displayName = typeof raw === "string" ? raw.trim().slice(0, 40) || null : null;
   await setSessionDisplayName(session.id, displayName);
 
-  return NextResponse.json({ ok: true, displayName });
+  return NextResponse.json(
+    { ok: true, displayName },
+    {
+      headers: {
+        "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+        Pragma: "no-cache",
+        Expires: "0",
+      },
+    }
+  );
 }
