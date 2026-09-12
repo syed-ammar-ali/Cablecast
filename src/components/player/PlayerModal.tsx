@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, X } from "lucide-react";
+import { Loader2, X, ShoppingBag, Zap } from "lucide-react";
 import { VideoPlayer } from "@/components/player/VideoPlayer";
 import type { MediaSearchResult, ShowDetails } from "@/types/media";
 import type { ScheduleEntry } from "@/types/schedule";
+import { notifyLibraryMutation, notifyBroadcastMutation } from "@/lib/syncEvents";
+import { triggerHaptic } from "@/lib/haptics";
 
 /**
  * A single, already-resolved embed URL with no fallback chain — used for
@@ -207,6 +209,76 @@ export function PlayerModal({
     };
   }, [isTv, media?.tmdbId, initialSeason]);
 
+  // Check season tape vault ownership for TV broadcasts
+  const [isSeasonOwned, setIsSeasonOwned] = useState<boolean | null>(null);
+  const [isCheckingOwnership, setIsCheckingOwnership] = useState(false);
+  const [isPurchasingTape, setIsPurchasingTape] = useState(false);
+
+  useEffect(() => {
+    if (!isTv || !media?.tmdbId) {
+      setIsSeasonOwned(true);
+      return;
+    }
+
+    let cancelled = false;
+    setIsCheckingOwnership(true);
+
+    fetch(`/api/vhs/action?mediaId=${media.tmdbId}&season=${season}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (cancelled) return;
+        setIsSeasonOwned(Boolean(data?.isOwned));
+      })
+      .catch(() => {
+        if (!cancelled) setIsSeasonOwned(true);
+      })
+      .finally(() => {
+        if (!cancelled) setIsCheckingOwnership(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isTv, media?.tmdbId, season]);
+
+  const handleBuySeasonTape = async () => {
+    if (!media?.tmdbId) return;
+    setIsPurchasingTape(true);
+    triggerHaptic(12);
+
+    try {
+      const res = await fetch("/api/vhs/action", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "BUY",
+          mediaId: media.tmdbId,
+          mediaType: "tv",
+          seasonNumber: season,
+          meta: {
+            title: media.title,
+            posterPath: media.posterUrl,
+            backdropUrl: media.backdropUrl,
+            releaseYear: media.releaseYear,
+          },
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to acquire tape.");
+      }
+
+      notifyLibraryMutation();
+      notifyBroadcastMutation();
+      setIsSeasonOwned(true);
+    } catch (err) {
+      console.error("[PlayerModal] Failed to buy tape:", err);
+    } finally {
+      setIsPurchasingTape(false);
+    }
+  };
+
   const showPlayer = Boolean(directBroadcast) || !isTv || (details && !isLoadingDetails);
 
   return (
@@ -246,7 +318,7 @@ export function PlayerModal({
             <X className="h-4 w-4" />
           </button>
         </div>
-      ) : !media || !showPlayer ? (
+      ) : !media || !showPlayer || isCheckingOwnership ? (
         <div className="relative flex h-full w-full items-center justify-center bg-black text-neutral-500">
           <button
             type="button"
@@ -256,7 +328,82 @@ export function PlayerModal({
           >
             <X className="h-4 w-4" />
           </button>
-          <Loader2 className="h-8 w-8 animate-spin" />
+          <Loader2 className="h-8 w-8 animate-spin text-purple-400" />
+        </div>
+      ) : isTv && isSeasonOwned === false ? (
+        /* Retro CRT Signal Restricted - Tape Not in Vault Screen */
+        <div className="relative flex h-full w-full flex-col items-center justify-center bg-neutral-950 p-4 text-center select-none overflow-hidden">
+          {/* Close button */}
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close player"
+            className="pointer-events-auto absolute right-[max(0.75rem,env(safe-area-inset-right))] top-[max(0.75rem,env(safe-area-inset-top))] z-40 flex h-8 sm:h-9 w-8 sm:w-9 items-center justify-center rounded-full border border-neutral-800/80 bg-black/85 text-neutral-300 shadow-lg backdrop-blur-md transition-all hover:scale-105 hover:text-white active:scale-95 cursor-pointer"
+          >
+            <X className="h-4 w-4" />
+          </button>
+
+          {/* Retro CRT Scanlines & Vignette */}
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,_transparent_0%,_black_90%)] opacity-80 z-10" />
+          <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.45)_50%)] bg-[length:100%_4px] opacity-50 z-10" />
+
+          {/* SMPTE Color Bars Header */}
+          <div className="w-full max-w-md h-3 flex overflow-hidden rounded-t-xl mb-0 border-t border-x border-neutral-800 shadow-lg z-20">
+            <div className="flex-1 bg-[#c0c0c0]" />
+            <div className="flex-1 bg-[#c0c000]" />
+            <div className="flex-1 bg-[#00c0c0]" />
+            <div className="flex-1 bg-[#00c000]" />
+            <div className="flex-1 bg-[#c000c0]" />
+            <div className="flex-1 bg-[#c00000]" />
+            <div className="flex-1 bg-[#0000c0]" />
+          </div>
+
+          <div className="relative z-20 w-full max-w-md rounded-b-2xl border border-neutral-800 bg-black/95 p-6 shadow-2xl backdrop-blur-md space-y-4">
+            <div className="flex flex-col items-center gap-2">
+              <div className="inline-flex items-center gap-2 rounded-full border border-amber-500/50 bg-amber-950/60 px-3 py-1 text-[11px] font-mono font-bold text-amber-300">
+                <span className="h-2 w-2 rounded-full bg-amber-400 animate-ping" />
+                <span>SIGNAL RESTRICTED // MASTER TAPE REQUIRED</span>
+              </div>
+
+              <h2 className="text-lg font-bold text-white mt-1">{media?.title}</h2>
+              <p className="text-xs font-mono text-purple-300">
+                Season {season} · Episode {episode}
+              </p>
+            </div>
+
+            <p className="text-xs text-neutral-400 font-mono leading-relaxed">
+              This broadcast is scheduled on your channel lineup, but the physical VHS master tape for <strong className="text-neutral-200">Season {season}</strong> is not preserved in your collection vault.
+            </p>
+
+            <div className="pt-2 space-y-2.5">
+              <button
+                type="button"
+                onClick={handleBuySeasonTape}
+                disabled={isPurchasingTape}
+                className="w-full flex items-center justify-center gap-2 rounded-xl border border-purple-500/60 bg-purple-950/80 hover:bg-purple-900 text-purple-200 hover:text-white py-3 text-xs font-bold font-mono uppercase tracking-wider shadow-lg transition-all active:scale-95 cursor-pointer disabled:opacity-50"
+              >
+                {isPurchasingTape ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin text-purple-300" />
+                    <span>Acquiring Tape from Vault...</span>
+                  </>
+                ) : (
+                  <>
+                    <ShoppingBag className="h-4 w-4 text-purple-300" />
+                    <span>Acquire Season {season} Master Tape ($4.99)</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={onClose}
+                className="w-full rounded-xl border border-neutral-800 bg-neutral-900 py-2.5 text-xs font-mono text-neutral-400 hover:text-white transition-colors cursor-pointer"
+              >
+                Return to Broadcast Studio
+              </button>
+            </div>
+          </div>
         </div>
       ) : (
         <VideoPlayer

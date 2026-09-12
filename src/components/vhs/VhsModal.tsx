@@ -94,6 +94,68 @@ function VhsBarcode({ mediaId, seasonNumber }: { mediaId: number | string; seaso
   );
 }
 
+/**
+ * Atmospheric retro VHS cassette sleeve loading skeleton.
+ * Displays dual rotating tape spools and archival retrieval status while
+ * the master season cover artwork is being resolved from the vault.
+ */
+function VhsSleeveSkeleton({
+  seasonNumber,
+  isTv,
+}: {
+  seasonNumber?: number;
+  isTv: boolean;
+}) {
+  return (
+    <div className="absolute inset-0 pt-7 bg-neutral-950 flex flex-col items-center justify-center overflow-hidden select-none">
+      {/* Subtle CRT scanline overlay */}
+      <div
+        className="pointer-events-none absolute inset-0 opacity-20"
+        style={{
+          backgroundImage:
+            "repeating-linear-gradient(0deg, rgba(255,255,255,0.08) 0px, rgba(255,255,255,0.08) 1px, transparent 1px, transparent 3px)",
+        }}
+      />
+
+      {/* Sweeping scanline light beam */}
+      <div className="pointer-events-none absolute inset-x-0 h-16 bg-gradient-to-b from-amber-500/0 via-amber-500/10 to-amber-500/0 animate-[pulse_2s_ease-in-out_infinite]" />
+
+      {/* Animated VHS Cassette Tape Spools */}
+      <div className="relative z-10 flex flex-col items-center justify-center gap-4 p-6 text-center">
+        {/* Dual tape reels with spinning teeth */}
+        <div className="flex items-center gap-5 text-neutral-600">
+          <div className="relative flex h-11 w-11 items-center justify-center rounded-full border-2 border-neutral-700/80 bg-neutral-900/90 shadow-inner">
+            <div className="h-4 w-4 rounded-full border border-neutral-600 border-dashed animate-[spin_3s_linear_infinite]" />
+            <span className="absolute h-1.5 w-1.5 rounded-full bg-amber-500/80 animate-pulse" />
+          </div>
+
+          {/* Magnetic tape band */}
+          <div className="h-0.5 w-10 bg-gradient-to-r from-neutral-700 via-neutral-600 to-neutral-700" />
+
+          <div className="relative flex h-11 w-11 items-center justify-center rounded-full border-2 border-neutral-700/80 bg-neutral-900/90 shadow-inner">
+            <div
+              className="h-4 w-4 rounded-full border border-neutral-600 border-dashed animate-[spin_3s_linear_infinite]"
+              style={{ animationDirection: "reverse" }}
+            />
+            <span className="absolute h-1.5 w-1.5 rounded-full bg-amber-500/80 animate-pulse" />
+          </div>
+        </div>
+
+        {/* Vintage Archive Badge */}
+        <div className="flex flex-col items-center gap-1.5 font-mono">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/40 bg-amber-950/40 px-3 py-1 text-[9px] font-bold uppercase tracking-widest text-amber-300 shadow-sm backdrop-blur-sm">
+            <Loader2 className="h-2.5 w-2.5 animate-spin text-amber-400" />
+            LOADING VAULT SLEEVE
+          </span>
+          <span className="text-[8px] font-semibold uppercase tracking-widest text-neutral-500">
+            {isTv && seasonNumber ? `SEASON ${seasonNumber} MASTER JACKET` : "ARCHIVAL MASTER TAPE"}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function VhsModal({
   isOpen,
   onClose,
@@ -120,6 +182,8 @@ export function VhsModal({
     Math.max(0, (initialSeason || 1) - 1)
   );
   const [metadata, setMetadata] = useState<VhsMetadata | null>(null);
+  const [isLoadingMetadata, setIsLoadingMetadata] = useState(true);
+  const [loadedImages, setLoadedImages] = useState<Record<string, boolean>>({});
   const [seasonCache, setSeasonCache] = useState<Record<number, VhsMetadata>>({});
   const seasonCacheRef = useRef<Record<number, VhsMetadata>>({});
   useEffect(() => {
@@ -203,7 +267,8 @@ export function VhsModal({
   useEffect(() => {
     setActiveSeasonIndex(Math.max(0, (initialSeason || 1) - 1));
     setIsFlipped(false);
-  }, [initialSeason, isOpen]);
+    setIsLoadingMetadata(true);
+  }, [initialSeason, isOpen, mediaId]);
 
   // Touch swipe to flip tape on mobile
   const touchStartXRef = useRef<number | null>(null);
@@ -283,9 +348,11 @@ export function VhsModal({
     // Check cache first
     if (normalizedType === "TV" && seasonCacheRef.current[selectedSeason]) {
       setMetadata(seasonCacheRef.current[selectedSeason]);
+      setIsLoadingMetadata(false);
       return;
     }
 
+    setIsLoadingMetadata(true);
     try {
       const url = new URL(
         `/api/vhs/${normalizedType.toLowerCase()}/${mediaId}`,
@@ -307,6 +374,8 @@ export function VhsModal({
     } catch (err) {
       console.error("[VhsModal] Metadata fetch error:", err);
       toast.error("Could not fetch sleeve metadata from vault", "Archive Lookup Error");
+    } finally {
+      setIsLoadingMetadata(false);
     }
   }, [isOpen, mediaId, normalizedType, selectedSeason, toast]);
 
@@ -469,6 +538,15 @@ export function VhsModal({
   const displayTitle = title || (isTv ? `Series #${mediaId}` : `Movie #${mediaId}`);
   const allSeasons = Array.from({ length: numSeasons }, (_, i) => i);
   const activeSeasonData = seasonCache[selectedSeason] || metadata;
+
+  // Single-card accurate poster resolution & image readiness
+  const isSinglePosterReady = Boolean(
+    (metadata?.frontPosterPath || (!isTv && initialPosterUrl)) && !isLoadingMetadata
+  );
+  const singlePosterSrc = isSinglePosterReady
+    ? metadata?.frontPosterPath || (!isTv ? initialPosterUrl : null)
+    : null;
+  const isSinglePosterLoaded = Boolean(singlePosterSrc && loadedImages[singlePosterSrc]);
 
   // Calculate formatted time remaining for active rental
   let timeRemainingStr: string | null = null;
@@ -770,15 +848,27 @@ export function VhsModal({
                 </div>
 
                 <div className="absolute inset-0 pt-7 bg-neutral-900 overflow-hidden flex items-center justify-center">
-                  {(metadata?.frontPosterPath || initialPosterUrl) ? (
+                  {/* Retro VHS Loading Skeleton - active while metadata or poster image is loading */}
+                  {(!isSinglePosterReady || !isSinglePosterLoaded) && (
+                    <VhsSleeveSkeleton isTv={isTv} seasonNumber={selectedSeason} />
+                  )}
+
+                  {singlePosterSrc && (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
-                      src={metadata?.frontPosterPath || initialPosterUrl || ""}
+                      src={singlePosterSrc}
                       alt={displayTitle}
-                      className="w-full h-full object-cover object-center"
+                      onLoad={() =>
+                        setLoadedImages((prev) => ({ ...prev, [singlePosterSrc]: true }))
+                      }
+                      className={`w-full h-full object-cover object-center transition-opacity duration-300 ${
+                        isSinglePosterLoaded ? "opacity-100" : "opacity-0"
+                      }`}
                       loading="eager"
                     />
-                  ) : (
+                  )}
+
+                  {!isLoadingMetadata && !singlePosterSrc && (
                     <div className="flex flex-col items-center justify-center p-6 text-center text-neutral-600">
                       <Film className="h-12 w-12 stroke-[1.2] mb-2 text-neutral-700" />
                       <p className="text-xs font-mono">No cover art in vault</p>
@@ -903,8 +993,10 @@ export function VhsModal({
               const seasonPoster =
                 metadata?.seasons?.find((s) => s.seasonNumber === seasonNum)?.posterPath ||
                 seasonCache[seasonNum]?.frontPosterPath ||
-                metadata?.frontPosterPath ||
-                (seasonNum === 1 ? initialPosterUrl : null);
+                (metadata?.frontPosterPath && !isMultiSeason ? metadata.frontPosterPath : null);
+
+              const isSeasonPosterReady = Boolean(seasonPoster && !isLoadingMetadata);
+              const isSeasonImageLoaded = Boolean(seasonPoster && loadedImages[seasonPoster]);
 
               if (isSelected) {
                 // ── ACTIVE FLIPPABLE 3D CARD ──
@@ -938,15 +1030,30 @@ export function VhsModal({
                         </div>
 
                         <div className="absolute inset-0 pt-7 bg-neutral-900 overflow-hidden flex items-center justify-center">
-                          {seasonPoster ? (
+                          {/* Retro VHS Loading Skeleton */}
+                          {(!isSeasonPosterReady || !isSeasonImageLoaded) && (
+                            <VhsSleeveSkeleton seasonNumber={seasonNum} isTv={isTv} />
+                          )}
+
+                          {seasonPoster && (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img
                               src={seasonPoster}
                               alt={displayTitle}
-                              className="w-full h-full object-cover object-center"
+                              onLoad={() =>
+                                setLoadedImages((prev) => ({
+                                  ...prev,
+                                  [seasonPoster]: true,
+                                }))
+                              }
+                              className={`w-full h-full object-cover object-center transition-opacity duration-300 ${
+                                isSeasonImageLoaded ? "opacity-100" : "opacity-0"
+                              }`}
                               loading="eager"
                             />
-                          ) : (
+                          )}
+
+                          {!isLoadingMetadata && !seasonPoster && (
                             <div className="flex flex-col items-center justify-center p-6 text-center text-neutral-600">
                               <Film className="h-12 w-12 stroke-[1.2] mb-2 text-neutral-700" />
                               <p className="text-xs font-mono">No cover art in vault</p>

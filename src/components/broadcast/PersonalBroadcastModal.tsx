@@ -27,7 +27,7 @@ import {
 } from "lucide-react";
 import { ChannelShareModal } from "@/components/social/ChannelShareHub";
 import { BroadcastSlotCard } from "./BroadcastSlotCard";
-import { NostalgiaSchedulerModal } from "@/components/calendar/NostalgiaSchedulerModal";
+import { BroadcastSchedulerModal } from "./BroadcastSchedulerModal";
 import { usePushNotifications } from "@/lib/usePushNotifications";
 import type {
   CalendarEntry,
@@ -1379,9 +1379,10 @@ export function PersonalBroadcastModal({
         />
 
         {/* Nostalgia Broadcast Series Scheduler Modal */}
-        <NostalgiaSchedulerModal
+        <BroadcastSchedulerModal
           isOpen={isNostalgiaModalOpen}
           onClose={() => setIsNostalgiaModalOpen(false)}
+          initialMode="nostalgia"
           onScheduled={() => {
             void fetchCalendarEntries();
             void fetchNostalgiaCampaigns();

@@ -32,24 +32,16 @@ const VhsModal = dynamic(
   { ssr: false },
 );
 
-const ScheduleBroadcastModal = dynamic(
+const BroadcastSchedulerModal = dynamic(
   () =>
-    import("@/components/broadcast/ScheduleBroadcastModal").then(
-      (mod) => mod.ScheduleBroadcastModal,
+    import("@/components/broadcast/BroadcastSchedulerModal").then(
+      (mod) => mod.BroadcastSchedulerModal,
     ),
   { ssr: false },
 );
 
 const PlayerModal = dynamic(
   () => import("@/components/player/PlayerModal").then((mod) => mod.PlayerModal),
-  { ssr: false },
-);
-
-const CalendarSchedulerModal = dynamic(
-  () =>
-    import("@/components/calendar/CalendarSchedulerModal").then(
-      (mod) => mod.CalendarSchedulerModal,
-    ),
   { ssr: false },
 );
 
@@ -813,10 +805,11 @@ export function ExploreView({
 
       {/* ── Modals: Broadcast Scheduling ──────────────────────────────────── */}
       {schedulingTarget && (
-        <ScheduleBroadcastModal
+        <BroadcastSchedulerModal
           isOpen={Boolean(schedulingTarget)}
           onClose={() => setSchedulingTarget(null)}
           media={schedulingTarget.media}
+          initialMode="weekly"
           initialSeason={schedulingTarget.season}
           existingSchedule={personalBroadcast.schedule}
           onSchedule={personalBroadcast.addSchedule}
@@ -835,10 +828,11 @@ export function ExploreView({
 
       {/* ── Modals: Calendar Specific Date Scheduler ────────────────────── */}
       {calendarTarget && (
-        <CalendarSchedulerModal
+        <BroadcastSchedulerModal
           isOpen={Boolean(calendarTarget)}
           onClose={() => setCalendarTarget(null)}
           media={calendarTarget.media}
+          initialMode="screening"
           initialSeason={calendarTarget.season}
           initialEpisode={calendarTarget.episode}
         />

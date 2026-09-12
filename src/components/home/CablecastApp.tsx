@@ -39,8 +39,8 @@ const PersonalBroadcastModal = dynamic(
   () => import("@/components/broadcast/PersonalBroadcastModal").then((mod) => mod.PersonalBroadcastModal),
   { ssr: false }
 );
-const ScheduleBroadcastModal = dynamic(
-  () => import("@/components/broadcast/ScheduleBroadcastModal").then((mod) => mod.ScheduleBroadcastModal),
+const BroadcastSchedulerModal = dynamic(
+  () => import("@/components/broadcast/BroadcastSchedulerModal").then((mod) => mod.BroadcastSchedulerModal),
   { ssr: false }
 );
 const ChannelRemote = dynamic(
@@ -342,6 +342,9 @@ export function CablecastApp({ initialView = "home" }: CablecastAppProps) {
     setDetailsTarget(null);
     setSchedulingTarget(null);
     setQuery("");
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
     navigateTo("home");
   }, [navigateTo]);
 
@@ -380,8 +383,8 @@ export function CablecastApp({ initialView = "home" }: CablecastAppProps) {
           />
         </div>
       ) : (
-        <div key="home-view" className="animate-in fade-in duration-150">
-          <div className="relative md:sticky md:top-0 z-10 px-3 pt-2 sm:px-4 sm:pt-3">
+        <div key="home-view" className="animate-[fadeIn_150ms_cubic-bezier(0.16,1,0.3,1)] [will-change:auto]">
+          <div className="sticky top-[calc(3.5rem+env(safe-area-inset-top,0px))] sm:top-[calc(4rem+env(safe-area-inset-top,0px))] md:top-0 z-10 px-3 pt-2 sm:px-4 sm:pt-3">
             <HeroBanner
               liveNow={liveNow}
               onSelectLive={(item) => resolver.resolveBroadcast(item, now)}
@@ -395,9 +398,9 @@ export function CablecastApp({ initialView = "home" }: CablecastAppProps) {
           </div>
 
           <div className="relative z-20 h-auto">
-            <div className="pointer-events-none h-16 bg-gradient-to-b from-transparent to-black" />
+            <div className="pointer-events-none h-16 sm:h-20 bg-gradient-to-b from-transparent via-black/80 to-black" />
 
-            <div id="broadcast-schedule-grid" className="bg-black px-0 md:px-4 pb-0 pt-2 h-auto">
+            <div id="broadcast-schedule-grid" className="scroll-mt-14 sm:scroll-mt-16 md:scroll-mt-0 bg-black px-0 md:px-4 pb-0 pt-2 h-auto">
               <TvGrid
                 schedule={schedule}
                 isLoading={isGuideLoading}
@@ -528,7 +531,7 @@ export function CablecastApp({ initialView = "home" }: CablecastAppProps) {
 
       {/* Quick Schedule Broadcast Popover Modal */}
       {schedulingTarget && (
-        <ScheduleBroadcastModal
+        <BroadcastSchedulerModal
           isOpen={Boolean(schedulingTarget)}
           onClose={() => setSchedulingTarget(null)}
           media={schedulingTarget.media}
