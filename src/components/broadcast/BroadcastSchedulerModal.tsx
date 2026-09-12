@@ -65,6 +65,8 @@ export interface BroadcastSchedulerModalProps {
     timezoneOffset?: number;
     startSeason?: number;
     startEpisode?: number;
+    totalEpisodes?: number;
+    autoShiftOnConflict?: boolean;
   }) => Promise<{ success: boolean; error?: string }>;
 }
 
@@ -264,6 +266,7 @@ export function BroadcastSchedulerModal({
   const [availableSeasons, setAvailableSeasons] = useState<
     Array<{ seasonNumber: number; name: string; episodeCount: number; airDate: string | null }>
   >([]);
+  const [mediaRuntime, setMediaRuntime] = useState<number | null>(null);
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
 
   // VHS Ownership state
@@ -317,6 +320,7 @@ export function BroadcastSchedulerModal({
       if (initialSeason) setStartSeason(initialSeason);
       if (initialEpisode) setStartEpisode(initialEpisode);
       if (initialDate) setScreeningDate(initialDate);
+      setMediaRuntime(null);
       setPreviewResult(null);
       setSeasonOverrides({});
     }
@@ -349,20 +353,24 @@ export function BroadcastSchedulerModal({
     }
   }, [selectedMedia, mode]);
 
-  // Fetch show season metadata
+  // Fetch show details, runtime & seasons
   useEffect(() => {
-    if (!selectedMedia?.tmdbId || selectedMedia.mediaType !== "tv") {
+    if (!selectedMedia?.tmdbId) {
       setAvailableSeasons([]);
+      setMediaRuntime(null);
       return;
     }
 
     let isMounted = true;
     setIsLoadingDetails(true);
 
-    fetch(`/api/tmdb/details?tmdbId=${selectedMedia.tmdbId}&mediaType=tv`)
+    fetch(`/api/tmdb/details?tmdbId=${selectedMedia.tmdbId}&mediaType=${selectedMedia.mediaType}`)
       .then((res) => res.json())
       .then((data) => {
         if (!isMounted) return;
+        if (data?.defaultRuntime?.exactMinutes) {
+          setMediaRuntime(data.defaultRuntime.exactMinutes);
+        }
         if (Array.isArray(data?.seasons)) {
           const valid = data.seasons
             .filter((s: { seasonNumber: number }) => s.seasonNumber > 0)
@@ -492,6 +500,24 @@ export function BroadcastSchedulerModal({
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
+  const effectiveRuntime = useMemo(() => {
+    if (mediaRuntime && mediaRuntime > 0) return mediaRuntime;
+    if ((selectedMedia as { runtimeMinutes?: number })?.runtimeMinutes) {
+      return (selectedMedia as { runtimeMinutes?: number }).runtimeMinutes!;
+    }
+    return isTv ? 45 : 120;
+  }, [mediaRuntime, selectedMedia, isTv]);
+
+  const effectiveBlockCount = useMemo(() => {
+    return Math.max(1, Math.ceil(effectiveRuntime / BLOCK_MINUTES));
+  }, [effectiveRuntime]);
+
+  const selectedSeasonMeta = useMemo(() => {
+    return availableSeasons.find((s) => s.seasonNumber === startSeason) || availableSeasons[0] || null;
+  }, [availableSeasons, startSeason]);
+
+  const selectedSeasonEpisodeCount = selectedSeasonMeta?.episodeCount || 0;
+
   // Time calculations
   const currentSlot = HALF_DAY_SLOTS[selectedSlotIndex] || HALF_DAY_SLOTS[17];
   const blockStartMinutes = toMinutesFromMidnight(currentSlot.hour12, currentSlot.minute, meridiem);
@@ -521,22 +547,24 @@ export function BroadcastSchedulerModal({
   const handleSnapBackToBack = useCallback(() => {
     triggerHaptic(10);
     setPreviewResult(null);
-    const s2 = fromMinutesToSlot(blockStartMinutes + 30);
+    const blockDuration = effectiveBlockCount * BLOCK_MINUTES;
+    const s2 = fromMinutesToSlot(blockStartMinutes + blockDuration);
     setSlot2Index(s2.slotIndex);
     setSlot2Meridiem(s2.meridiem);
     if (episodesPerDay === 3) {
-      const s3 = fromMinutesToSlot(blockStartMinutes + 60);
+      const s3 = fromMinutesToSlot(blockStartMinutes + blockDuration * 2);
       setSlot3Index(s3.slotIndex);
       setSlot3Meridiem(s3.meridiem);
     }
     toast.info("Time slots snapped consecutively back-to-back.", "Back-to-Back");
-  }, [blockStartMinutes, episodesPerDay, toast]);
+  }, [blockStartMinutes, episodesPerDay, effectiveBlockCount, toast]);
 
   const intraSlotOverlapError = useMemo(() => {
     if (!isTv || episodesPerDay === 1) return null;
+    const blockDuration = effectiveBlockCount * BLOCK_MINUTES;
     if (episodesPerDay >= 2) {
-      if (slot2Minutes < blockStartMinutes + 30 && slot2Minutes >= blockStartMinutes) {
-        return "Episode 2 starts before Episode 1 finishes. Space out times or snap back-to-back.";
+      if (slot2Minutes < blockStartMinutes + blockDuration && slot2Minutes >= blockStartMinutes) {
+        return `Episode 2 starts before Episode 1 finishes (${effectiveBlockCount * 30}m block). Space out times or snap back-to-back.`;
       }
       if (blockStartMinutes === slot2Minutes) {
         return "Episode 1 and Episode 2 cannot air at the exact same time.";
@@ -546,8 +574,8 @@ export function BroadcastSchedulerModal({
       }
     }
     if (episodesPerDay === 3) {
-      if (slot3Minutes < slot2Minutes + 30 && slot3Minutes >= slot2Minutes) {
-        return "Episode 3 starts before Episode 2 finishes. Space out times or snap back-to-back.";
+      if (slot3Minutes < slot2Minutes + blockDuration && slot3Minutes >= slot2Minutes) {
+        return `Episode 3 starts before Episode 2 finishes (${effectiveBlockCount * 30}m block). Space out times or snap back-to-back.`;
       }
       if (slot3Minutes === blockStartMinutes || slot3Minutes === slot2Minutes) {
         return "Episode 3 cannot air at the exact same time as an earlier episode.";
@@ -557,14 +585,13 @@ export function BroadcastSchedulerModal({
       }
     }
     return null;
-  }, [isTv, episodesPerDay, blockStartMinutes, slot2Minutes, slot3Minutes]);
+  }, [isTv, episodesPerDay, blockStartMinutes, slot2Minutes, slot3Minutes, effectiveBlockCount]);
 
   // Conflict detection with existing weekly schedule
   const scheduleOverlapConflict = useMemo(() => {
     if (mode !== "weekly" || !selectedMedia || existingSchedule.length === 0) return null;
 
-    const runtime = isTv ? 30 : 120;
-    const blockCount = Math.max(1, Math.ceil(runtime / BLOCK_MINUTES));
+    const blockDuration = effectiveBlockCount * BLOCK_MINUTES;
 
     for (const day of selectedDays) {
       const daySchedules = existingSchedule.filter(
@@ -576,18 +603,82 @@ export function BroadcastSchedulerModal({
         const schedEnd = schedStart + scheduled.blockCount * BLOCK_MINUTES;
 
         // Check each planned episode slot
-        for (const plannedStart of dailySlots) {
-          const plannedEnd = plannedStart + blockCount * BLOCK_MINUTES;
+        for (let sIdx = 0; sIdx < dailySlots.length; sIdx++) {
+          const plannedStart = dailySlots[sIdx];
+          const plannedEnd = plannedStart + blockDuration;
           const isOverlap = plannedStart < schedEnd && plannedEnd > schedStart;
           if (isOverlap) {
             const dayName = DAYS_OF_WEEK.find((d) => d.day === day)?.short || "Day";
-            return `Conflicts with "${scheduled.title}" on ${dayName} at ${formatBlockTime(schedStart)}.`;
+            return {
+              message: `Conflicts with "${scheduled.title}" on ${dayName} at ${formatBlockTime(schedStart)}.`,
+              conflictTitle: scheduled.title,
+              conflictDay: day,
+              conflictStart: schedStart,
+              conflictEnd: schedEnd,
+              slotIndex: sIdx,
+            };
           }
         }
       }
     }
     return null;
-  }, [mode, selectedMedia, existingSchedule, selectedDays, dailySlots, isTv]);
+  }, [mode, selectedMedia, existingSchedule, selectedDays, dailySlots, effectiveBlockCount]);
+
+  const nextAvailableSlot = useMemo(() => {
+    if (!scheduleOverlapConflict || mode !== "weekly") return null;
+    const blockDuration = effectiveBlockCount * BLOCK_MINUTES;
+    const day = scheduleOverlapConflict.conflictDay;
+    const dayItems = existingSchedule
+      .filter((s) => s.dayOfWeek === day && s.tmdbId !== selectedMedia?.tmdbId)
+      .sort((a, b) => a.blockStartMinutes - b.blockStartMinutes);
+
+    // Search forward from the end of conflicting show
+    const searchFrom = Math.min(1440, scheduleOverlapConflict.conflictEnd);
+    for (let m = searchFrom; m <= 1440 - blockDuration; m += BLOCK_MINUTES) {
+      const end = m + blockDuration;
+      const overlaps = dayItems.some((item) => {
+        const itemEnd = item.blockStartMinutes + item.blockCount * BLOCK_MINUTES;
+        return m < itemEnd && end > item.blockStartMinutes;
+      });
+      if (!overlaps) return m;
+    }
+
+    // Wrap around to earlier in the day
+    for (let m = 0; m < scheduleOverlapConflict.conflictStart; m += BLOCK_MINUTES) {
+      if (m + blockDuration > 1440) break;
+      const end = m + blockDuration;
+      const overlaps = dayItems.some((item) => {
+        const itemEnd = item.blockStartMinutes + item.blockCount * BLOCK_MINUTES;
+        return m < itemEnd && end > item.blockStartMinutes;
+      });
+      if (!overlaps) return m;
+    }
+
+    return null;
+  }, [scheduleOverlapConflict, mode, effectiveBlockCount, existingSchedule, selectedMedia?.tmdbId]);
+
+  const handleShiftToNextAvailable = useCallback(() => {
+    if (nextAvailableSlot === null) return;
+    triggerHaptic(12);
+    const { slotIndex, meridiem: newMeridiem } = fromMinutesToSlot(nextAvailableSlot);
+    setSelectedSlotIndex(slotIndex);
+    setMeridiem(newMeridiem);
+    if (episodesPerDay >= 2) {
+      const blockDuration = effectiveBlockCount * BLOCK_MINUTES;
+      const s2 = fromMinutesToSlot(nextAvailableSlot + blockDuration);
+      setSlot2Index(s2.slotIndex);
+      setSlot2Meridiem(s2.meridiem);
+      if (episodesPerDay === 3) {
+        const s3 = fromMinutesToSlot(nextAvailableSlot + blockDuration * 2);
+        setSlot3Index(s3.slotIndex);
+        setSlot3Meridiem(s3.meridiem);
+      }
+    }
+    toast.success(
+      `Shifted broadcast to next open slot: ${formatBlockTime(nextAvailableSlot)}`,
+      "Slot Auto-Shifted",
+    );
+  }, [nextAvailableSlot, episodesPerDay, effectiveBlockCount, toast]);
 
   // Days toggling
   const toggleDay = useCallback((day: number) => {
@@ -788,19 +879,38 @@ export function BroadcastSchedulerModal({
 
     try {
       if (mode === "weekly") {
+        if (scheduleOverlapConflict) {
+          if (nextAvailableSlot !== null) {
+            handleShiftToNextAvailable();
+            toast.info(
+              `Shifted from overlapping slot to ${formatBlockTime(nextAvailableSlot)}. Tap "Lock In" again to confirm booking.`,
+              "Slot Auto-Shifted",
+            );
+            return;
+          } else {
+            toast.error(
+              `Cannot schedule: overlaps with "${scheduleOverlapConflict.conflictTitle}". Please select another time or day.`,
+              "Schedule Conflict",
+            );
+            return;
+          }
+        }
+
         const payload = {
           tmdbId: selectedMedia.tmdbId,
           mediaType: selectedMedia.mediaType as "movie" | "tv",
           title: selectedMedia.title,
           posterPath: selectedMedia.posterPath || null,
           backdropUrl: selectedMedia.backdropUrl || null,
-          runtimeMinutes: (selectedMedia as { runtimeMinutes?: number }).runtimeMinutes || (isTv ? 30 : 120),
+          runtimeMinutes: effectiveRuntime,
           daysOfWeek: selectedDays,
           blockStartMinutes,
           dailySlots,
           episodesPerDay,
           startSeason: isTv ? startSeason : undefined,
           startEpisode: isTv ? startEpisode : undefined,
+          totalEpisodes: isTv && selectedSeasonEpisodeCount > 0 ? selectedSeasonEpisodeCount : undefined,
+          autoShiftOnConflict: true,
         };
 
         if (onSchedule) {
@@ -831,8 +941,8 @@ export function BroadcastSchedulerModal({
           "Broadcast Slotted",
         );
       } else if (mode === "screening") {
-        const defaultRuntime = isTv ? 30 : ((selectedMedia as { runtimeMinutes?: number }).runtimeMinutes || 120);
-        const blockCount = Math.max(1, Math.ceil(defaultRuntime / BLOCK_MINUTES));
+        const defaultRuntime = effectiveRuntime;
+        const blockCount = effectiveBlockCount;
 
         const res = await fetch("/api/calendar", {
           method: "POST",
@@ -1046,10 +1156,14 @@ export function BroadcastSchedulerModal({
                       isLoadingDetails ? (
                         <span className="text-purple-400 animate-pulse">Scanning seasons...</span>
                       ) : (
-                        `${availableSeasons.length} Available Seasons · Airing Season ${startSeason}`
+                        `${availableSeasons.length} Available Seasons · Airing Season ${startSeason}${
+                          selectedSeasonEpisodeCount > 0 ? ` (${selectedSeasonEpisodeCount} eps)` : ""
+                        } · ${effectiveRuntime}m (${effectiveBlockCount} ${
+                          effectiveBlockCount === 1 ? "Block" : "Blocks"
+                        })`
                       )
                     ) : (
-                      "Feature Film Broadcast"
+                      `Feature Film Broadcast · ${effectiveRuntime}m (${effectiveBlockCount} Blocks)`
                     )}
                   </p>
                 </div>
@@ -1254,6 +1368,35 @@ export function BroadcastSchedulerModal({
                 </div>
               </div>
 
+              {/* Season Selector for TV in Weekly Mode */}
+              {isTv && availableSeasons.length > 0 && (
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-mono font-bold uppercase tracking-wider text-neutral-300">
+                      Starting Season
+                    </label>
+                    <span className="text-[11px] font-mono text-purple-300 font-bold">
+                      {selectedSeasonEpisodeCount > 0 ? `${selectedSeasonEpisodeCount} Episodes` : ""}
+                    </span>
+                  </div>
+                  <select
+                    value={startSeason}
+                    onChange={(e) => {
+                      triggerHaptic(8);
+                      setStartSeason(Number(e.target.value));
+                      setStartEpisode(1);
+                    }}
+                    className="w-full rounded-xl border border-neutral-800 bg-neutral-900 px-3 py-2 text-xs font-mono font-bold text-white focus:border-purple-500/60 focus:outline-none cursor-pointer min-h-[38px]"
+                  >
+                    {availableSeasons.map((s) => (
+                      <option key={s.seasonNumber} value={s.seasonNumber}>
+                        {s.name} ({s.episodeCount} eps)
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               {/* Episodes per day (TV only) */}
               {isTv && (
                 <div className="space-y-2">
@@ -1282,13 +1425,14 @@ export function BroadcastSchedulerModal({
                           triggerHaptic(8);
                           setEpisodesPerDay(cnt);
                           setActiveSlotEditing(0);
+                          const blockDuration = effectiveBlockCount * BLOCK_MINUTES;
                           if (cnt >= 2) {
-                            const s2 = fromMinutesToSlot(blockStartMinutes + 30);
+                            const s2 = fromMinutesToSlot(blockStartMinutes + blockDuration);
                             setSlot2Index(s2.slotIndex);
                             setSlot2Meridiem(s2.meridiem);
                           }
                           if (cnt === 3) {
-                            const s3 = fromMinutesToSlot(blockStartMinutes + 60);
+                            const s3 = fromMinutesToSlot(blockStartMinutes + blockDuration * 2);
                             setSlot3Index(s3.slotIndex);
                             setSlot3Meridiem(s3.meridiem);
                           }
@@ -1469,9 +1613,21 @@ export function BroadcastSchedulerModal({
             )}
 
             {scheduleOverlapConflict && (
-              <div className="flex items-center gap-2 p-2.5 rounded-xl border border-amber-800/60 bg-amber-950/30 text-amber-300 text-xs font-mono animate-in fade-in">
-                <AlertCircle className="h-4 w-4 shrink-0 text-amber-400" />
-                <span className="truncate">{scheduleOverlapConflict}</span>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 rounded-xl border border-amber-800/60 bg-amber-950/30 text-amber-300 text-xs font-mono animate-in fade-in">
+                <div className="flex items-center gap-2 min-w-0">
+                  <AlertCircle className="h-4 w-4 shrink-0 text-amber-400" />
+                  <span className="truncate">{scheduleOverlapConflict.message}</span>
+                </div>
+                {nextAvailableSlot !== null && (
+                  <button
+                    type="button"
+                    onClick={handleShiftToNextAvailable}
+                    className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-amber-500/50 bg-amber-900/50 hover:bg-amber-800/70 text-amber-200 px-2.5 py-1 text-[11px] font-bold shrink-0 transition-colors cursor-pointer"
+                  >
+                    <span>Shift to Next Slot ({formatBlockTime(nextAvailableSlot)})</span>
+                    <ChevronRight className="h-3 w-3" />
+                  </button>
+                )}
               </div>
             )}
 

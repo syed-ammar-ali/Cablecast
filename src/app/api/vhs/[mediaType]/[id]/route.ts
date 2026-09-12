@@ -67,14 +67,14 @@ export async function GET(
           {
             episodeNumber: 1,
             name: isTv ? "Episode 1" : "Feature Presentation",
-            runtime: isTv ? 24 : 90,
+            runtime: isTv ? 45 : 105,
           },
         ],
         credits: {
           creators: ["Cablecast Vault"],
           mainCast: ["Ensemble Cast"],
         },
-        calculatedRuntime: isTv ? 24 : 90,
+        calculatedRuntime: isTv ? 45 : 105,
       },
       { status: 200 }
     );

@@ -4,9 +4,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Check,
   ChevronDown,
+  FastForward,
   RadioTower,
   RefreshCw,
   SatelliteDish,
+  Tv,
+  Volume2,
+  VolumeX,
   X,
 } from "lucide-react";
 import {
@@ -19,9 +23,13 @@ import { CHANNELS } from "@/config/channels";
 import { BLOCK_MINUTES } from "@/lib/runtime";
 import {
   getAppointmentEndDate,
+  getAppointmentStartDate,
   msUntilNextBlockBoundary,
 } from "@/lib/schedule";
-import { fetchChannelNowPlaying } from "@/lib/liveChannelClient";
+import {
+  fetchChannelNowPlaying,
+  fetchChannelNextUpcoming,
+} from "@/lib/liveChannelClient";
 import { getRandomBumper, type Bumper } from "@/lib/bumpers";
 import { DeadAirScreen } from "@/components/player/DeadAirScreen";
 import type { MediaType } from "@/types/media";
@@ -52,6 +60,12 @@ interface VideoPlayerProps {
 
 type ScreenMode = "tuning" | "off-air" | "bumper" | "content";
 
+function formatCommercialCountdown(totalSeconds: number): string {
+  const mins = Math.floor(totalSeconds / 60);
+  const secs = totalSeconds % 60;
+  return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+}
+
 export function VideoPlayer({
   tmdbId,
   season = 1,
@@ -62,6 +76,17 @@ export function VideoPlayer({
   initialLiveEntry,
   onClose,
 }: VideoPlayerProps) {
+  const [currentSeason, setCurrentSeason] = useState(season);
+  const [currentEpisode, setCurrentEpisode] = useState(episode);
+
+  useEffect(() => {
+    setCurrentSeason(season);
+  }, [season]);
+
+  useEffect(() => {
+    setCurrentEpisode(episode);
+  }, [episode]);
+
   const [currentProviderIndex, setCurrentProviderIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [exhausted, setExhausted] = useState(false);
@@ -100,12 +125,24 @@ export function VideoPlayer({
   const [isTuningChannel, setIsTuningChannel] = useState(false);
   const [isBumperPhase, setIsBumperPhase] = useState(false);
   const [bumper, setBumper] = useState<Bumper | null>(null);
+  const [isBumperMuted, setIsBumperMuted] = useState(true);
+  const [nextUpcomingEntry, setNextUpcomingEntry] = useState<ScheduleEntry | null>(null);
   const tuneRequestIdRef = useRef(0);
 
   const activeChannel = CHANNELS[channelIndex];
 
+  const advanceToNextEpisode = useCallback(() => {
+    setIsBumperPhase(false);
+    setBumper(null);
+    setCurrentEpisode((prev) => prev + 1);
+    setCurrentProviderIndex(0);
+    setExhausted(false);
+    setIsLoading(true);
+    setReloadTick((t) => t + 1);
+  }, []);
+
   const screenMode: ScreenMode = !isLiveMode
-    ? "content"
+    ? (isBumperPhase ? "bumper" : "content")
     : isTuningChannel
       ? "tuning"
       : isOffAir
@@ -121,12 +158,17 @@ export function VideoPlayer({
         mediaType: liveEntry.mediaType,
         season: liveEntry.season ?? 1,
         episode: liveEntry.episode ?? 1,
-        startOffsetSeconds: liveEntry.liveOffsetSeconds ?? startOffsetSeconds,
         title: liveEntry.title,
       };
     }
-    return { tmdbId, mediaType, season, episode, startOffsetSeconds, title };
-  }, [isLiveMode, liveEntry, tmdbId, mediaType, season, episode, startOffsetSeconds, title]);
+    return {
+      tmdbId,
+      mediaType,
+      season: currentSeason,
+      episode: currentEpisode,
+      title: title ? title.replace(/·\s*S\d+E\d+/i, `· S${currentSeason}E${currentEpisode}`) : title,
+    };
+  }, [isLiveMode, liveEntry, tmdbId, mediaType, currentSeason, currentEpisode, title]);
 
   const contentIdentity = `${activePlayback.tmdbId}-${activePlayback.mediaType}-${activePlayback.season}-${activePlayback.episode}`;
 
@@ -153,7 +195,6 @@ export function VideoPlayer({
       mediaType: activePlayback.mediaType,
       season: activePlayback.season,
       episode: activePlayback.episode,
-      startOffsetSeconds: activePlayback.startOffsetSeconds,
     });
   }, [currentProviderIndex, activePlayback, isDynamic, dynamicEmbedUrl, currentProvider]);
 
@@ -231,29 +272,7 @@ export function VideoPlayer({
     // actually working.
     clearLoadTimeout();
     setIsLoading(false);
-
-    const offset = activePlayback.startOffsetSeconds;
-    if (offset && offset > 0 && iframeRef.current?.contentWindow) {
-      const win = iframeRef.current.contentWindow;
-      const sendSeek = () => {
-        try {
-          win.postMessage({ type: "seek", time: offset, seconds: offset }, "*");
-          win.postMessage({ event: "seek", time: offset, value: offset }, "*");
-          win.postMessage({ type: "setCurrentTime", value: offset }, "*");
-          win.postMessage({ event: "command", func: "seekTo", args: [offset, true] }, "*");
-          win.postMessage({ method: "setCurrentTime", value: offset }, "*");
-          win.postMessage(JSON.stringify({ event: "command", func: "seekTo", args: [offset, true] }), "*");
-        } catch {
-          // Cross-origin safety
-        }
-      };
-
-      sendSeek();
-      setTimeout(sendSeek, 600);
-      setTimeout(sendSeek, 1500);
-      setTimeout(sendSeek, 3000);
-    }
-  }, [clearLoadTimeout, activePlayback.startOffsetSeconds]);
+  }, [clearLoadTimeout]);
 
   const handleIframeError = useCallback(() => {
     advanceProvider();
@@ -315,7 +334,6 @@ export function VideoPlayer({
         .then((data: { match: { videoId: string } | null }) => {
           if (dynamicRequestIdRef.current !== requestId) return;
           if (data.match?.videoId) {
-            const startOffset = Math.floor(activePlayback.startOffsetSeconds ?? 0);
             const origin = typeof window !== "undefined" ? window.location.origin : "";
             const ytParams = new URLSearchParams({
               autoplay: "1",
@@ -323,7 +341,6 @@ export function VideoPlayer({
               modestbranding: "1",
             });
             if (origin) ytParams.set("origin", origin);
-            if (startOffset > 0) ytParams.set("start", String(startOffset));
 
             setDynamicEmbedUrl(
               `https://www.youtube.com/embed/${data.match.videoId}?${ytParams.toString()}`,
@@ -456,62 +473,141 @@ export function VideoPlayer({
   const enterBumperPhase = useCallback(() => {
     setIsBumperPhase(true);
     setBumper((prev) => getRandomBumper(prev?.id));
-  }, []);
+    if (isLiveMode) {
+      void fetchChannelNextUpcoming(activeChannel.number).then((nextEntry) => {
+        if (nextEntry) {
+          setNextUpcomingEntry(nextEntry);
+        }
+      });
+    }
+  }, [isLiveMode, activeChannel.number]);
 
-  const handleBumperEnded = useCallback(() => {
-    setBumper((prev) => getRandomBumper(prev?.id));
-  }, []);
+  const handleAdvanceToNextProgram = useCallback(() => {
+    setIsBumperPhase(false);
+    setBumper(null);
+    setNextUpcomingEntry(null);
+    if (isLiveMode) {
+      void tuneToChannel(activeChannel.number);
+    } else if (mediaType === "tv") {
+      advanceToNextEpisode();
+    }
+  }, [isLiveMode, tuneToChannel, activeChannel.number, mediaType, advanceToNextEpisode]);
 
-  // The "live broadcast clock": schedules a bumper transition once the
-  // program's known runtime has elapsed (if it's shorter than its reserved
-  // block), and always schedules a re-check of the channel at the top of
-  // the next block — this is what makes the simulated channel roll over to
-  // the next scheduled program (or off-air) on its own, without the viewer
-  // touching anything.
-  useEffect(() => {
-    if (!isLiveMode) return;
-
-    const channelNumber = activeChannel.number;
-    const timers: ReturnType<typeof setTimeout>[] = [];
-
-    if (isOffAir) {
-      const delay = msUntilNextBlockBoundary();
-      timers.push(
-        setTimeout(() => {
-          if (activeChannel.number === channelNumber) {
-            void tuneToChannel(channelNumber);
-          }
-        }, delay),
-      );
+  // Target time for next scheduled program during commercial break
+  const nextProgramTargetTimeMs = useMemo(() => {
+    if (!isLiveMode) return null;
+    if (nextUpcomingEntry) {
+      return getAppointmentStartDate(nextUpcomingEntry).getTime();
     }
     if (liveEntry) {
-      const blockEndMs = Math.max(0, getAppointmentEndDate(liveEntry).getTime() - Date.now());
-      const blockDurationSeconds = liveEntry.blockCount * BLOCK_MINUTES * 60;
+      return getAppointmentEndDate(liveEntry).getTime();
+    }
+    return null;
+  }, [isLiveMode, nextUpcomingEntry, liveEntry]);
 
-      if (liveEntry.runtimeMinutes != null) {
-        const contentDurationSeconds = liveEntry.runtimeMinutes * 60;
-        if (contentDurationSeconds < blockDurationSeconds) {
-          const elapsedSeconds = liveEntry.liveOffsetSeconds ?? 0;
-          const remainingContentMs = Math.max(
-            0,
-            (contentDurationSeconds - elapsedSeconds) * 1000,
-          );
-          timers.push(setTimeout(enterBumperPhase, remainingContentMs));
-        }
+  const handleBumperEnded = useCallback(() => {
+    // If we are in live broadcast mode, check if the next program's scheduled start time has arrived!
+    if (isLiveMode) {
+      const nextTargetMs = nextProgramTargetTimeMs;
+      if (nextTargetMs && Date.now() >= nextTargetMs) {
+        handleAdvanceToNextProgram();
+        return;
+      }
+    }
+    // For on-demand TV show binging, advance to next episode after the commercial break
+    if (!isLiveMode && mediaType === "tv") {
+      handleAdvanceToNextProgram();
+      return;
+    }
+    // Otherwise, continue endless loop through randomized retro commercials
+    setBumper((prev) => getRandomBumper(prev?.id));
+  }, [isLiveMode, nextProgramTargetTimeMs, mediaType, handleAdvanceToNextProgram]);
+
+  const [secondsUntilNextProgram, setSecondsUntilNextProgram] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (screenMode !== "bumper" || !nextProgramTargetTimeMs) {
+      setSecondsUntilNextProgram(null);
+      return;
+    }
+
+    const updateCountdown = () => {
+      const remaining = Math.max(0, Math.ceil((nextProgramTargetTimeMs - Date.now()) / 1000));
+      setSecondsUntilNextProgram(remaining);
+    };
+
+    updateCountdown();
+    const interval = setInterval(updateCountdown, 1000);
+    return () => clearInterval(interval);
+  }, [screenMode, nextProgramTargetTimeMs]);
+
+  // The dynamic broadcast clock:
+  // 1. Plays the entire episode from 00:00 without skipping or cutting content.
+  // 2. Automatically rolls retro commercials only after the episode completes.
+  // 3. Hands off to the next program when its scheduled airtime arrives.
+  useEffect(() => {
+    const timers: ReturnType<typeof setTimeout>[] = [];
+
+    if (isLiveMode) {
+      const channelNumber = activeChannel.number;
+
+      if (isOffAir) {
+        const delay = msUntilNextBlockBoundary();
+        timers.push(
+          setTimeout(() => {
+            if (activeChannel.number === channelNumber) {
+              void tuneToChannel(channelNumber);
+            }
+          }, delay),
+        );
       }
 
-      timers.push(
-        setTimeout(() => {
-          if (activeChannel.number === channelNumber) {
-            void tuneToChannel(channelNumber);
-          }
-        }, blockEndMs),
-      );
+      if (liveEntry) {
+        // Episode content duration based on TMDB runtime
+        const effectiveRuntimeMinutes =
+          liveEntry.runtimeMinutes && liveEntry.runtimeMinutes > 0
+            ? liveEntry.runtimeMinutes
+            : liveEntry.mediaType === "movie"
+            ? 105
+            : 45;
+        const contentDurationMs = effectiveRuntimeMinutes * 60 * 1000;
+
+        // Commercial break trigger: only fires after the viewer has completed watching the full show.
+        // Anchored to active playback (does not count loader / provider search time against runtime).
+        if (!isLoading && !exhausted && screenMode === "content") {
+          timers.push(setTimeout(enterBumperPhase, contentDurationMs));
+        }
+
+        // Block end trigger: when the block officially ends, if we are in commercial break, roll to next show
+        const blockEndMs = Math.max(0, getAppointmentEndDate(liveEntry).getTime() - Date.now());
+        if (blockEndMs > 0) {
+          timers.push(
+            setTimeout(() => {
+              if (activeChannel.number === channelNumber) {
+                setIsBumperPhase((currentBumperPhase) => {
+                  if (currentBumperPhase) {
+                    void tuneToChannel(channelNumber);
+                    return false;
+                  }
+                  return currentBumperPhase;
+                });
+              }
+            }, blockEndMs),
+          );
+        }
+      }
+    } else {
+      // On-demand playback: roll retro commercial break when episode runtime elapses
+      if (!isLoading && !exhausted && screenMode === "content") {
+        const estimatedMinutes = mediaType === "movie" ? 105 : 45;
+        const contentDurationMs = estimatedMinutes * 60 * 1000;
+        timers.push(setTimeout(enterBumperPhase, contentDurationMs));
+      }
     }
 
     return () => timers.forEach(clearTimeout);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLiveMode, isOffAir, liveEntry?.id, activeChannel.number]);
+  }, [isLiveMode, isOffAir, liveEntry?.id, activeChannel.number, mediaType, enterBumperPhase, tuneToChannel, isLoading, exhausted, screenMode]);
 
   const displayTitle = !isLiveMode
     ? title ?? "Now Playing"
@@ -554,16 +650,15 @@ export function VideoPlayer({
   }, [cycleChannel, onClose]);
 
   const isLiveNow = isLiveMode && screenMode === "content";
-  const isSyncedTuneIn = !isLiveMode && startOffsetSeconds > 0;
   // Once a third-party provider's iframe is actually up and playing, it
   // almost always renders its own title/episode UI baked into the video —
   // showing our own title text on top of that just duplicates it. Only the
-  // status tags below (live/tune-in), which the provider has no way of
+  // status tags below (live), which the provider has no way of
   // knowing about, are still worth surfacing at that point.
   const isProviderUiVisible =
     screenMode === "content" && hasLoadableSource && !exhausted && !isLoading && (!isDynamic || Boolean(dynamicEmbedUrl));
   const showNameInBadge = !isProviderUiVisible;
-  const showBadge = showNameInBadge || isLiveNow || isSyncedTuneIn;
+  const showBadge = showNameInBadge || isLiveNow;
 
   return (
     <div
@@ -613,10 +708,51 @@ export function VideoPlayer({
               src={bumper.url}
               className="absolute inset-0 h-full w-full object-contain"
               autoPlay
-              muted
+              muted={isBumperMuted}
               playsInline
               onEnded={handleBumperEnded}
             />
+            {/* CRT Scanline and Phosphor Glow Layer for authentic broadcast feel */}
+            <div
+              className="pointer-events-none absolute inset-0 z-10"
+              style={{
+                background:
+                  "repeating-linear-gradient(0deg, rgba(0,0,0,0.25) 0px, rgba(0,0,0,0.25) 1px, transparent 1px, transparent 2px)",
+              }}
+            />
+            {/* Retro station ID, commercial category & audio toggle badge overlay */}
+            <div className="absolute bottom-[max(1rem,env(safe-area-inset-bottom))] left-[max(1rem,env(safe-area-inset-left))] z-20 flex flex-col gap-2 rounded-lg border border-amber-500/50 bg-black/85 p-2.5 sm:p-3 font-mono text-xs text-amber-400 backdrop-blur-md shadow-[0_0_20px_rgba(245,158,11,0.25)] max-w-[calc(100vw-2rem)] sm:max-w-md pointer-events-auto">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2 truncate">
+                  <span className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-amber-500" />
+                  <span className="font-bold tracking-widest truncate">{bumper.label}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsBumperMuted((prev) => !prev)}
+                  className="flex items-center gap-1.5 rounded-md border border-amber-500/50 bg-amber-950/50 hover:bg-amber-900/70 px-2 py-1 text-[10px] font-mono text-amber-300 hover:text-white transition-all active:scale-95 cursor-pointer touch-manipulation shrink-0 shadow-sm"
+                  title={isBumperMuted ? "Unmute commercial audio" : "Mute commercial audio"}
+                >
+                  {isBumperMuted ? (
+                    <VolumeX className="h-3.5 w-3.5 text-neutral-400" />
+                  ) : (
+                    <Volume2 className="h-3.5 w-3.5 text-amber-400 animate-pulse" />
+                  )}
+                  <span>{isBumperMuted ? "Unmute Ad" : "Audio On"}</span>
+                </button>
+              </div>
+              {bumper.categoryLabel && (
+                <div className="flex items-center gap-2">
+                  <span className="text-[9px] sm:text-[10px] text-amber-200/80 uppercase tracking-widest truncate">
+                    {bumper.categoryLabel}
+                  </span>
+                  <span className="text-[9px] text-neutral-500">·</span>
+                  <span className="text-[9px] text-neutral-400 uppercase tracking-wider">
+                    Commercial Break
+                  </span>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -669,99 +805,152 @@ export function VideoPlayer({
           <div
             className="pointer-events-auto absolute left-[max(0.75rem,env(safe-area-inset-left))] top-[max(0.75rem,env(safe-area-inset-top))] z-30 flex max-w-[48vw] sm:max-w-[320px] flex-col rounded-lg border border-neutral-800/80 bg-black/85 px-2.5 py-1.5 shadow-lg backdrop-blur-md"
           >
-            {(isLiveNow || isSyncedTuneIn) && (
-              <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-red-400">
-                <span className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-red-500" />
-                <span className="truncate">
-                  {isLiveNow ? `CH ${String(activeChannel.number).padStart(2, "0")} · Live` : "Live Tune-In"}
-                </span>
-              </p>
+            {screenMode === "bumper" ? (
+              <div className="flex items-center gap-1.5 text-[10px] sm:text-xs font-mono font-bold tracking-wider text-amber-400">
+                <span className="h-2 w-2 animate-pulse rounded-full bg-amber-500" />
+                <span>COMMERCIAL BREAK</span>
+              </div>
+            ) : (
+              <>
+                {isLiveNow && (
+                  <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-red-400">
+                    <span className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-red-500" />
+                    <span className="truncate">
+                      CH {String(activeChannel.number).padStart(2, "0")} · On Air
+                    </span>
+                  </p>
+                )}
+                {showNameInBadge && (
+                  <p className="truncate text-xs sm:text-sm font-semibold text-neutral-100">{displayTitle}</p>
+                )}
+                {isLiveNow && <p className="truncate text-[10px] text-neutral-400">{activeChannel.name}</p>}
+              </>
             )}
-            {showNameInBadge && (
-              <p className="truncate text-xs sm:text-sm font-semibold text-neutral-100">{displayTitle}</p>
-            )}
-            {isLiveNow && <p className="truncate text-[10px] text-neutral-400">{activeChannel.name}</p>}
           </div>
         )}
 
-        {/* ── 2. Top-Right Sticky Component: Stream Switcher & Close ───────────── */}
+        {/* ── 2. Top-Right Sticky Component: Stream Switcher, Next Show & Close ── */}
         <div
-          className="pointer-events-auto absolute right-[max(0.75rem,env(safe-area-inset-right))] top-[max(0.75rem,env(safe-area-inset-top))] z-30 flex items-center gap-2"
+          className="pointer-events-auto absolute right-[max(0.75rem,env(safe-area-inset-right))] top-[max(0.75rem,env(safe-area-inset-top))] z-30 flex items-center gap-1.5 sm:gap-2"
         >
-          <div className="flex items-center rounded-lg border border-neutral-800/80 bg-black/85 text-neutral-300 shadow-lg backdrop-blur-md">
-            {screenMode === "content" && (
-              <span className="flex h-8 sm:h-9 items-center gap-1 rounded-l-lg border-r border-neutral-800/80 px-2 sm:px-2.5 text-[10px] font-mono uppercase tracking-wider text-neutral-400">
-                <SatelliteDish className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0" />
-                <span>{String(currentProviderIndex + 1).padStart(2, "0")}/{String(PROVIDER_COUNT).padStart(2, "0")}</span>
-              </span>
-            )}
-
-            <div ref={providerMenuRef} className="relative flex items-stretch">
-              <button
-                type="button"
-                onClick={advanceProvider}
-                disabled={exhausted || screenMode !== "content"}
-                title="Stream not working? Swap to next"
-                aria-label="Stream not working? Swap to next"
-                className={`flex h-8 sm:h-9 items-center gap-1 px-2 sm:px-2.5 text-neutral-300 transition-colors hover:bg-white/10 hover:text-white active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer ${
-                  screenMode === "content" ? "" : "rounded-l-lg"
-                }`}
-              >
-                <RefreshCw className="h-3.5 w-3.5" />
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsProviderMenuOpen((open) => !open)}
-                disabled={screenMode !== "content"}
-                aria-label="Select stream source"
-                aria-expanded={isProviderMenuOpen}
-                className="flex h-8 sm:h-9 w-6 items-center justify-center rounded-r-lg border-l border-neutral-800/80 text-neutral-300 transition-colors hover:bg-white/10 hover:text-white active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
-              >
-                <ChevronDown className={`h-3 w-3 sm:h-3.5 sm:w-3.5 transition-transform ${isProviderMenuOpen ? "rotate-180" : ""}`} />
-              </button>
-
-              {isProviderMenuOpen && (
-                <div className="absolute right-0 top-full mt-2 w-52 sm:w-56 max-h-[50vh] sm:max-h-[60vh] overflow-hidden flex flex-col rounded-xl border border-neutral-800 bg-neutral-950/95 shadow-2xl shadow-black backdrop-blur-xl z-40">
-                  <p className="border-b border-neutral-800/80 bg-white/5 px-3 py-1.5 text-[10px] uppercase tracking-widest text-neutral-400 shrink-0 font-medium">
-                    Select Stream ({currentProviderIndex + 1}/{PROVIDER_COUNT})
-                  </p>
-                  <ul className="flex-1 overflow-y-auto no-scrollbar">
-                    {providerList.map((provider) => {
-                      const isActive = provider.index === currentProviderIndex;
-                      return (
-                        <li key={provider.id}>
-                          <button
-                            type="button"
-                            onClick={() => jumpToProvider(provider.index)}
-                            className={`flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-[11px] uppercase tracking-wide transition-colors hover:bg-white/10 active:bg-white/15 cursor-pointer ${
-                              isActive ? "bg-white/10 font-semibold text-white" : "text-neutral-300"
-                            }`}
-                          >
-                            <span className="flex items-center gap-1.5 truncate">
-                              <span
-                                className={`h-1.5 w-1.5 shrink-0 rounded-full ${
-                                  provider.isDynamic ? "bg-amber-400" : "bg-emerald-400"
-                                }`}
-                              />
-                              <span className="truncate">{provider.name}</span>
-                            </span>
-                            {isActive && <Check className="h-3 w-3 shrink-0 text-emerald-400" />}
-                          </button>
-                        </li>
-                      );
-                    })}
-                  </ul>
+          {screenMode === "bumper" ? (
+            <>
+              {/* Next Program / Episode countdown pill */}
+              <div className="flex items-center gap-1.5 sm:gap-2 rounded-lg border border-neutral-800/90 bg-black/85 px-2 sm:px-2.5 py-1.5 font-mono text-xs backdrop-blur-md shadow-lg">
+                <span className="h-2 w-2 shrink-0 animate-ping rounded-full bg-emerald-400" />
+                <div className="flex flex-col">
+                  <span className="text-[8px] sm:text-[9px] text-neutral-400 uppercase tracking-wider">
+                    {secondsUntilNextProgram !== null && secondsUntilNextProgram > 0
+                      ? `Next in ${formatCommercialCountdown(secondsUntilNextProgram)}`
+                      : "Next Ready"}
+                  </span>
+                  <span className="font-bold text-white text-[10px] sm:text-xs truncate max-w-[85px] xs:max-w-[130px] sm:max-w-[200px]">
+                    {mediaType === "tv" && !isLiveMode
+                      ? `Episode ${currentEpisode + 1}`
+                      : nextUpcomingEntry?.title || activeChannel.name}
+                  </span>
                 </div>
+              </div>
+
+              {/* Next Show skip button */}
+              <button
+                type="button"
+                onClick={handleAdvanceToNextProgram}
+                className="flex h-8 sm:h-9 items-center gap-1.5 rounded-lg border border-amber-500/60 bg-amber-950/80 hover:bg-amber-900/90 text-amber-200 hover:text-white px-2.5 sm:px-3 text-xs font-mono font-bold tracking-wider shadow-lg transition-all active:scale-95 cursor-pointer touch-manipulation"
+                title="Skip commercial break and tune into next program"
+              >
+                <FastForward className="h-3.5 w-3.5" />
+                <span className="hidden xs:inline sm:inline">Next Show</span>
+              </button>
+            </>
+          ) : (
+            <div className="flex items-center rounded-lg border border-neutral-800/80 bg-black/85 text-neutral-300 shadow-lg backdrop-blur-md">
+              {screenMode === "content" && (
+                <span className="flex h-8 sm:h-9 items-center gap-1 rounded-l-lg border-r border-neutral-800/80 px-2 sm:px-2.5 text-[10px] font-mono uppercase tracking-wider text-neutral-400">
+                  <SatelliteDish className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0" />
+                  <span>{String(currentProviderIndex + 1).padStart(2, "0")}/{String(PROVIDER_COUNT).padStart(2, "0")}</span>
+                </span>
+              )}
+
+              <div ref={providerMenuRef} className="relative flex items-stretch">
+                <button
+                  type="button"
+                  onClick={advanceProvider}
+                  disabled={exhausted || screenMode !== "content"}
+                  title="Stream not working? Swap to next"
+                  aria-label="Stream not working? Swap to next"
+                  className={`flex h-8 sm:h-9 items-center gap-1 px-2 sm:px-2.5 text-neutral-300 transition-colors hover:bg-white/10 hover:text-white active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer touch-manipulation ${
+                    screenMode === "content" ? "" : "rounded-l-lg"
+                  }`}
+                >
+                  <RefreshCw className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsProviderMenuOpen((open) => !open)}
+                  disabled={screenMode !== "content"}
+                  aria-label="Select stream source"
+                  aria-expanded={isProviderMenuOpen}
+                  className="flex h-8 sm:h-9 w-6 items-center justify-center rounded-r-lg border-l border-neutral-800/80 text-neutral-300 transition-colors hover:bg-white/10 hover:text-white active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer touch-manipulation"
+                >
+                  <ChevronDown className={`h-3 w-3 sm:h-3.5 sm:w-3.5 transition-transform ${isProviderMenuOpen ? "rotate-180" : ""}`} />
+                </button>
+
+                {isProviderMenuOpen && (
+                  <div className="absolute right-0 top-full mt-2 w-52 sm:w-56 max-h-[50vh] sm:max-h-[60vh] overflow-hidden flex flex-col rounded-xl border border-neutral-800 bg-neutral-950/95 shadow-2xl shadow-black backdrop-blur-xl z-40">
+                    <p className="border-b border-neutral-800/80 bg-white/5 px-3 py-1.5 text-[10px] uppercase tracking-widest text-neutral-400 shrink-0 font-medium">
+                      Select Stream ({currentProviderIndex + 1}/{PROVIDER_COUNT})
+                    </p>
+                    <ul className="flex-1 overflow-y-auto no-scrollbar">
+                      {providerList.map((provider) => {
+                        const isActive = provider.index === currentProviderIndex;
+                        return (
+                          <li key={provider.id}>
+                            <button
+                              type="button"
+                              onClick={() => jumpToProvider(provider.index)}
+                              className={`flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-[11px] uppercase tracking-wide transition-colors hover:bg-white/10 active:bg-white/15 cursor-pointer touch-manipulation ${
+                                isActive ? "bg-white/10 font-semibold text-white" : "text-neutral-300"
+                              }`}
+                            >
+                              <span className="flex items-center gap-1.5 truncate">
+                                <span
+                                  className={`h-1.5 w-1.5 shrink-0 rounded-full ${
+                                    provider.isDynamic ? "bg-amber-400" : "bg-emerald-400"
+                                  }`}
+                                />
+                                <span className="truncate">{provider.name}</span>
+                              </span>
+                              {isActive && <Check className="h-3 w-3 shrink-0 text-emerald-400" />}
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                )}
+              </div>
+
+              {screenMode === "content" && (
+                <button
+                  type="button"
+                  onClick={enterBumperPhase}
+                  title="Finished watching? Roll retro commercial break"
+                  className="flex h-8 sm:h-9 items-center gap-1.5 border-l border-neutral-800/80 px-2 sm:px-2.5 text-[10px] sm:text-[11px] font-mono font-medium text-amber-300/90 hover:bg-white/10 hover:text-amber-200 transition-colors cursor-pointer touch-manipulation"
+                >
+                  <Tv className="h-3.5 w-3.5 text-amber-400" />
+                  <span className="hidden sm:inline">Roll Ads</span>
+                </button>
               )}
             </div>
-          </div>
+          )}
 
           {onClose && (
             <button
               type="button"
               onClick={onClose}
               aria-label="Close player"
-              className="flex h-8 sm:h-9 w-8 sm:w-9 items-center justify-center rounded-full border border-neutral-800/80 bg-black/85 text-neutral-300 shadow-lg backdrop-blur-md transition-all hover:scale-105 hover:text-white active:scale-95 cursor-pointer"
+              className="flex h-8 sm:h-9 w-8 sm:w-9 items-center justify-center rounded-full border border-neutral-800/80 bg-black/85 text-neutral-300 shadow-lg backdrop-blur-md transition-all hover:scale-105 hover:text-white active:scale-95 cursor-pointer touch-manipulation shrink-0"
             >
               <X className="h-4 w-4" />
             </button>

@@ -279,7 +279,31 @@ export async function getShowDetails(tmdbId: number | string): Promise<ShowDetai
     append_to_response: "credits,content_ratings",
   });
 
-  const defaultMinutes = raw.episode_run_time?.[0] ?? 0;
+  let defaultMinutes = raw.episode_run_time?.[0] ?? 0;
+  if (!defaultMinutes && raw.last_episode_to_air?.runtime) {
+    defaultMinutes = raw.last_episode_to_air.runtime;
+  }
+  if (!defaultMinutes && raw.next_episode_to_air?.runtime) {
+    defaultMinutes = raw.next_episode_to_air.runtime;
+  }
+  if (!defaultMinutes) {
+    try {
+      const s1Raw = await tmdbFetch<TmdbSeasonDetailsRaw>(`/tv/${tmdbId}/season/1`);
+      const s1EpRuntime = s1Raw.episodes?.find((e) => e.runtime && e.runtime > 0)?.runtime;
+      if (s1EpRuntime) {
+        defaultMinutes = s1EpRuntime;
+      }
+    } catch {
+      // ignore
+    }
+  }
+  // If still zero, fallback based on genre (comedies/animation ~24m, dramas ~45m)
+  if (!defaultMinutes) {
+    const genres = (raw.genres ?? []).map((g) => g.name.toLowerCase());
+    const isShortForm = genres.some((g) => g.includes("comedy") || g.includes("animation"));
+    defaultMinutes = isShortForm ? 24 : 45;
+  }
+
   const { cast, producers } = normalizeCredits(raw.credits);
   const creators = dedupeNames((raw.created_by ?? []).map((person) => person.name));
 

@@ -45,6 +45,12 @@ interface RawTmdbTvShow {
     episode_count?: number;
   }>;
   episode_run_time?: number[];
+  last_episode_to_air?: {
+    runtime?: number | null;
+  } | null;
+  next_episode_to_air?: {
+    runtime?: number | null;
+  } | null;
   created_by?: Array<{ name: string }>;
   credits?: {
     cast?: Array<{ name: string }>;
@@ -174,7 +180,7 @@ export async function getVhsMetadata(
     // Guest stars / supporting appearances (cast members beyond top 5)
     const guestStars = Array.from(new Set(castList.slice(5, 11).map((c) => c.name.trim()).filter(Boolean)));
 
-    const calculatedRuntime = movie.runtime && movie.runtime > 0 ? movie.runtime : 90;
+    const calculatedRuntime = movie.runtime && movie.runtime > 0 ? movie.runtime : 105;
 
     const episodes: VhsEpisode[] = [
       {
@@ -227,9 +233,19 @@ export async function getVhsMetadata(
       `Season ${validSeason} of ${show.name || "the television series"}.`;
 
     // Default episode runtime fallback
-    const defaultEpisodeRuntime = show.episode_run_time?.[0] && show.episode_run_time[0] > 0
-      ? show.episode_run_time[0]
-      : 24;
+    const episodesWithRuntime = (season?.episodes || []).filter((e) => typeof e.runtime === "number" && e.runtime > 0);
+    const avgSeasonRuntime = episodesWithRuntime.length > 0
+      ? Math.round(episodesWithRuntime.reduce((sum, e) => sum + (e.runtime || 0), 0) / episodesWithRuntime.length)
+      : null;
+
+    const defaultEpisodeRuntime =
+      (show.episode_run_time?.[0] && show.episode_run_time[0] > 0)
+        ? show.episode_run_time[0]
+        : (show.last_episode_to_air?.runtime && show.last_episode_to_air.runtime > 0)
+        ? show.last_episode_to_air.runtime
+        : (show.next_episode_to_air?.runtime && show.next_episode_to_air.runtime > 0)
+        ? show.next_episode_to_air.runtime
+        : (avgSeasonRuntime ?? 45);
 
     // Episodes mapping
     const rawEpisodes = season?.episodes || [];

@@ -31,7 +31,7 @@ export interface BlockState {
 }
 
 export const DEFAULT_BLOCK_SECONDS = 30 * 60; // 1800 seconds (30 minutes)
-export const DEFAULT_BUMPER_STREAM_URL = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4";
+export const DEFAULT_BUMPER_STREAM_URL = "https://vjs.zencdn.net/v/oceans.mp4";
 
 /**
  * Requirement 1: Block State Calculation

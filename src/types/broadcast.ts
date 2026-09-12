@@ -81,6 +81,7 @@ export interface CreatePersonalScheduleInput {
   startSeason?: number;
   startEpisode?: number;
   totalEpisodes?: number;
+  autoShiftOnConflict?: boolean;
 }
 
 export const DAYS_OF_WEEK = [

@@ -17,6 +17,7 @@ import { useToast } from "@/components/ui/ToastProvider";
 import { notifyLibraryMutation, notifyBroadcastMutation } from "@/lib/syncEvents";
 import { NotificationPermissionPrompt } from "@/components/notifications/NotificationPermissionPrompt";
 import type { MediaSearchResult } from "@/types/media";
+import type { ScheduleEntry } from "@/types/schedule";
 
 // Dynamically imported heavy modals to minimize initial bundle size and boost Core Web Vitals
 const PlayerModal = dynamic(
@@ -66,6 +67,7 @@ interface PlayerTarget {
   initialEpisode?: number;
   startOffsetSeconds?: number;
   startTime?: number | string | Date;
+  initialLiveEntry?: ScheduleEntry;
 }
 
 interface CablecastAppProps {
@@ -546,6 +548,7 @@ export function CablecastApp({ initialView = "home" }: CablecastAppProps) {
           initialEpisode={playerTarget.initialEpisode}
           startOffsetSeconds={playerTarget.startOffsetSeconds}
           startTime={playerTarget.startTime}
+          initialLiveEntry={playerTarget.initialLiveEntry}
           onClose={() => setPlayerTarget(null)}
         />
       )}

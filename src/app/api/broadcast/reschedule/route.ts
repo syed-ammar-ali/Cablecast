@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getSession, getPersistentUserId } from "@/lib/auth/server";
 import { BLOCK_MINUTES } from "@/lib/runtime";
 import { DAYS_OF_WEEK, formatBlockTimeRange } from "@/types/broadcast";
+import { getShowDetails, getMovieDetails } from "@/lib/tmdb";
 
 export async function POST(request: NextRequest) {
   try {
@@ -70,17 +71,33 @@ export async function POST(request: NextRequest) {
       }
 
       // 2. Accurately determine runtime and blockCount (e.g. 120m / 4 blocks for movies)
-      const runtimeMinutes =
+      let runtimeMinutes =
         missedItem.runtimeMinutes ??
         originalSchedule?.runtimeMinutes ??
-        (missedItem.mediaType === "movie" ? 120 : 30);
+        null;
+
+      if (!runtimeMinutes) {
+        try {
+          if (missedItem.mediaType === "movie") {
+            const details = await getMovieDetails(missedItem.tmdbId);
+            runtimeMinutes = details.defaultRuntime?.exactMinutes ?? 105;
+          } else {
+            const details = await getShowDetails(missedItem.tmdbId);
+            runtimeMinutes = details.defaultRuntime?.exactMinutes ?? 45;
+          }
+        } catch {
+          runtimeMinutes = missedItem.mediaType === "movie" ? 105 : 45;
+        }
+      }
+
+      const safeRuntimeMinutes = runtimeMinutes ?? (missedItem.mediaType === "movie" ? 105 : 45);
 
       const blockCount =
         missedItem.blockCount && missedItem.blockCount > 0
           ? missedItem.blockCount
           : originalSchedule?.blockCount && originalSchedule.blockCount > 0
             ? originalSchedule.blockCount
-            : Math.max(1, Math.ceil(runtimeMinutes / BLOCK_MINUTES));
+            : Math.max(1, Math.ceil(safeRuntimeMinutes / BLOCK_MINUTES));
 
       const requestedEnd = startMin + blockCount * BLOCK_MINUTES;
 

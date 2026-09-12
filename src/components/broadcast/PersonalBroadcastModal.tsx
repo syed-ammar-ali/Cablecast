@@ -992,9 +992,15 @@ export function PersonalBroadcastModal({
                               <span className="inline-flex items-center rounded-md border border-amber-700/50 bg-amber-950/40 px-2 py-0.5 font-mono text-[10px] font-bold text-amber-300">
                                 MISSED AIRING
                               </span>
-                              <span className="inline-flex items-center rounded-md border border-neutral-700 bg-neutral-900/90 px-1.5 py-0.5 font-mono text-[10px] font-medium text-neutral-300">
-                                {item.blockCount ?? (item.mediaType === "movie" ? 4 : 1)} {(item.blockCount ?? (item.mediaType === "movie" ? 4 : 1)) === 1 ? "Block" : "Blocks"} ({item.runtimeMinutes ?? (item.mediaType === "movie" ? 120 : 30)}m)
-                              </span>
+                              {(() => {
+                                const effectiveBlockCount = item.blockCount ?? (item.runtimeMinutes ? Math.max(1, Math.ceil(item.runtimeMinutes / 30)) : (item.mediaType === "movie" ? 4 : 1));
+                                const effectiveRuntime = item.runtimeMinutes ?? (item.blockCount ? item.blockCount * 30 : (item.mediaType === "movie" ? 120 : effectiveBlockCount * 30));
+                                return (
+                                  <span className="inline-flex items-center rounded-md border border-neutral-700 bg-neutral-900/90 px-1.5 py-0.5 font-mono text-[10px] font-medium text-neutral-300">
+                                    {effectiveBlockCount} {effectiveBlockCount === 1 ? "Block" : "Blocks"} ({effectiveRuntime}m)
+                                  </span>
+                                );
+                              })()}
                               <h4 className="text-sm font-bold text-white truncate">{item.title}</h4>
                             </div>
 
@@ -1410,8 +1416,8 @@ function RescheduleRerunModal({
     mode?: "move" | "one_off",
   ) => Promise<{ success: boolean; error?: string }>;
 }) {
-  const runtimeMinutes = item.runtimeMinutes ?? (item.mediaType === "movie" ? 120 : 30);
-  const blockCount = item.blockCount ?? Math.max(1, Math.ceil(runtimeMinutes / 30));
+  const blockCount = item.blockCount ?? (item.runtimeMinutes ? Math.max(1, Math.ceil(item.runtimeMinutes / 30)) : (item.mediaType === "movie" ? 4 : 1));
+  const runtimeMinutes = item.runtimeMinutes ?? (item.blockCount ? item.blockCount * 30 : (item.mediaType === "movie" ? 120 : blockCount * 30));
 
   const [mode, setMode] = useState<"move" | "one_off">("move");
   const [day, setDay] = useState<number>(new Date().getDay());

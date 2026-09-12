@@ -6,6 +6,7 @@ import { DAYS_OF_WEEK, formatBlockTime } from "@/types/broadcast";
 import type { CreatePersonalScheduleInput, PersonalScheduleItem } from "@/types/broadcast";
 import type { MediaType } from "@/types/media";
 import { checkMediaOwnership, getBroadcastSlotStatus } from "@/lib/mediaOwnership";
+import { getShowDetails } from "@/lib/tmdb";
 
 /**
  * Calculates whether an appointment is live at the current second and its elapsed offset.
@@ -45,6 +46,34 @@ function getNextAirDate(dayOfWeek: number, blockStartMinutes: number, now: Date)
   const airDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + daysUntil);
   airDate.setHours(Math.floor(blockStartMinutes / 60), blockStartMinutes % 60, 0, 0);
   return airDate;
+}
+
+function findNextOpenSlotForDay(
+  dayMatches: { blockStartMinutes: number; blockCount: number }[],
+  blockCount: number,
+  preferredStart: number,
+): number | null {
+  const blockDuration = blockCount * BLOCK_MINUTES;
+  // First search from preferredStart forward up to end of day
+  for (let m = preferredStart; m <= 1440 - blockDuration; m += BLOCK_MINUTES) {
+    const end = m + blockDuration;
+    const hasOverlap = dayMatches.some((item) => {
+      const itemEnd = item.blockStartMinutes + item.blockCount * BLOCK_MINUTES;
+      return m < itemEnd && end > item.blockStartMinutes;
+    });
+    if (!hasOverlap) return m;
+  }
+  // Wrap around from beginning of day
+  for (let m = 0; m < preferredStart; m += BLOCK_MINUTES) {
+    if (m + blockDuration > 1440) break;
+    const end = m + blockDuration;
+    const hasOverlap = dayMatches.some((item) => {
+      const itemEnd = item.blockStartMinutes + item.blockCount * BLOCK_MINUTES;
+      return m < itemEnd && end > item.blockStartMinutes;
+    });
+    if (!hasOverlap) return m;
+  }
+  return null;
 }
 
 export async function GET() {
@@ -147,7 +176,7 @@ export async function GET() {
           const showWeeklySlots = items.filter((it) => it.tmdbId === item.tmdbId && !it.isRerun);
           const weeklyIncrement = Math.max(1, showWeeklySlots.length);
           const nextEpisode = item.currentEpisode + weeklyIncrement;
-          const totalSeasonEpisodes = item.totalEpisodes ?? 24;
+          const totalSeasonEpisodes = item.totalEpisodes ?? 12;
 
           if (nextEpisode > totalSeasonEpisodes) {
             // Season completed! Create alert and drop show from schedule
@@ -197,6 +226,43 @@ export async function GET() {
       where: { sessionId: { in: userKeys } },
       orderBy: [{ dayOfWeek: "asc" }, { blockStartMinutes: "asc" }],
     });
+
+    // Self-healing check for existing items that were created with legacy 24-episode or 30-minute block defaults
+    const legacyTvItems = updatedItems.filter(
+      (it) => it.mediaType === "tv" && (it.totalEpisodes === 24 || it.runtimeMinutes === 30),
+    );
+    if (legacyTvItems.length > 0) {
+      const uniqueTmdbIds = Array.from(new Set(legacyTvItems.map((it) => it.tmdbId)));
+      await Promise.allSettled(
+        uniqueTmdbIds.map(async (tmdbId) => {
+          try {
+            const details = await getShowDetails(tmdbId);
+            const epRuntime = details.defaultRuntime?.exactMinutes || 45;
+            const newBlockCount = Math.max(1, Math.ceil(epRuntime / BLOCK_MINUTES));
+            const relevantItems = legacyTvItems.filter((it) => it.tmdbId === tmdbId);
+
+            for (const relItem of relevantItems) {
+              const sMatch = details.seasons?.find((s) => s.seasonNumber === relItem.currentSeason);
+              const realTotalEpisodes = sMatch?.episodeCount || details.numberOfEpisodes || relItem.totalEpisodes;
+
+              await prisma.userPersonalSchedule.update({
+                where: { id: relItem.id },
+                data: {
+                  totalEpisodes: realTotalEpisodes,
+                  runtimeMinutes: epRuntime,
+                  blockCount: newBlockCount,
+                },
+              });
+              relItem.totalEpisodes = realTotalEpisodes;
+              relItem.runtimeMinutes = epRuntime;
+              relItem.blockCount = newBlockCount;
+            }
+          } catch (err) {
+            console.debug?.("[api/broadcast/personal] Self-healing skipped for show:", tmdbId, err);
+          }
+        }),
+      );
+    }
 
     // Dynamically evaluate slot status for all schedule items
     const schedule: PersonalScheduleItem[] = await Promise.all(
@@ -494,11 +560,35 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Calculate block count from runtime: Movies (e.g. 105 mins = 4 blocks = 120 mins)
-    const blockCount = input.runtimeMinutes && input.runtimeMinutes > 0
-      ? Math.max(1, Math.ceil(input.runtimeMinutes / BLOCK_MINUTES))
-      : input.mediaType === "movie" ? 4 : 1;
+    // Resolve accurate runtime and season total episodes
+    let runtimeMinutes = input.runtimeMinutes && input.runtimeMinutes > 0 ? Number(input.runtimeMinutes) : null;
+    let totalEpisodes = input.totalEpisodes && input.totalEpisodes > 0 ? Number(input.totalEpisodes) : null;
+    const targetSeason = input.mediaType === "tv" ? (input.startSeason ?? 1) : 1;
 
+    if (!runtimeMinutes || (input.mediaType === "tv" && (!totalEpisodes || totalEpisodes === 24))) {
+      try {
+        const details = await getShowDetails(input.tmdbId);
+        if (!runtimeMinutes && details.defaultRuntime?.exactMinutes) {
+          runtimeMinutes = details.defaultRuntime.exactMinutes;
+        }
+        if (input.mediaType === "tv" && (!totalEpisodes || totalEpisodes === 24)) {
+          const sMatch = details.seasons?.find((s) => s.seasonNumber === targetSeason);
+          if (sMatch?.episodeCount) {
+            totalEpisodes = sMatch.episodeCount;
+          } else if (details.numberOfEpisodes) {
+            totalEpisodes = details.numberOfEpisodes;
+          }
+        }
+      } catch (err) {
+        console.warn("[api/broadcast/personal] Failed to fetch TMDB details for fallback:", err);
+      }
+    }
+
+    if (!runtimeMinutes) {
+      runtimeMinutes = input.mediaType === "movie" ? 120 : 45;
+    }
+
+    const blockCount = Math.max(1, Math.ceil(runtimeMinutes / BLOCK_MINUTES));
     const requestedEnd = input.blockStartMinutes + blockCount * BLOCK_MINUTES;
 
     // Fetch existing schedule for this user to validate conflicts and duplicates
@@ -507,7 +597,6 @@ export async function POST(request: NextRequest) {
     });
 
     // Prevent duplicate scheduling of the same title/season
-    const targetSeason = input.mediaType === "tv" ? (input.startSeason ?? 1) : 1;
     const duplicate = existing.find(
       (item) =>
         item.tmdbId === input.tmdbId &&
@@ -522,7 +611,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const targetDailySlots: number[] =
+    let targetDailySlots: number[] =
       input.mediaType === "tv" && Array.isArray(input.dailySlots) && input.dailySlots.length > 0
         ? input.dailySlots.map(Number)
         : [Number(input.blockStartMinutes)];
@@ -538,7 +627,7 @@ export async function POST(request: NextRequest) {
           if (s1 < s2End && s1End > s2) {
             return NextResponse.json(
               {
-                error: `Episode time slot conflict: ${formatBlockTime(s1)} overlaps with ${formatBlockTime(s2)}. Please space out your episode times.`,
+                error: `Episode time slot conflict: ${formatBlockTime(s1)} overlaps with ${formatBlockTime(s2)}. Each episode requires a ${blockCount * BLOCK_MINUTES}m block. Please space out your episode times.`,
               },
               { status: 400 },
             );
@@ -551,21 +640,34 @@ export async function POST(request: NextRequest) {
     for (const day of input.daysOfWeek) {
       const dayMatches = existing.filter((item) => item.dayOfWeek === day);
 
-      for (const slotStart of targetDailySlots) {
+      for (let sIdx = 0; sIdx < targetDailySlots.length; sIdx++) {
+        const slotStart = targetDailySlots[sIdx];
         const slotEnd = slotStart + blockCount * BLOCK_MINUTES;
 
-        for (const item of dayMatches) {
+        const overlappingItem = dayMatches.find((item) => {
           const itemEnd = item.blockStartMinutes + item.blockCount * BLOCK_MINUTES;
-          const overlaps = slotStart < itemEnd && slotEnd > item.blockStartMinutes;
+          return slotStart < itemEnd && slotEnd > item.blockStartMinutes;
+        });
 
-          if (overlaps) {
+        if (overlappingItem) {
+          const nextOpen = findNextOpenSlotForDay(
+            dayMatches,
+            blockCount,
+            overlappingItem.blockStartMinutes + overlappingItem.blockCount * BLOCK_MINUTES,
+          );
+
+          if (input.autoShiftOnConflict && nextOpen !== null) {
+            targetDailySlots[sIdx] = nextOpen;
+          } else {
             const dayName = DAYS_OF_WEEK.find((d) => d.day === day)?.name ?? `Day ${day}`;
-            const itemTime = formatBlockTime(item.blockStartMinutes);
+            const itemTime = formatBlockTime(overlappingItem.blockStartMinutes);
             return NextResponse.json(
               {
-                error: `Slot conflict on ${dayName} at ${itemTime}: Already occupied by "${item.title}". You cannot schedule two broadcasts at the same time.`,
-                conflictWith: item.title,
+                error: `Slot conflict on ${dayName} at ${itemTime}: Already occupied by "${overlappingItem.title}". You cannot schedule two broadcasts at the same time.`,
+                conflictWith: overlappingItem.title,
                 conflictDay: day,
+                suggestedSlot: nextOpen,
+                suggestedSlotTime: nextOpen !== null ? formatBlockTime(nextOpen) : null,
               },
               { status: 409 },
             );
@@ -591,13 +693,13 @@ export async function POST(request: NextRequest) {
             title: input.title,
             posterPath: input.posterPath ?? null,
             backdropUrl: input.backdropUrl ?? null,
-            runtimeMinutes: input.runtimeMinutes ?? (input.mediaType === "movie" ? 120 : 30),
+            runtimeMinutes,
             dayOfWeek: day,
             blockStartMinutes: slotMinutes,
             blockCount,
-            currentSeason: input.startSeason ?? 1,
+            currentSeason: targetSeason,
             currentEpisode: episodeNum,
-            totalEpisodes: input.totalEpisodes ?? (input.mediaType === "tv" ? 24 : null),
+            totalEpisodes: totalEpisodes ?? (input.mediaType === "tv" ? 12 : null),
             timezoneOffset: typeof input.timezoneOffset === "number" ? input.timezoneOffset : null,
           },
         });

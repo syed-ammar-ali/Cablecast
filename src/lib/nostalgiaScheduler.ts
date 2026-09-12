@@ -331,8 +331,10 @@ export function generateNostalgiaSchedule(config: NostalgiaScheduleConfig): Nost
         targetDays,
       );
     } else {
-      // Fallback if no air date is known: start in September of that projected year
-      seasonPremiereDate = findClosestTargetWeekday(projectedYear, 8, 20, targetDays);
+      // Fallback if no air date is known: adopt baseline premiere month/day from series debut, or fallback to September
+      const fallbackMonth = sFirstEpAir ? parseDateSafe(sFirstEpAir).getMonth() : 8;
+      const fallbackDay = sFirstEpAir ? parseDateSafe(sFirstEpAir).getDate() : 20;
+      seasonPremiereDate = findClosestTargetWeekday(projectedYear, fallbackMonth, fallbackDay, targetDays);
     }
 
     // Schedule each episode in the season

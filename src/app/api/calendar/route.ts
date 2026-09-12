@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getSession, getPersistentUserId } from "@/lib/auth/server";
 import { BLOCK_MINUTES, normalizeRuntime } from "@/lib/runtime";
 import { formatBlockTime } from "@/types/broadcast";
+import { getShowDetails, getMovieDetails } from "@/lib/tmdb";
 
 export async function GET(request: NextRequest) {
   try {
@@ -107,8 +108,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Calculate block count from runtime
-    const normRuntime = runtimeMinutes ? normalizeRuntime(runtimeMinutes) : null;
+    // Calculate block count from runtime dynamically
+    let resolvedRuntime = runtimeMinutes ? Number(runtimeMinutes) : null;
+    if (!resolvedRuntime || resolvedRuntime <= 0) {
+      try {
+        if (mediaType === "movie") {
+          const movie = await getMovieDetails(Number(tmdbId));
+          resolvedRuntime = movie?.defaultRuntime?.exactMinutes && movie.defaultRuntime.exactMinutes > 0 ? movie.defaultRuntime.exactMinutes : 105;
+        } else {
+          const show = await getShowDetails(Number(tmdbId));
+          resolvedRuntime = show?.defaultRuntime?.exactMinutes && show.defaultRuntime.exactMinutes > 0 ? show.defaultRuntime.exactMinutes : 45;
+        }
+      } catch {
+        resolvedRuntime = mediaType === "movie" ? 105 : 45;
+      }
+    }
+    const normRuntime = resolvedRuntime ? normalizeRuntime(resolvedRuntime) : null;
     const blockCount = normRuntime ? normRuntime.blockCount : 1;
     const entryEnd = blockStartMinutes + blockCount * BLOCK_MINUTES;
 
@@ -175,7 +190,7 @@ export async function POST(request: NextRequest) {
         title,
         posterPath: posterPath || null,
         backdropUrl: backdropUrl || null,
-        runtimeMinutes: runtimeMinutes ? Number(runtimeMinutes) : null,
+        runtimeMinutes: resolvedRuntime ? Number(resolvedRuntime) : null,
         scheduledDate,
         blockStartMinutes: Number(blockStartMinutes),
         blockCount,

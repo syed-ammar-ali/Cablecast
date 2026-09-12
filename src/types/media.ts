@@ -58,6 +58,8 @@ export interface TmdbTvDetailsRaw {
   number_of_seasons: number;
   number_of_episodes: number;
   episode_run_time: number[];
+  last_episode_to_air?: { runtime?: number | null } | null;
+  next_episode_to_air?: { runtime?: number | null } | null;
   seasons: TmdbSeasonSummaryRaw[];
   vote_average?: number;
   genres?: TmdbGenreRaw[];
