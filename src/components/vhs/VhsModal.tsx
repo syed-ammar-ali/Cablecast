@@ -182,6 +182,7 @@ export function VhsModal({
     Math.max(0, (initialSeason || 1) - 1)
   );
   const [metadata, setMetadata] = useState<VhsMetadata | null>(null);
+  const [hasInitialMetadataLoaded, setHasInitialMetadataLoaded] = useState(false);
   const [isLoadingMetadata, setIsLoadingMetadata] = useState(true);
   const [loadedImages, setLoadedImages] = useState<Record<string, boolean>>({});
   const [seasonCache, setSeasonCache] = useState<Record<number, VhsMetadata>>({});
@@ -293,6 +294,7 @@ export function VhsModal({
     setIsFlipped(false);
     setMetadata(null);
     setSeasonCache({});
+    setHasInitialMetadataLoaded(false);
     setIsLoadingMetadata(true);
   }, [initialSeason, isOpen, mediaId]);
 
@@ -357,6 +359,7 @@ export function VhsModal({
     // Check cache first
     if (normalizedType === "TV" && seasonCacheRef.current[selectedSeason]) {
       setMetadata(seasonCacheRef.current[selectedSeason]);
+      setHasInitialMetadataLoaded(true);
       setIsLoadingMetadata(false);
       return;
     }
@@ -377,6 +380,7 @@ export function VhsModal({
       }
       const data: VhsMetadata = await res.json();
       setMetadata(data);
+      setHasInitialMetadataLoaded(true);
       if (normalizedType === "TV") {
         setSeasonCache((prev) => ({ ...prev, [selectedSeason]: data }));
       }
@@ -385,6 +389,7 @@ export function VhsModal({
       toast.error("Could not fetch sleeve metadata from vault", "Archive Lookup Error");
     } finally {
       setIsLoadingMetadata(false);
+      setHasInitialMetadataLoaded(true);
     }
   }, [isOpen, mediaId, normalizedType, selectedSeason, toast]);
 
@@ -549,7 +554,8 @@ export function VhsModal({
   const activeSeasonData = seasonCache[selectedSeason] || metadata;
 
   // Single-card accurate poster resolution & image readiness
-  const singlePosterSrc = metadata?.frontPosterPath || initialPosterUrl || null;
+  const singlePosterSrc =
+    metadata?.frontPosterPath || (hasInitialMetadataLoaded ? initialPosterUrl : null);
   const isSinglePosterLoaded = Boolean(singlePosterSrc && loadedImages[singlePosterSrc]);
 
   // Calculate formatted time remaining for active rental
@@ -864,12 +870,12 @@ export function VhsModal({
                 </div>
 
                 <div className="absolute inset-0 pt-7 bg-neutral-900 overflow-hidden flex items-center justify-center">
-                  {/* Retro VHS Loading Skeleton - active while initial poster is loading */}
-                  {(!singlePosterSrc && isLoadingMetadata) || (!isSinglePosterLoaded && !singlePosterSrc) ? (
+                  {/* Retro VHS Loading Skeleton - ONLY on the first load */}
+                  {!hasInitialMetadataLoaded && (
                     <VhsSleeveSkeleton isTv={isTv} seasonNumber={selectedSeason} />
-                  ) : null}
+                  )}
 
-                  {singlePosterSrc && (
+                  {hasInitialMetadataLoaded && singlePosterSrc && (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={singlePosterSrc}
@@ -882,7 +888,7 @@ export function VhsModal({
                     />
                   )}
 
-                  {!isLoadingMetadata && !singlePosterSrc && (
+                  {hasInitialMetadataLoaded && !singlePosterSrc && (
                     <div className="flex flex-col items-center justify-center p-6 text-center text-neutral-600">
                       <Film className="h-12 w-12 stroke-[1.2] mb-2 text-neutral-700" />
                       <p className="text-xs font-mono">No cover art in vault</p>
@@ -1016,8 +1022,7 @@ export function VhsModal({
               const seasonPoster =
                 metadata?.seasons?.find((s) => s.seasonNumber === seasonNum)?.posterPath ||
                 seasonCache[seasonNum]?.frontPosterPath ||
-                (seasonNum === 1 ? metadata?.frontPosterPath || initialPosterUrl : null) ||
-                (!isMultiSeason ? metadata?.frontPosterPath || initialPosterUrl : null);
+                (metadata?.frontPosterPath && !isMultiSeason ? metadata.frontPosterPath : null);
 
               if (isSelected) {
                 // ── ACTIVE FLIPPABLE 3D CARD ──
@@ -1063,12 +1068,12 @@ export function VhsModal({
                         </div>
 
                         <div className="absolute inset-0 pt-7 bg-neutral-900 overflow-hidden flex items-center justify-center">
-                          {/* Retro VHS Loading Skeleton - ONLY show if no season poster is available yet on initial load */}
-                          {!seasonPoster && isLoadingMetadata && (
+                          {/* Retro VHS Loading Skeleton - ONLY on the first load */}
+                          {!hasInitialMetadataLoaded && (
                             <VhsSleeveSkeleton seasonNumber={seasonNum} isTv={isTv} />
                           )}
 
-                          {seasonPoster && (
+                          {hasInitialMetadataLoaded && seasonPoster && (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img
                               src={seasonPoster}
@@ -1084,7 +1089,7 @@ export function VhsModal({
                             />
                           )}
 
-                          {!isLoadingMetadata && !seasonPoster && (
+                          {hasInitialMetadataLoaded && !seasonPoster && (
                             <div className="flex flex-col items-center justify-center p-6 text-center text-neutral-600">
                               <Film className="h-12 w-12 stroke-[1.2] mb-2 text-neutral-700" />
                               <p className="text-xs font-mono">No cover art in vault</p>
