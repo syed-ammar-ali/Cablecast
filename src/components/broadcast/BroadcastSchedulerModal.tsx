@@ -950,6 +950,7 @@ export function BroadcastSchedulerModal({
           startEpisode: isTv ? startEpisode : undefined,
           totalEpisodes: isTv && selectedSeasonEpisodeCount > 0 ? selectedSeasonEpisodeCount : undefined,
           autoShiftOnConflict: true,
+          timezoneOffset: new Date().getTimezoneOffset(),
         };
 
         if (onSchedule) {

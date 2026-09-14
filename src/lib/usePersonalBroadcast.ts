@@ -77,7 +77,8 @@ export function usePersonalBroadcast() {
   // Synchronize broadcast schedule quietly from server
   const syncFromServer = useCallback(async (signal?: AbortSignal) => {
     try {
-      const res = await fetch("/api/broadcast/personal", { signal });
+      const tzOffset = typeof window !== "undefined" ? new Date().getTimezoneOffset() : -330;
+      const res = await fetch(`/api/broadcast/personal?tzOffset=${tzOffset}`, { signal });
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data.schedule)) {
@@ -320,6 +321,31 @@ export function usePersonalBroadcast() {
     [syncFromServer],
   );
 
+  const markAsWatched = useCallback(
+    async (scheduleId?: string, tmdbId?: number) => {
+      if (!scheduleId && !tmdbId) return;
+      setSchedule((prev) =>
+        prev.map((item) => {
+          if ((scheduleId && item.id === scheduleId) || (tmdbId && item.tmdbId === tmdbId)) {
+            return { ...item, wasWatched: true };
+          }
+          return item;
+        })
+      );
+
+      try {
+        await fetch("/api/broadcast/personal", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "markWatched", scheduleId, tmdbId }),
+        });
+      } catch (e) {
+        console.error("Failed to mark slot as watched:", e);
+      }
+    },
+    [],
+  );
+
   return {
     schedule,
     missed,
@@ -337,6 +363,7 @@ export function usePersonalBroadcast() {
     dismissMissed,
     dismissSeasonAlert,
     updateChannelName,
+    markAsWatched,
     isScheduled,
     getScheduledDays,
     refresh: syncFromServer,

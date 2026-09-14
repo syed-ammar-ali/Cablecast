@@ -520,6 +520,12 @@ export function CablecastApp({ initialView = "home" }: CablecastAppProps) {
         onRescheduleMissed={personalBroadcast.rescheduleMissed}
         onDismissMissed={personalBroadcast.dismissMissed}
         onPlay={({ media, season, episode, startOffsetSeconds }) => {
+          const liveSlot = personalBroadcast.schedule.find(
+            (s) => s.isLiveNow && s.tmdbId === media.tmdbId,
+          );
+          if (liveSlot) {
+            void personalBroadcast.markAsWatched(liveSlot.id, media.tmdbId);
+          }
           setPlayerTarget({
             media,
             initialSeason: season,
@@ -598,9 +604,15 @@ export function CablecastApp({ initialView = "home" }: CablecastAppProps) {
         !isExploreOpen &&
         !schedulingTarget && (
           <ChannelRemote
-            onTuneIn={(media, startOffsetSeconds) =>
-              setPlayerTarget({ media, startOffsetSeconds })
-            }
+            onTuneIn={(media, startOffsetSeconds) => {
+              const liveSlot = personalBroadcast.schedule.find(
+                (s) => s.isLiveNow && s.tmdbId === media.tmdbId,
+              );
+              if (liveSlot) {
+                void personalBroadcast.markAsWatched(liveSlot.id, media.tmdbId);
+              }
+              setPlayerTarget({ media, startOffsetSeconds });
+            }}
             onNavigateDate={(iso) => {
               setSelectedDate(iso);
               window.scrollTo({ top: 0, behavior: "smooth" });

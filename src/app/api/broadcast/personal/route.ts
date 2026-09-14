@@ -16,36 +16,102 @@ function computeLiveState(
   blockStartMinutes: number,
   blockCount: number,
   now: Date = new Date(),
+  tzOffset: number = -330,
 ) {
-  const currentDay = now.getDay();
+  const localMs = now.getTime() - tzOffset * 60 * 1000;
+  const local = new Date(localMs);
+  const currentDay = local.getUTCDay();
   if (currentDay !== dayOfWeek) {
     return { isLiveNow: false, liveOffsetSeconds: null };
   }
 
-  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+  const currentMinutes = local.getUTCHours() * 60 + local.getUTCMinutes();
   const blockEndMinutes = blockStartMinutes + blockCount * BLOCK_MINUTES;
 
   if (currentMinutes >= blockStartMinutes && currentMinutes < blockEndMinutes) {
     const elapsedMinutes = currentMinutes - blockStartMinutes;
-    const elapsedSeconds = elapsedMinutes * 60 + now.getSeconds();
+    const elapsedSeconds = elapsedMinutes * 60 + local.getUTCSeconds();
     return { isLiveNow: true, liveOffsetSeconds: elapsedSeconds };
   }
 
   return { isLiveNow: false, liveOffsetSeconds: null };
 }
 
-function getNextAirDate(dayOfWeek: number, blockStartMinutes: number, now: Date): Date {
-  const currentDay = now.getDay();
-  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+function getNextAirDate(
+  dayOfWeek: number,
+  blockStartMinutes: number,
+  now: Date,
+  tzOffset: number = -330,
+): Date {
+  const localMs = now.getTime() - tzOffset * 60 * 1000;
+  const local = new Date(localMs);
+  const currentDay = local.getUTCDay();
+  const currentMinutes = local.getUTCHours() * 60 + local.getUTCMinutes();
 
   let daysUntil = (dayOfWeek - currentDay + 7) % 7;
   if (daysUntil === 0 && currentMinutes > blockStartMinutes) {
     daysUntil = 7;
   }
 
-  const airDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + daysUntil);
-  airDate.setHours(Math.floor(blockStartMinutes / 60), blockStartMinutes % 60, 0, 0);
-  return airDate;
+  const targetLocalMs = localMs + daysUntil * 24 * 60 * 60 * 1000;
+  const targetLocal = new Date(targetLocalMs);
+  const [y, m, d] = targetLocal.toISOString().slice(0, 10).split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d, 0, blockStartMinutes, 0) + tzOffset * 60 * 1000);
+}
+
+interface PastOccurrence {
+  isoDate: string;
+  occurrenceEndUtcMs: number;
+  daysAgo: number;
+}
+
+/**
+ * Accurately determines the most recent completed occurrence of a recurring slot
+ * in the user's local timezone.
+ * Returns null if the slot has not aired yet or if the occurrence finished before
+ * the schedule item was created.
+ */
+function getMostRecentPastOccurrence(
+  dayOfWeek: number,
+  blockStartMinutes: number,
+  blockCount: number,
+  createdAt: Date,
+  now: Date,
+  tzOffset: number = -330,
+): PastOccurrence | null {
+  const localMs = now.getTime() - tzOffset * 60 * 1000;
+  const local = new Date(localMs);
+  const localCurrentDay = local.getUTCDay();
+  const localCurrentMinutes = local.getUTCHours() * 60 + local.getUTCMinutes();
+  const blockEndMinutes = blockStartMinutes + blockCount * BLOCK_MINUTES;
+
+  let daysAgo: number;
+  if (dayOfWeek === localCurrentDay) {
+    if (localCurrentMinutes >= blockEndMinutes) {
+      daysAgo = 0; // Completed earlier today
+    } else {
+      daysAgo = 7; // Previous week's occurrence
+    }
+  } else {
+    daysAgo = (localCurrentDay - dayOfWeek + 7) % 7;
+  }
+
+  const occurrenceLocalMs = localMs - daysAgo * 24 * 60 * 60 * 1000;
+  const occurrenceLocal = new Date(occurrenceLocalMs);
+  const isoDate = occurrenceLocal.toISOString().slice(0, 10);
+
+  const [y, m, d] = isoDate.split("-").map(Number);
+  const occurrenceEndUtcMs = Date.UTC(y, m - 1, d, 0, blockEndMinutes, 0) + tzOffset * 60 * 1000;
+
+  // Occurrence cannot be in the future, nor before the schedule item's creation
+  if (occurrenceEndUtcMs > now.getTime()) {
+    return null;
+  }
+  if (createdAt && occurrenceEndUtcMs < new Date(createdAt).getTime()) {
+    return null;
+  }
+
+  return { isoDate, occurrenceEndUtcMs, daysAgo };
 }
 
 function findNextOpenSlotForDay(
@@ -76,7 +142,7 @@ function findNextOpenSlotForDay(
   return null;
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const session = await getSession();
     if (!session) {
@@ -93,9 +159,11 @@ export async function GET() {
     const userId = getPersistentUserId(session);
     const userKeys = Array.from(new Set([userId, session.id, session.accessCodeId])).filter(Boolean) as string[];
     const now = new Date();
-    const todayDayOfWeek = now.getDay();
-    const currentMinutes = now.getHours() * 60 + now.getMinutes();
-    const todayIsoDate = now.toISOString().slice(0, 10);
+
+    const { searchParams } = new URL(request.url);
+    const tzQuery = searchParams.get("tzOffset");
+    let userTzOffset: number | null =
+      tzQuery !== null && !isNaN(Number(tzQuery)) ? Number(tzQuery) : null;
 
     // Fetch user channel settings (prefer persistent userId, fallback to any session key)
     let channelSettings = await prisma.userChannelSettings.findFirst({
@@ -112,12 +180,38 @@ export async function GET() {
       orderBy: [{ dayOfWeek: "asc" }, { blockStartMinutes: "asc" }],
     });
 
-    // Check for past broadcast slots that aired today and completed
-    for (const item of items) {
-      const blockEndMinutes = item.blockStartMinutes + item.blockCount * BLOCK_MINUTES;
-      const isPastToday = item.dayOfWeek === todayDayOfWeek && currentMinutes >= blockEndMinutes;
+    if (userTzOffset === null) {
+      const itemWithTz = items.find((it) => typeof it.timezoneOffset === "number");
+      if (itemWithTz && typeof itemWithTz.timezoneOffset === "number") {
+        userTzOffset = itemWithTz.timezoneOffset;
+      } else {
+        const sub = await prisma.pushSubscription.findFirst({
+          where: { userId: { in: userKeys }, timezoneOffset: { not: null } },
+        });
+        userTzOffset = sub && typeof sub.timezoneOffset === "number" ? sub.timezoneOffset : -330;
+      }
+    }
 
-      if (isPastToday && item.lastAiredDate !== todayIsoDate) {
+    const localNowMs = now.getTime() - userTzOffset * 60 * 1000;
+    const localNow = new Date(localNowMs);
+    const todayDayOfWeek = localNow.getUTCDay();
+    const todayIsoDate = localNow.toISOString().slice(0, 10);
+
+    // Check for past broadcast slots that completed (retroactively checks across all past days)
+    for (const item of items) {
+      const itemTz = typeof item.timezoneOffset === "number" ? item.timezoneOffset : userTzOffset;
+      const pastOccurrence = getMostRecentPastOccurrence(
+        item.dayOfWeek,
+        item.blockStartMinutes,
+        item.blockCount,
+        item.createdAt,
+        now,
+        itemTz,
+      );
+
+      if (pastOccurrence && item.lastAiredDate !== pastOccurrence.isoDate) {
+        const airIsoDate = pastOccurrence.isoDate;
+
         if (item.isRerun) {
           // One-off rerun has completed its airing window!
           // Remove it from the schedule so it doesn't repeat weekly.
@@ -129,8 +223,8 @@ export async function GET() {
 
         // Atomic lock: Only the first concurrent worker to mark lastAiredDate proceeds with advancing & alerts
         const lockUpdate = await prisma.userPersonalSchedule.updateMany({
-          where: { id: item.id, NOT: { lastAiredDate: todayIsoDate } },
-          data: { lastAiredDate: todayIsoDate },
+          where: { id: item.id, NOT: { lastAiredDate: airIsoDate } },
+          data: { lastAiredDate: airIsoDate },
         });
 
         if (lockUpdate.count === 0) {
@@ -144,7 +238,7 @@ export async function GET() {
             where: {
               sessionId: { in: userKeys },
               scheduleId: item.id,
-              originalAirDate: todayIsoDate,
+              originalAirDate: airIsoDate,
             },
           });
 
@@ -163,7 +257,7 @@ export async function GET() {
                 season: item.mediaType === "tv" ? item.currentSeason : null,
                 episode: item.mediaType === "tv" ? item.currentEpisode : null,
                 episodeTitle: null,
-                originalAirDate: todayIsoDate,
+                originalAirDate: airIsoDate,
                 originalAirTime: formatBlockTime(item.blockStartMinutes),
               },
             });
@@ -201,7 +295,7 @@ export async function GET() {
               where: { id: item.id },
               data: {
                 currentEpisode: nextEpisode,
-                lastAiredDate: todayIsoDate,
+                lastAiredDate: airIsoDate,
                 lastAiredSeason: item.currentSeason,
                 lastAiredEpisode: item.currentEpisode,
                 wasWatched: false,
@@ -213,7 +307,7 @@ export async function GET() {
           await prisma.userPersonalSchedule.update({
             where: { id: item.id },
             data: {
-              lastAiredDate: todayIsoDate,
+              lastAiredDate: airIsoDate,
               wasWatched: false,
             },
           });
@@ -280,9 +374,10 @@ export async function GET() {
     // Dynamically evaluate slot status for all schedule items
     const schedule: PersonalScheduleItem[] = await Promise.all(
       updatedItems.map(async (item) => {
-        const liveState = computeLiveState(item.dayOfWeek, item.blockStartMinutes, item.blockCount, now);
+        const itemTz = typeof item.timezoneOffset === "number" ? item.timezoneOffset : userTzOffset;
+        const liveState = computeLiveState(item.dayOfWeek, item.blockStartMinutes, item.blockCount, now, itemTz);
         const dayName = DAYS_OF_WEEK.find((d) => d.day === item.dayOfWeek)?.name ?? `Day ${item.dayOfWeek}`;
-        const targetAirDate = getNextAirDate(item.dayOfWeek, item.blockStartMinutes, now);
+        const targetAirDate = getNextAirDate(item.dayOfWeek, item.blockStartMinutes, now, itemTz);
 
         const slotStatus = await getBroadcastSlotStatus(
           userId,
@@ -347,7 +442,7 @@ export async function GET() {
     });
 
     const calendarItems: PersonalScheduleItem[] = calendarEntries.map((c) => {
-      const liveState = computeLiveState(todayDayOfWeek, c.blockStartMinutes, c.blockCount, now);
+      const liveState = computeLiveState(todayDayOfWeek, c.blockStartMinutes, c.blockCount, now, userTzOffset);
       return {
         id: `cal-${c.id}`,
         sessionId: c.sessionId,
@@ -413,7 +508,7 @@ export async function GET() {
         const dayOfWeek = Number(item.dayOfWeek);
         const blockStartMinutes = Number(item.blockStartMinutes);
         const blockCount = Number(item.blockCount || 1);
-        const liveState = computeLiveState(dayOfWeek, blockStartMinutes, blockCount, now);
+        const liveState = computeLiveState(dayOfWeek, blockStartMinutes, blockCount, now, userTzOffset);
         const dayName =
           DAYS_OF_WEEK.find((d) => d.day === dayOfWeek)?.name ??
           `Day ${dayOfWeek}`;
@@ -509,6 +604,26 @@ export async function POST(request: NextRequest) {
         where: { id: body.alertId, sessionId: { in: userKeys } },
         data: { isDismissed: true },
       });
+      return NextResponse.json({ success: true });
+    }
+
+    // Handle marking a scheduled slot as watched
+    if (body.action === "markWatched") {
+      const scheduleId = typeof body.scheduleId === "string" ? body.scheduleId : undefined;
+      const tmdbId = typeof body.tmdbId === "number" ? body.tmdbId : undefined;
+
+      if (scheduleId) {
+        await prisma.userPersonalSchedule.updateMany({
+          where: { id: scheduleId, sessionId: { in: userKeys } },
+          data: { wasWatched: true },
+        });
+      } else if (tmdbId) {
+        await prisma.userPersonalSchedule.updateMany({
+          where: { tmdbId, sessionId: { in: userKeys } },
+          data: { wasWatched: true },
+        });
+      }
+
       return NextResponse.json({ success: true });
     }
 
@@ -710,7 +825,7 @@ export async function POST(request: NextRequest) {
             currentSeason: targetSeason,
             currentEpisode: episodeNum,
             totalEpisodes: totalEpisodes ?? (input.mediaType === "tv" ? 12 : null),
-            timezoneOffset: typeof input.timezoneOffset === "number" ? input.timezoneOffset : null,
+            timezoneOffset: typeof input.timezoneOffset === "number" ? input.timezoneOffset : -330,
           },
         });
         created.push(item);

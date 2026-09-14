@@ -95,22 +95,13 @@ export function isSlotStartingSoon(
   userOffsetMinutes?: number | null,
   now: Date = new Date(),
 ): { isStartingSoon: boolean; localIsoDate: string } {
-  const hasExplicitOffset =
-    typeof slot.timezoneOffset === "number" || typeof userOffsetMinutes === "number";
-
-  if (!hasExplicitOffset) {
-    const currentDay = now.getDay();
-    const currentMinutes = now.getHours() * 60 + now.getMinutes();
-    const isStarting =
-      slot.dayOfWeek === currentDay &&
-      slot.blockStartMinutes >= currentMinutes - 2 &&
-      slot.blockStartMinutes <= currentMinutes + 20;
-
-    return { isStartingSoon: isStarting, localIsoDate: now.toISOString().slice(0, 10) };
-  }
-
+  // Effective offset: slot offset -> userOffsetMinutes -> default IST (-330)
   const effectiveOffset =
-    typeof slot.timezoneOffset === "number" ? slot.timezoneOffset : (userOffsetMinutes ?? 0);
+    typeof slot.timezoneOffset === "number"
+      ? slot.timezoneOffset
+      : typeof userOffsetMinutes === "number"
+        ? userOffsetMinutes
+        : -330;
 
   // Local time for user = UTC time - effectiveOffset (Date.prototype.getTimezoneOffset convention: UTC - Local)
   const localTimeMs = now.getTime() - effectiveOffset * 60_000;
@@ -124,8 +115,9 @@ export function isSlotStartingSoon(
     return { isStartingSoon: false, localIsoDate };
   }
 
-  const targetMinStart = localMinutes - 2;
-  const targetMinEnd = localMinutes + 20;
+  // Lookahead window: slot starting within upcoming 25 minutes or started within the last 5 minutes
+  const targetMinStart = localMinutes - 5;
+  const targetMinEnd = localMinutes + 25;
 
   const isStartingSoon =
     slot.blockStartMinutes >= targetMinStart && slot.blockStartMinutes <= targetMinEnd;
@@ -160,16 +152,22 @@ export function getNotificationImages(
  * Lookahead window: slots starting between now - 2 mins and now + 20 mins in the user's local timezone.
  */
 export async function dispatchStartingSoonAlerts(now: Date = new Date()): Promise<{ count: number; failed: number; cleaned: number }> {
-  // Fetch active schedules and user subscriptions with timezones
-  const [upcomingSlots, subscriptions] = await Promise.all([
+  // Fetch active schedules, user subscriptions, and session aliases
+  const [upcomingSlots, subscriptions, sessions] = await Promise.all([
     prisma.userPersonalSchedule.findMany() || [],
     prisma.pushSubscription.findMany({ select: { userId: true, timezoneOffset: true } }) || [],
+    prisma.session.findMany({ select: { id: true, accessCodeId: true } }) || [],
   ]);
 
   const userTimezoneMap = new Map<string, number>();
   for (const sub of subscriptions) {
-    if (typeof sub.timezoneOffset === "number" && !userTimezoneMap.has(sub.userId)) {
+    if (typeof sub.timezoneOffset === "number") {
       userTimezoneMap.set(sub.userId, sub.timezoneOffset);
+      const relatedSession = sessions.find((s) => s.id === sub.userId || s.accessCodeId === sub.userId);
+      if (relatedSession) {
+        if (relatedSession.id) userTimezoneMap.set(relatedSession.id, sub.timezoneOffset);
+        if (relatedSession.accessCodeId) userTimezoneMap.set(relatedSession.accessCodeId, sub.timezoneOffset);
+      }
     }
   }
 
@@ -181,7 +179,7 @@ export async function dispatchStartingSoonAlerts(now: Date = new Date()): Promis
     const effectiveOffset =
       typeof slot.timezoneOffset === "number"
         ? slot.timezoneOffset
-        : userTimezoneMap.get(slot.sessionId);
+        : (userTimezoneMap.get(slot.sessionId) ?? -330);
 
     const { isStartingSoon, localIsoDate } = isSlotStartingSoon(slot, effectiveOffset, now);
     if (!isStartingSoon) continue;
