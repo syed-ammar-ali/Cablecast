@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Check,
   ChevronDown,
+  ChevronLeft,
   FastForward,
   RadioTower,
   RefreshCw,
@@ -20,6 +21,7 @@ import {
   listProviders,
   PROVIDER_COUNT,
 } from "@/lib/providers";
+import { triggerHaptic } from "@/lib/haptics";
 import { REGION_OPTIONS, type StreamRegion } from "@/config/providers";
 import { CHANNELS } from "@/config/channels";
 import { BLOCK_MINUTES } from "@/lib/runtime";
@@ -712,179 +714,92 @@ export function VideoPlayer({
   const showNameInBadge = !isProviderUiVisible;
   const showBadge = showNameInBadge || isLiveNow;
 
+  // ── Touch Swipe-to-Back Gesture Tracking ──
+  const touchStartRef = useRef<{ x: number; y: number; time: number } | null>(null);
+
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    if (e.touches.length === 1) {
+      touchStartRef.current = {
+        x: e.touches[0].clientX,
+        y: e.touches[0].clientY,
+        time: Date.now(),
+      };
+    }
+  }, []);
+
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    if (!touchStartRef.current || e.changedTouches.length === 0) return;
+    const start = touchStartRef.current;
+    touchStartRef.current = null;
+
+    const endX = e.changedTouches[0].clientX;
+    const endY = e.changedTouches[0].clientY;
+    const deltaX = endX - start.x;
+    const deltaY = endY - start.y;
+    const elapsed = Date.now() - start.time;
+
+    const isHorizontal = deltaX > 0 && deltaX > Math.abs(deltaY) * 1.2;
+    const isFastFlick = elapsed < 350 && deltaX > 45 && isHorizontal;
+    const isLongSwipe = deltaX > 75 && isHorizontal;
+
+    if (start.x < 120 && (isFastFlick || isLongSwipe)) {
+      triggerHaptic(10);
+      onClose?.();
+    }
+  }, [onClose]);
+
   return (
     <div
       ref={containerRef}
-      className="relative h-full w-full overflow-hidden bg-black"
+      className="relative h-full w-full flex flex-col overflow-hidden bg-black select-none"
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
     >
-      {/* Screen — fills the entire player with no invisible touch blockers */}
-      <div className="relative h-full w-full bg-black">
-        {screenMode === "content" && !exhausted && hasLoadableSource && (
-          <div className="relative h-full w-full">
-            <iframe
-              ref={iframeRef}
-              key={iframeKey}
-              src={source.url}
-              title={displayTitle}
-              className="absolute inset-0 h-full w-full border-0"
-              width="100%"
-              height="100%"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
-              allowFullScreen
-              referrerPolicy={
-                currentProvider?.id === "youtube-official"
-                  ? "strict-origin-when-cross-origin"
-                  : "no-referrer"
-              }
-              onLoad={handleIframeLoad}
-              onError={handleIframeError}
-            />
-          </div>
-        )}
-
-        {screenMode === "off-air" && (
-          <DeadAirScreen
-            channel={activeChannel}
-            nextProgramTitle={liveEntry?.title}
-            nextProgramStartTime={offAirTargetTime ?? undefined}
-            onProgramStart={() => {
-              void tuneToChannel(activeChannel.number);
-            }}
-          />
-        )}
-
-        {screenMode === "bumper" && bumper && (
-          <div className="absolute inset-0 bg-black">
-            <video
-              key={bumper.id}
-              src={bumper.url}
-              className="absolute inset-0 h-full w-full object-contain"
-              autoPlay
-              muted={isBumperMuted}
-              playsInline
-              onEnded={handleBumperEnded}
-            />
-            {/* CRT Scanline and Phosphor Glow Layer for authentic broadcast feel */}
-            <div
-              className="pointer-events-none absolute inset-0 z-10"
-              style={{
-                background:
-                  "repeating-linear-gradient(0deg, rgba(0,0,0,0.25) 0px, rgba(0,0,0,0.25) 1px, transparent 1px, transparent 2px)",
-              }}
-            />
-            {/* Retro station ID, commercial category & audio toggle badge overlay */}
-            <div className="absolute bottom-[max(1rem,env(safe-area-inset-bottom))] left-[max(1rem,env(safe-area-inset-left))] z-20 flex flex-col gap-2 rounded-lg border border-amber-500/50 bg-black/85 p-2.5 sm:p-3 font-mono text-xs text-amber-400 backdrop-blur-md shadow-[0_0_20px_rgba(245,158,11,0.25)] max-w-[calc(100vw-2rem)] sm:max-w-md pointer-events-auto">
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2 truncate">
-                  <span className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-amber-500" />
-                  <span className="font-bold tracking-widest truncate">{bumper.label}</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsBumperMuted((prev) => !prev)}
-                  className="flex items-center gap-1.5 rounded-md border border-amber-500/50 bg-amber-950/50 hover:bg-amber-900/70 px-2 py-1 text-[10px] font-mono text-amber-300 hover:text-white transition-all active:scale-95 cursor-pointer touch-manipulation shrink-0 shadow-sm"
-                  title={isBumperMuted ? "Unmute commercial audio" : "Mute commercial audio"}
-                >
-                  {isBumperMuted ? (
-                    <VolumeX className="h-3.5 w-3.5 text-neutral-400" />
-                  ) : (
-                    <Volume2 className="h-3.5 w-3.5 text-amber-400 animate-pulse" />
-                  )}
-                  <span>{isBumperMuted ? "Unmute Ad" : "Audio On"}</span>
-                </button>
-              </div>
-              {bumper.categoryLabel && (
-                <div className="flex items-center gap-2">
-                  <span className="text-[9px] sm:text-[10px] text-amber-200/80 uppercase tracking-widest truncate">
-                    {bumper.categoryLabel}
-                  </span>
-                  <span className="text-[9px] text-neutral-500">·</span>
-                  <span className="text-[9px] text-neutral-400 uppercase tracking-wider">
-                    Commercial Break
-                  </span>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {screenMode === "tuning" && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/95 text-neutral-300">
-            <RadioTower className="h-10 w-10 animate-pulse" />
-            <p className="text-sm uppercase tracking-widest">Tuning {activeChannel.name}...</p>
-          </div>
-        )}
-
-        {screenMode === "content" && isDynamic && !dynamicEmbedUrl && !exhausted && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/90 text-neutral-300">
-            <RadioTower className="h-10 w-10 animate-pulse" />
-            <p className="text-sm uppercase tracking-widest">Searching {currentProvider?.name}...</p>
-            <div className="h-1 w-40 overflow-hidden rounded-full bg-neutral-800">
-              <div className="h-full w-1/3 animate-[loading-scan_1.2s_ease-in-out_infinite] bg-neutral-400" />
-            </div>
-          </div>
-        )}
-
-        {screenMode === "content" && hasLoadableSource && isLoading && !exhausted && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/90 text-neutral-300">
-            <RadioTower className="h-10 w-10 animate-pulse" />
-            <p className="text-sm uppercase tracking-widest">Tuning into {source.providerName}...</p>
-            <div className="h-1 w-40 overflow-hidden rounded-full bg-neutral-800">
-              <div className="h-full w-1/3 animate-[loading-scan_1.2s_ease-in-out_infinite] bg-neutral-400" />
-            </div>
-          </div>
-        )}
-
-        {screenMode === "content" && exhausted && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-black/95 px-6 text-center text-neutral-300">
-            <SatelliteDish className="h-10 w-10" />
-            <p className="text-sm uppercase tracking-widest">
-              All broadcast feeds exhausted — no signal detected.
-            </p>
+      {/* ── Top Header Bar ── */}
+      <header className="w-full shrink-0 flex items-center justify-between gap-2 px-2.5 sm:px-4 py-2 pt-[max(0.5rem,env(safe-area-inset-top))] border-b border-neutral-800/80 bg-neutral-950/95 backdrop-blur-md z-30">
+        {/* Left Section: Back Button + Program / On-Air Badge */}
+        <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 max-w-[55vw] sm:max-w-[420px]">
+          {onClose && (
             <button
               type="button"
-              onClick={retryFromTop}
-              className="flex items-center gap-2 rounded-md border border-neutral-600 bg-white/5 px-4 py-2 text-xs uppercase tracking-widest text-neutral-200 transition-colors hover:bg-white/10 cursor-pointer"
+              onClick={onClose}
+              aria-label="Back"
+              title="Back (Esc / Back gesture)"
+              className="flex h-8 sm:h-9 w-8 sm:w-9 shrink-0 items-center justify-center rounded-lg border border-neutral-800/80 bg-black/85 text-neutral-300 shadow-lg backdrop-blur-md transition-all hover:scale-105 hover:text-white active:scale-95 cursor-pointer touch-manipulation"
             >
-              <RefreshCw className="h-4 w-4" />
-              Retry From Feed 1
+              <ChevronLeft className="h-4 w-4 sm:h-5 sm:w-5" />
             </button>
-          </div>
-        )}
+          )}
 
-        {/* ── 1. Top-Left Sticky Component: On-Air / Program Badge ─────────────── */}
-        {showBadge && (
-          <div
-            className="pointer-events-auto absolute left-[max(0.75rem,env(safe-area-inset-left))] top-[max(0.75rem,env(safe-area-inset-top))] z-30 flex max-w-[48vw] sm:max-w-[320px] flex-col rounded-lg border border-neutral-800/80 bg-black/85 px-2.5 py-1.5 shadow-lg backdrop-blur-md"
-          >
-            {screenMode === "bumper" ? (
-              <div className="flex items-center gap-1.5 text-[10px] sm:text-xs font-mono font-bold tracking-wider text-amber-400">
-                <span className="h-2 w-2 animate-pulse rounded-full bg-amber-500" />
-                <span>COMMERCIAL BREAK</span>
-              </div>
-            ) : (
-              <>
-                {isLiveNow && (
-                  <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-red-400">
-                    <span className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-red-500" />
-                    <span className="truncate">
-                      CH {String(activeChannel.number).padStart(2, "0")} · On Air
-                    </span>
-                  </p>
-                )}
-                {showNameInBadge && (
-                  <p className="truncate text-xs sm:text-sm font-semibold text-neutral-100">{displayTitle}</p>
-                )}
-                {isLiveNow && <p className="truncate text-[10px] text-neutral-400">{activeChannel.name}</p>}
-              </>
-            )}
-          </div>
-        )}
+          {showBadge && (
+            <div className="flex flex-col min-w-0 rounded-lg border border-neutral-800/80 bg-black/85 px-2.5 py-1 sm:py-1.5 shadow-lg backdrop-blur-md">
+              {screenMode === "bumper" ? (
+                <div className="flex items-center gap-1.5 text-[10px] sm:text-xs font-mono font-bold tracking-wider text-amber-400 truncate">
+                  <span className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-amber-500" />
+                  <span className="truncate">COMMERCIAL BREAK</span>
+                </div>
+              ) : (
+                <>
+                  {isLiveNow && (
+                    <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-red-400">
+                      <span className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-red-500" />
+                      <span className="truncate">
+                        CH {String(activeChannel.number).padStart(2, "0")} · On Air
+                      </span>
+                    </p>
+                  )}
+                  {showNameInBadge && (
+                    <p className="truncate text-xs sm:text-sm font-semibold text-neutral-100">{displayTitle}</p>
+                  )}
+                  {isLiveNow && <p className="truncate text-[10px] text-neutral-400">{activeChannel.name}</p>}
+                </>
+              )}
+            </div>
+          )}
+        </div>
 
-        {/* ── 2. Top-Right Sticky Component: Stream Switcher, Next Show & Close ── */}
-        <div
-          className="pointer-events-auto absolute right-[max(0.75rem,env(safe-area-inset-right))] top-[max(0.75rem,env(safe-area-inset-top))] z-30 flex items-center gap-1.5 sm:gap-2"
-        >
+        {/* Right Section: Stream Switcher / Next Show / Close Button */}
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           {screenMode === "bumper" ? (
             <>
               {/* Next Program / Episode countdown pill */}
@@ -1031,13 +946,158 @@ export function VideoPlayer({
               type="button"
               onClick={onClose}
               aria-label="Close player"
+              title="Close player (Esc)"
               className="flex h-8 sm:h-9 w-8 sm:w-9 items-center justify-center rounded-full border border-neutral-800/80 bg-black/85 text-neutral-300 shadow-lg backdrop-blur-md transition-all hover:scale-105 hover:text-white active:scale-95 cursor-pointer touch-manipulation shrink-0"
             >
               <X className="h-4 w-4" />
             </button>
           )}
         </div>
-      </div>
+      </header>
+
+      {/* ── Main Screen Body: Fits Remaining Viewport Below Header ── */}
+      <main className="relative flex-1 min-h-0 w-full bg-black flex items-center justify-center overflow-hidden">
+        {/* Left Edge Gesture Strip for Touch Back Gestures */}
+        <div
+          className="absolute left-0 top-0 bottom-0 w-6 sm:w-8 z-20 touch-pan-y pointer-events-auto"
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+          aria-hidden="true"
+        />
+
+        {screenMode === "content" && !exhausted && hasLoadableSource && (
+          <div className="relative h-full w-full flex items-center justify-center bg-black">
+            <iframe
+              ref={iframeRef}
+              key={iframeKey}
+              src={source.url}
+              title={displayTitle}
+              className="w-full h-full border-0"
+              width="100%"
+              height="100%"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
+              allowFullScreen
+              referrerPolicy={
+                currentProvider?.id === "youtube-official"
+                  ? "strict-origin-when-cross-origin"
+                  : "no-referrer"
+              }
+              onLoad={handleIframeLoad}
+              onError={handleIframeError}
+            />
+          </div>
+        )}
+
+        {screenMode === "off-air" && (
+          <DeadAirScreen
+            channel={activeChannel}
+            nextProgramTitle={liveEntry?.title}
+            nextProgramStartTime={offAirTargetTime ?? undefined}
+            onProgramStart={() => {
+              void tuneToChannel(activeChannel.number);
+            }}
+          />
+        )}
+
+        {screenMode === "bumper" && bumper && (
+          <div className="absolute inset-0 bg-black flex items-center justify-center">
+            <video
+              key={bumper.id}
+              src={bumper.url}
+              className="w-full h-full object-contain"
+              autoPlay
+              muted={isBumperMuted}
+              playsInline
+              onEnded={handleBumperEnded}
+            />
+            {/* CRT Scanline and Phosphor Glow Layer for authentic broadcast feel */}
+            <div
+              className="pointer-events-none absolute inset-0 z-10"
+              style={{
+                background:
+                  "repeating-linear-gradient(0deg, rgba(0,0,0,0.25) 0px, rgba(0,0,0,0.25) 1px, transparent 1px, transparent 2px)",
+              }}
+            />
+            {/* Retro station ID, commercial category & audio toggle badge overlay */}
+            <div className="absolute bottom-[max(1rem,env(safe-area-inset-bottom))] left-[max(1rem,env(safe-area-inset-left))] z-20 flex flex-col gap-2 rounded-lg border border-amber-500/50 bg-black/85 p-2.5 sm:p-3 font-mono text-xs text-amber-400 backdrop-blur-md shadow-[0_0_20px_rgba(245,158,11,0.25)] max-w-[calc(100vw-2rem)] sm:max-w-md pointer-events-auto">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2 truncate">
+                  <span className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-amber-500" />
+                  <span className="font-bold tracking-widest truncate">{bumper.label}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsBumperMuted((prev) => !prev)}
+                  className="flex items-center gap-1.5 rounded-md border border-amber-500/50 bg-amber-950/50 hover:bg-amber-900/70 px-2 py-1 text-[10px] font-mono text-amber-300 hover:text-white transition-all active:scale-95 cursor-pointer touch-manipulation shrink-0 shadow-sm"
+                  title={isBumperMuted ? "Unmute commercial audio" : "Mute commercial audio"}
+                >
+                  {isBumperMuted ? (
+                    <VolumeX className="h-3.5 w-3.5 text-neutral-400" />
+                  ) : (
+                    <Volume2 className="h-3.5 w-3.5 text-amber-400 animate-pulse" />
+                  )}
+                  <span>{isBumperMuted ? "Unmute Ad" : "Audio On"}</span>
+                </button>
+              </div>
+              {bumper.categoryLabel && (
+                <div className="flex items-center gap-2">
+                  <span className="text-[9px] sm:text-[10px] text-amber-200/80 uppercase tracking-widest truncate">
+                    {bumper.categoryLabel}
+                  </span>
+                  <span className="text-[9px] text-neutral-500">·</span>
+                  <span className="text-[9px] text-neutral-400 uppercase tracking-wider">
+                    Commercial Break
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {screenMode === "tuning" && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/95 text-neutral-300">
+            <RadioTower className="h-10 w-10 animate-pulse" />
+            <p className="text-sm uppercase tracking-widest">Tuning {activeChannel.name}...</p>
+          </div>
+        )}
+
+        {screenMode === "content" && isDynamic && !dynamicEmbedUrl && !exhausted && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/90 text-neutral-300">
+            <RadioTower className="h-10 w-10 animate-pulse" />
+            <p className="text-sm uppercase tracking-widest">Searching {currentProvider?.name}...</p>
+            <div className="h-1 w-40 overflow-hidden rounded-full bg-neutral-800">
+              <div className="h-full w-1/3 animate-[loading-scan_1.2s_ease-in-out_infinite] bg-neutral-400" />
+            </div>
+          </div>
+        )}
+
+        {screenMode === "content" && hasLoadableSource && isLoading && !exhausted && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/90 text-neutral-300">
+            <RadioTower className="h-10 w-10 animate-pulse" />
+            <p className="text-sm uppercase tracking-widest">Tuning into {source.providerName}...</p>
+            <div className="h-1 w-40 overflow-hidden rounded-full bg-neutral-800">
+              <div className="h-full w-1/3 animate-[loading-scan_1.2s_ease-in-out_infinite] bg-neutral-400" />
+            </div>
+          </div>
+        )}
+
+        {screenMode === "content" && exhausted && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-black/95 px-6 text-center text-neutral-300">
+            <SatelliteDish className="h-10 w-10" />
+            <p className="text-sm uppercase tracking-widest">
+              All broadcast feeds exhausted — no signal detected.
+            </p>
+            <button
+              type="button"
+              onClick={retryFromTop}
+              className="flex items-center gap-2 rounded-md border border-neutral-600 bg-white/5 px-4 py-2 text-xs uppercase tracking-widest text-neutral-200 transition-colors hover:bg-white/10 cursor-pointer"
+            >
+              <RefreshCw className="h-4 w-4" />
+              Retry From Feed 1
+            </button>
+          </div>
+        )}
+      </main>
     </div>
   );
 }

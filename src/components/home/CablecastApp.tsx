@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import dynamic from "next/dynamic";
 import { AppHeader } from "@/components/home/AppHeader";
 import { HeroBanner } from "@/components/home/HeroBanner";
@@ -162,9 +162,46 @@ export function CablecastApp({ initialView = "home" }: CablecastAppProps) {
     [],
   );
 
+  // Modal tracking refs for back-navigation layers
+  const playerTargetRef = useRef(playerTarget);
+  playerTargetRef.current = playerTarget;
+  const directBroadcastTargetRef = useRef(directBroadcastTarget);
+  directBroadcastTargetRef.current = directBroadcastTarget;
+  const detailsTargetRef = useRef(detailsTarget);
+  detailsTargetRef.current = detailsTarget;
+  const isModalOpenRef = useRef(isModalOpen);
+  isModalOpenRef.current = isModalOpen;
+  const schedulingTargetRef = useRef(schedulingTarget);
+  schedulingTargetRef.current = schedulingTarget;
+
   // Synchronize Browser Back / Forward buttons & URL state
   useEffect(() => {
     const handlePopState = () => {
+      // 1. Layer 1: Video Player modals
+      if (playerTargetRef.current) {
+        setPlayerTarget(null);
+        return;
+      }
+      if (directBroadcastTargetRef.current) {
+        setDirectBroadcastTarget(null);
+        return;
+      }
+      // 2. Layer 2: Inspection & Scheduler modals
+      if (detailsTargetRef.current) {
+        setDetailsTarget(null);
+        return;
+      }
+      if (isModalOpenRef.current) {
+        setIsModalOpen(false);
+        setSelectedMedia(null);
+        return;
+      }
+      if (schedulingTargetRef.current) {
+        setSchedulingTarget(null);
+        return;
+      }
+
+      // 3. Layer 3: Main view navigation
       const path = window.location.pathname.replace(/^\//, "") || "home";
       if (path === "explore" || path === "broadcast" || path === "library" || path === "home") {
         navigateTo(path as AppView, false);

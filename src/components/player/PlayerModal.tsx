@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Loader2, X, ShoppingBag, Zap } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { ChevronLeft, Loader2, X, ShoppingBag, Zap } from "lucide-react";
 import { VideoPlayer } from "@/components/player/VideoPlayer";
 import type { MediaSearchResult, ShowDetails } from "@/types/media";
 import type { ScheduleEntry } from "@/types/schedule";
@@ -57,6 +57,73 @@ export function PlayerModal({
 
   const [season, setSeason] = useState(initialSeason ?? 1);
   const episode = initialEpisode ?? 1;
+
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
+  // ── Browser History & Native Back Navigation (Web & Mobile) ──
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const modalHistoryKey = `player-${Date.now()}`;
+    window.history.pushState(
+      { ...(window.history.state || {}), cablecastModal: modalHistoryKey },
+      "",
+      window.location.href,
+    );
+
+    let isPoppedByBrowser = false;
+
+    const handlePopState = () => {
+      isPoppedByBrowser = true;
+      onCloseRef.current();
+    };
+
+    window.addEventListener("popstate", handlePopState);
+
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+      if (!isPoppedByBrowser && window.history.state?.cablecastModal === modalHistoryKey) {
+        window.history.back();
+      }
+    };
+  }, []);
+
+  // ── Touch Swipe-to-Back Gesture Tracking ──
+  const touchStartRef = useRef<{ x: number; y: number; time: number } | null>(null);
+
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    if (e.touches.length === 1) {
+      touchStartRef.current = {
+        x: e.touches[0].clientX,
+        y: e.touches[0].clientY,
+        time: Date.now(),
+      };
+    }
+  }, []);
+
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    if (!touchStartRef.current || e.changedTouches.length === 0) return;
+    const start = touchStartRef.current;
+    touchStartRef.current = null;
+
+    const endX = e.changedTouches[0].clientX;
+    const endY = e.changedTouches[0].clientY;
+    const deltaX = endX - start.x;
+    const deltaY = endY - start.y;
+    const elapsed = Date.now() - start.time;
+
+    const isHorizontal = deltaX > 0 && deltaX > Math.abs(deltaY) * 1.2;
+    const isFastFlick = elapsed < 350 && deltaX > 45 && isHorizontal;
+    const isLongSwipe = deltaX > 75 && isHorizontal;
+
+    if (start.x < 120 && (isFastFlick || isLongSwipe)) {
+      triggerHaptic(10);
+      onCloseRef.current();
+    }
+  }, []);
 
   useEffect(() => {
     function handleEscape(event: KeyboardEvent) {
@@ -284,66 +351,116 @@ export function PlayerModal({
   const showPlayer = Boolean(directBroadcast) || !isTv || (details && !isLoadingDetails);
 
   return (
-    <div className="fixed inset-0 z-[100] bg-black animate-in fade-in">
+    <div
+      className="fixed inset-0 z-[100] bg-black animate-in fade-in flex flex-col overflow-hidden select-none"
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+    >
       {directBroadcast ? (
-        <div className="relative h-full w-full bg-black">
-          <iframe
-            key={directBroadcast.embedUrl}
-            src={directBroadcast.embedUrl}
-            title={directBroadcast.title}
-            className="absolute inset-0 h-full w-full border-0"
-            width="100%"
-            height="100%"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
-            allowFullScreen
-            referrerPolicy="strict-origin-when-cross-origin"
-          />
+        <div className="relative h-full w-full flex flex-col bg-black overflow-hidden">
+          {/* Top Header Bar */}
+          <header className="w-full shrink-0 flex items-center justify-between gap-2 px-3 sm:px-4 py-2 pt-[max(0.5rem,env(safe-area-inset-top))] border-b border-neutral-800/80 bg-neutral-950/95 backdrop-blur-md z-30">
+            <div className="flex items-center gap-2 min-w-0 max-w-[75vw] sm:max-w-md">
+              <button
+                type="button"
+                onClick={onClose}
+                aria-label="Back"
+                title="Back (Esc / Back gesture)"
+                className="flex h-8 sm:h-9 w-8 sm:w-9 shrink-0 items-center justify-center rounded-lg border border-neutral-800/80 bg-black/85 text-neutral-300 shadow-lg backdrop-blur-md transition-all hover:scale-105 hover:text-white active:scale-95 cursor-pointer touch-manipulation"
+              >
+                <ChevronLeft className="h-4 w-4 sm:h-5 sm:w-5" />
+              </button>
 
-          {/* Top-left broadcast badge: strictly fits its shape, pointer-events-auto */}
-          <div className="pointer-events-auto absolute left-[max(0.75rem,env(safe-area-inset-left))] top-[max(0.75rem,env(safe-area-inset-top))] z-30 max-w-[50vw] sm:max-w-[320px] rounded-lg border border-neutral-800/80 bg-black/85 px-2.5 py-1.5 shadow-lg backdrop-blur-md">
-            <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-red-400">
-              <span className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-red-500" />
-              <span className="truncate">{directBroadcast.label}</span>
-            </p>
-            {directBroadcast.title && (
-              <p className="truncate text-xs sm:text-sm font-semibold text-neutral-100">{directBroadcast.title}</p>
-            )}
-          </div>
+              <div className="flex flex-col min-w-0 rounded-lg border border-neutral-800/80 bg-black/85 px-2.5 py-1 sm:py-1.5 shadow-lg backdrop-blur-md">
+                <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-red-400">
+                  <span className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-red-500" />
+                  <span className="truncate">{directBroadcast.label}</span>
+                </p>
+                {directBroadcast.title && (
+                  <p className="truncate text-xs sm:text-sm font-semibold text-neutral-100">{directBroadcast.title}</p>
+                )}
+              </div>
+            </div>
 
-          {/* Top-right close button: strictly fits its shape, pointer-events-auto */}
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close broadcast"
-            className="pointer-events-auto absolute right-[max(0.75rem,env(safe-area-inset-right))] top-[max(0.75rem,env(safe-area-inset-top))] z-30 flex h-8 sm:h-9 w-8 sm:w-9 items-center justify-center rounded-full border border-neutral-800/80 bg-black/85 text-neutral-300 shadow-lg backdrop-blur-md transition-all hover:scale-105 hover:text-white active:scale-95 cursor-pointer"
-          >
-            <X className="h-4 w-4" />
-          </button>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close broadcast"
+              title="Close (Esc)"
+              className="flex h-8 sm:h-9 w-8 sm:w-9 shrink-0 items-center justify-center rounded-full border border-neutral-800/80 bg-black/85 text-neutral-300 shadow-lg backdrop-blur-md transition-all hover:scale-105 hover:text-white active:scale-95 cursor-pointer touch-manipulation"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </header>
+
+          {/* Body Below Header Fitting the Screen */}
+          <main className="relative flex-1 min-h-0 w-full bg-black flex items-center justify-center overflow-hidden">
+            {/* Left Edge Gesture Strip for Touch Back Gestures */}
+            <div
+              className="absolute left-0 top-0 bottom-0 w-6 sm:w-8 z-20 touch-pan-y pointer-events-auto"
+              onTouchStart={handleTouchStart}
+              onTouchEnd={handleTouchEnd}
+              aria-hidden="true"
+            />
+            <iframe
+              key={directBroadcast.embedUrl}
+              src={directBroadcast.embedUrl}
+              title={directBroadcast.title}
+              className="w-full h-full border-0"
+              width="100%"
+              height="100%"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
+              allowFullScreen
+              referrerPolicy="strict-origin-when-cross-origin"
+            />
+          </main>
         </div>
       ) : !media || !showPlayer || isCheckingOwnership ? (
-        <div className="relative flex h-full w-full items-center justify-center bg-black text-neutral-500">
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close player"
-            className="pointer-events-auto absolute right-[max(0.75rem,env(safe-area-inset-right))] top-[max(0.75rem,env(safe-area-inset-top))] z-40 flex h-8 sm:h-9 w-8 sm:w-9 items-center justify-center rounded-full border border-neutral-800/80 bg-black/85 text-neutral-300 shadow-lg backdrop-blur-md transition-all hover:scale-105 hover:text-white active:scale-95 cursor-pointer"
-          >
-            <X className="h-4 w-4" />
-          </button>
-          <Loader2 className="h-8 w-8 animate-spin text-purple-400" />
+        <div className="relative flex h-full w-full flex-col bg-black text-neutral-500">
+          <header className="w-full shrink-0 flex items-center justify-between px-3 sm:px-4 py-2 pt-[max(0.5rem,env(safe-area-inset-top))] border-b border-neutral-800/80 bg-neutral-950/95 backdrop-blur-md z-30">
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Back"
+              className="flex h-8 sm:h-9 w-8 sm:w-9 items-center justify-center rounded-lg border border-neutral-800/80 bg-black/85 text-neutral-300 shadow-lg backdrop-blur-md transition-all hover:scale-105 hover:text-white active:scale-95 cursor-pointer touch-manipulation"
+            >
+              <ChevronLeft className="h-4 w-4 sm:h-5 sm:w-5" />
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close player"
+              className="flex h-8 sm:h-9 w-8 sm:w-9 items-center justify-center rounded-full border border-neutral-800/80 bg-black/85 text-neutral-300 shadow-lg backdrop-blur-md transition-all hover:scale-105 hover:text-white active:scale-95 cursor-pointer touch-manipulation"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </header>
+          <div className="flex-1 min-h-0 flex items-center justify-center">
+            <Loader2 className="h-8 w-8 animate-spin text-purple-400" />
+          </div>
         </div>
       ) : isTv && isSeasonOwned === false ? (
         /* Retro CRT Signal Restricted - Tape Not in Vault Screen */
-        <div className="relative flex h-full w-full flex-col items-center justify-center bg-neutral-950 p-4 text-center select-none overflow-hidden">
-          {/* Close button */}
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close player"
-            className="pointer-events-auto absolute right-[max(0.75rem,env(safe-area-inset-right))] top-[max(0.75rem,env(safe-area-inset-top))] z-40 flex h-8 sm:h-9 w-8 sm:w-9 items-center justify-center rounded-full border border-neutral-800/80 bg-black/85 text-neutral-300 shadow-lg backdrop-blur-md transition-all hover:scale-105 hover:text-white active:scale-95 cursor-pointer"
-          >
-            <X className="h-4 w-4" />
-          </button>
+        <div className="relative flex h-full w-full flex-col bg-neutral-950 select-none overflow-hidden">
+          <header className="w-full shrink-0 flex items-center justify-between px-3 sm:px-4 py-2 pt-[max(0.5rem,env(safe-area-inset-top))] border-b border-neutral-800/80 bg-neutral-950/95 backdrop-blur-md z-30">
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Back"
+              className="flex h-8 sm:h-9 w-8 sm:w-9 items-center justify-center rounded-lg border border-neutral-800/80 bg-black/85 text-neutral-300 shadow-lg backdrop-blur-md transition-all hover:scale-105 hover:text-white active:scale-95 cursor-pointer touch-manipulation"
+            >
+              <ChevronLeft className="h-4 w-4 sm:h-5 sm:w-5" />
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close player"
+              className="flex h-8 sm:h-9 w-8 sm:w-9 items-center justify-center rounded-full border border-neutral-800/80 bg-black/85 text-neutral-300 shadow-lg backdrop-blur-md transition-all hover:scale-105 hover:text-white active:scale-95 cursor-pointer touch-manipulation"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </header>
+          <div className="relative flex-1 min-h-0 flex flex-col items-center justify-center p-4 text-center">
 
           {/* Retro CRT Scanlines & Vignette */}
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,_transparent_0%,_black_90%)] opacity-80 z-10" />
@@ -406,6 +523,7 @@ export function PlayerModal({
               </button>
             </div>
           </div>
+        </div>
         </div>
       ) : (
         <VideoPlayer
