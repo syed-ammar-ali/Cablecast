@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { AlertCircle, AlertTriangle, CheckCircle2, Info, Radio, X } from "lucide-react";
 
 export type ToastType = "success" | "error" | "warning" | "info" | "broadcast";
@@ -123,38 +123,41 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     [dismissToast]
   );
 
-  const toast = {
-    success: (message: string, title?: string) => showToast({ type: "success", title, message }),
-    error: (message: string, title?: string) => showToast({ type: "error", title, message }),
-    warning: (message: string, title?: string) => showToast({ type: "warning", title, message }),
-    info: (message: string, title?: string) => showToast({ type: "info", title, message }),
-    broadcast: (options: BroadcastToastOptions | string, title?: string) => {
-      if (typeof options === "string") {
-        showToast({
-          type: "broadcast",
-          title: title || "Live Broadcast",
-          message: options,
-          duration: 7000,
-        });
-      } else {
-        showToast({
-          type: "broadcast",
-          title: options.title || "Live Broadcast",
-          message: options.message,
-          posterUrl: options.posterUrl,
-          badgeText: options.badgeText,
-          duration: options.duration ?? 7000,
-          action:
-            options.actionLabel && options.onAction
-              ? {
-                  label: options.actionLabel,
-                  onClick: options.onAction,
-                }
-              : undefined,
-        });
-      }
-    },
-  };
+  const toast = useMemo(
+    () => ({
+      success: (message: string, title?: string) => showToast({ type: "success", title, message }),
+      error: (message: string, title?: string) => showToast({ type: "error", title, message }),
+      warning: (message: string, title?: string) => showToast({ type: "warning", title, message }),
+      info: (message: string, title?: string) => showToast({ type: "info", title, message }),
+      broadcast: (options: BroadcastToastOptions | string, title?: string) => {
+        if (typeof options === "string") {
+          showToast({
+            type: "broadcast",
+            title: title || "Live Broadcast",
+            message: options,
+            duration: 7000,
+          });
+        } else {
+          showToast({
+            type: "broadcast",
+            title: options.title || "Live Broadcast",
+            message: options.message,
+            posterUrl: options.posterUrl,
+            badgeText: options.badgeText,
+            duration: options.duration ?? 7000,
+            action:
+              options.actionLabel && options.onAction
+                ? {
+                    label: options.actionLabel,
+                    onClick: options.onAction,
+                  }
+                : undefined,
+          });
+        }
+      },
+    }),
+    [showToast],
+  );
 
   const confirm = useCallback((options: ConfirmOptions): Promise<boolean> => {
     return new Promise<boolean>((resolve) => {
@@ -352,6 +355,8 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
         <div
           role="dialog"
           aria-modal="true"
+          aria-labelledby="confirm-dialog-title"
+          aria-describedby="confirm-dialog-body"
           className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/90 p-4 backdrop-blur-md animate-in fade-in"
           onClick={() => handleConfirmClose(false)}
         >
@@ -369,13 +374,13 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
               >
                 <AlertTriangle className="h-5 w-5" />
               </div>
-              <h3 className="text-base font-bold text-white tracking-wide">
+              <h3 id="confirm-dialog-title" className="text-base font-bold text-white tracking-wide">
                 {confirmDialog.options.title}
               </h3>
             </div>
 
             {/* Body Message */}
-            <p className="mt-3 text-xs leading-relaxed text-neutral-300">
+            <p id="confirm-dialog-body" className="mt-3 text-xs leading-relaxed text-neutral-300">
               {renderFormattedMessage(confirmDialog.options.message, confirmDialog.options.isDestructive)}
             </p>
 
@@ -383,6 +388,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
             <div className="mt-6 flex items-center justify-center gap-3">
               <button
                 type="button"
+                autoFocus
                 onClick={() => handleConfirmClose(false)}
                 className="min-w-[100px] rounded-xl border border-neutral-700 bg-neutral-900 px-5 py-2.5 text-xs font-medium text-neutral-200 transition-colors hover:border-neutral-600 hover:bg-neutral-800 hover:text-white"
               >
@@ -390,7 +396,6 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
               </button>
               <button
                 type="button"
-                autoFocus
                 onClick={() => handleConfirmClose(true)}
                 className={`min-w-[120px] rounded-xl px-5 py-2.5 text-xs font-semibold transition-all ${confirmDialog.options.isDestructive
                     ? "bg-red-600 text-white hover:bg-red-500 shadow-md shadow-red-600/20"

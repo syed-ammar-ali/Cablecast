@@ -16,9 +16,21 @@
   -webkit-tap-highlight-color: transparent;
 }
 
-*:focus,
-*:focus-visible {
+/* Suppress focus ring only for mouse/touch interactions (not keyboard) */
+*:focus:not(:focus-visible) {
   outline: none;
+}
+
+/* Provide a subtle, on-brand keyboard focus ring for accessibility */
+*:focus-visible {
+  outline: 2px solid rgba(251, 191, 36, 0.6);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+@keyframes scanline-fill {
+  from { width: 0%; }
+  to   { width: 100%; }
 }
 
 html,

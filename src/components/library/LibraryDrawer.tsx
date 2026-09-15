@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import {
   ArrowLeft,
@@ -33,9 +33,10 @@ interface LibraryDrawerProps {
   collection: LibraryMediaItem[];
   owned: LibraryMediaItem[];
   rented: LibraryMediaItem[];
+  isLoading?: boolean;
   onPlay?: (media: MediaSearchResult, season?: number) => void;
   onAddToBroadcast?: (media: MediaSearchResult, season?: number) => void;
-  onRemoveItem?: (mediaId: number | string, seasonNumber?: number | null) => Promise<boolean>;
+  onRemoveItem?: (mediaId: number | string, seasonNumber?: number | null, mediaType?: string) => Promise<boolean>;
   isScheduled?: (tmdbId: number, seasonNumber?: number) => boolean;
   onOpenBroadcastStudio?: () => void;
   onSelectMedia?: (media: MediaSearchResult, season?: number) => void;
@@ -61,6 +62,7 @@ export function LibraryDrawer({
   isScheduled,
   onOpenBroadcastStudio,
   onSelectMedia,
+  isLoading,
 }: LibraryDrawerProps) {
   const { toast, confirm } = useToast();
   const [activeTab, setActiveTab] = useState<LibraryTabKey>("COLLECTION");
@@ -115,8 +117,12 @@ export function LibraryDrawer({
     }
   };
 
-  const filteredItems = getActiveItems().filter((item) =>
-    item.title.toLowerCase().includes(filterQuery.toLowerCase())
+  const filteredItems = useMemo(
+    () =>
+      getActiveItems().filter((item) =>
+        item.title.toLowerCase().includes(filterQuery.toLowerCase())
+      ),
+    [activeTab, filterQuery, collection, owned, rented]
   );
 
   const handleDeleteItem = async (item: LibraryMediaItem) => {
@@ -140,7 +146,7 @@ export function LibraryDrawer({
     const key = `${item.tmdbId}_${item.seasonNumber ?? 0}`;
     setDeletingKey(key);
     try {
-      const success = await onRemoveItem?.(item.tmdbId, item.seasonNumber);
+      const success = await onRemoveItem?.(item.tmdbId, item.seasonNumber, item.mediaType);
       if (success) {
         toast.success(
           isRented ? `Returned "${itemDisplayName}".` : `Removed "${itemDisplayName}" from vault.`,
@@ -211,7 +217,10 @@ export function LibraryDrawer({
             {/* 1. COLLECTION */}
             <button
               type="button"
-              onClick={() => setActiveTab("COLLECTION")}
+              onClick={() => {
+                setActiveTab("COLLECTION");
+                setFilterQuery("");
+              }}
               className={`flex flex-1 justify-center items-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 sm:px-3 py-1.5 text-[11px] sm:text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
                 activeTab === "COLLECTION"
                   ? "bg-neutral-800 text-white shadow-md ring-1 ring-neutral-700"
@@ -230,7 +239,10 @@ export function LibraryDrawer({
             {/* 2. OWNED */}
             <button
               type="button"
-              onClick={() => setActiveTab("OWNED")}
+              onClick={() => {
+                setActiveTab("OWNED");
+                setFilterQuery("");
+              }}
               className={`flex flex-1 justify-center items-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 sm:px-3 py-1.5 text-[11px] sm:text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
                 activeTab === "OWNED"
                   ? "bg-neutral-800 text-white shadow-md ring-1 ring-neutral-700"
@@ -249,7 +261,10 @@ export function LibraryDrawer({
             {/* 3. RENTED */}
             <button
               type="button"
-              onClick={() => setActiveTab("RENTED")}
+              onClick={() => {
+                setActiveTab("RENTED");
+                setFilterQuery("");
+              }}
               className={`flex flex-1 justify-center items-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 sm:px-3 py-1.5 text-[11px] sm:text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
                 activeTab === "RENTED"
                   ? "bg-neutral-800 text-white shadow-md ring-1 ring-neutral-700"
@@ -293,7 +308,19 @@ export function LibraryDrawer({
 
         {/* Content List Area */}
         <div className="no-scrollbar flex-1 overflow-y-auto p-4 sm:p-6 pb-[max(6rem,env(safe-area-inset-bottom)+5rem)] space-y-3.5 flex flex-col">
-          {filteredItems.length === 0 ? (
+          {isLoading && filteredItems.length === 0 ? (
+            <div className="space-y-3 p-2">
+              {[...Array(4)].map((_, i) => (
+                <div key={i} className="flex items-center gap-3 animate-pulse p-2 rounded-xl border border-neutral-900 bg-neutral-950">
+                  <div className="h-16 w-11 rounded-lg bg-neutral-800 shrink-0" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-3.5 w-3/4 rounded bg-neutral-800" />
+                    <div className="h-2.5 w-1/2 rounded bg-neutral-800/80" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : filteredItems.length === 0 ? (
             <EmptyState tabKey={activeTab} hasQuery={Boolean(filterQuery)} onExplore={onClose} />
           ) : (
             <div key={activeTab} className="grid grid-cols-1 gap-3.5 animate-in fade-in duration-150">

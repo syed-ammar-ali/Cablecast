@@ -12,6 +12,9 @@ interface RateLimitRecord {
   resetTime: number;
 }
 
+// ⚠️ This in-memory cache is per-process. On serverless deployments (e.g. Vercel),
+// a cold start resets all counters. For production hardening, replace with
+// a Neon/Redis-backed store using the same interface.
 // In-memory token bucket / sliding window cache
 const ipCache = new Map<string, RateLimitRecord>();
 
@@ -32,6 +35,11 @@ if (typeof setInterval !== "undefined") {
  */
 export async function getClientIp(): Promise<string> {
   const headerStore = await headers();
+  // Prefer Vercel's server-set header which clients cannot spoof
+  const vercelIp = headerStore.get("x-vercel-forwarded-for");
+  if (vercelIp) {
+    return vercelIp.split(",")[0].trim();
+  }
   const forwardedFor = headerStore.get("x-forwarded-for");
   if (forwardedFor) {
     return forwardedFor.split(",")[0].trim();

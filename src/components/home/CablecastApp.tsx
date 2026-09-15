@@ -57,7 +57,7 @@ const DontDeleteModal = dynamic(
   { ssr: false }
 );
 
-const CLOCK_TICK_MS = 20_000;
+const CLOCK_TICK_MS = 10_000;
 
 export type AppView = "home" | "explore" | "broadcast" | "library";
 
@@ -513,6 +513,7 @@ export function CablecastApp({ initialView = "home" }: CablecastAppProps) {
           setSchedulingTarget({ media, season });
         }}
         onRemoveItem={library.removeItem}
+        isLoading={library.isLoading}
         isScheduled={(tmdbId, season) => personalBroadcast.isScheduled(tmdbId, season)}
         onOpenBroadcastStudio={() => {
           setIsLibraryOpen(false);

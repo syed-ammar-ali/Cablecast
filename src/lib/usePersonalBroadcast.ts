@@ -114,7 +114,6 @@ export function usePersonalBroadcast() {
   useEffect(() => {
 
     const controller = new AbortController();
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     void syncFromServer(controller.signal);
 
     const handleMutation = () => {

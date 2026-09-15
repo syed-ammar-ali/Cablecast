@@ -52,6 +52,20 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: redemptionError }, { status: 403 });
   }
 
+  // Atomically check maxUses AND increment in one operation to prevent race conditions
+  if (accessCode.maxUses !== null) {
+    const updated = await prisma.accessCode.updateMany({
+      where: { id: accessCode.id, useCount: { lt: accessCode.maxUses } },
+      data: { useCount: { increment: 1 } },
+    });
+    if (updated.count === 0) {
+      return NextResponse.json(
+        { error: "This code has reached its maximum number of uses." },
+        { status: 403 }
+      );
+    }
+  }
+
   // Priority: 1. Client-remembered viewer name (if this device has one saved)
   const clientName = typeof displayName === "string" ? sanitizeDisplayName(displayName) : null;
   const initialName = clientName || null;
@@ -63,6 +77,15 @@ export async function POST(request: NextRequest) {
   );
 
   if (!sessionResult.success) {
+    if (accessCode.maxUses !== null) {
+      await prisma.accessCode
+        .update({
+          where: { id: accessCode.id },
+          data: { useCount: { decrement: 1 } },
+        })
+        .catch(() => {});
+    }
+
     return NextResponse.json(
       {
         error: "DEVICE_LIMIT_REACHED",
@@ -74,10 +97,13 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  await prisma.accessCode.update({
-    where: { id: accessCode.id },
-    data: { useCount: { increment: 1 } },
-  });
+  // If code has unlimited uses (maxUses === null), increment useCount on successful redemption
+  if (accessCode.maxUses === null) {
+    await prisma.accessCode.update({
+      where: { id: accessCode.id },
+      data: { useCount: { increment: 1 } },
+    });
+  }
 
   return NextResponse.json({
     ok: true,

@@ -274,6 +274,7 @@ export async function GET(request: NextRequest) {
 
           if (nextEpisode > totalSeasonEpisodes) {
             // Season completed! Create alert and drop show from schedule
+            // Note: nextSeason (currentSeason + 1) is provisional; client validates against TMDB season count before scheduling
             await prisma.userSeasonCompletedAlert.create({
               data: {
                 sessionId: userId,

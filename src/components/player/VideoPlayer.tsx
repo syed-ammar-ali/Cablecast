@@ -325,7 +325,6 @@ export function VideoPlayer({
       return;
     }
 
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsLoading(true);
     clearLoadTimeout();
     timeoutRef.current = setTimeout(() => {
@@ -673,7 +672,7 @@ export function VideoPlayer({
           ? `Tuning ${activeChannel.name}...`
           : liveEntry?.title ?? title ?? "Now Playing";
 
-  // Desktop keyboard shortcuts: arrow keys cycle live channels, escape closes
+  // Desktop keyboard shortcuts: arrow keys cycle live channels (Escape is handled by outer modal)
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
       if (
@@ -691,9 +690,6 @@ export function VideoPlayer({
           event.preventDefault();
           cycleChannel(-1);
           break;
-        case "Escape":
-          onClose?.();
-          break;
         default:
           break;
       }
@@ -701,7 +697,7 @@ export function VideoPlayer({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [cycleChannel, onClose]);
+  }, [cycleChannel]);
 
   const isLiveNow = isLiveMode && screenMode === "content";
   // Once a third-party provider's iframe is actually up and playing, it
@@ -714,46 +710,10 @@ export function VideoPlayer({
   const showNameInBadge = !isProviderUiVisible;
   const showBadge = showNameInBadge || isLiveNow;
 
-  // ── Touch Swipe-to-Back Gesture Tracking ──
-  const touchStartRef = useRef<{ x: number; y: number; time: number } | null>(null);
-
-  const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    if (e.touches.length === 1) {
-      touchStartRef.current = {
-        x: e.touches[0].clientX,
-        y: e.touches[0].clientY,
-        time: Date.now(),
-      };
-    }
-  }, []);
-
-  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
-    if (!touchStartRef.current || e.changedTouches.length === 0) return;
-    const start = touchStartRef.current;
-    touchStartRef.current = null;
-
-    const endX = e.changedTouches[0].clientX;
-    const endY = e.changedTouches[0].clientY;
-    const deltaX = endX - start.x;
-    const deltaY = endY - start.y;
-    const elapsed = Date.now() - start.time;
-
-    const isHorizontal = deltaX > 0 && deltaX > Math.abs(deltaY) * 1.2;
-    const isFastFlick = elapsed < 350 && deltaX > 45 && isHorizontal;
-    const isLongSwipe = deltaX > 75 && isHorizontal;
-
-    if (start.x < 120 && (isFastFlick || isLongSwipe)) {
-      triggerHaptic(10);
-      onClose?.();
-    }
-  }, [onClose]);
-
   return (
     <div
       ref={containerRef}
       className="relative h-full w-full flex flex-col overflow-hidden bg-black select-none"
-      onTouchStart={handleTouchStart}
-      onTouchEnd={handleTouchEnd}
     >
       {/* ── Top Header Bar ── */}
       <header className="w-full shrink-0 flex items-center justify-between gap-2 px-2.5 sm:px-4 py-2 pt-[max(0.5rem,env(safe-area-inset-top))] border-b border-neutral-800/80 bg-neutral-950/95 backdrop-blur-md z-30">
@@ -823,11 +783,12 @@ export function VideoPlayer({
               <button
                 type="button"
                 onClick={handleAdvanceToNextProgram}
+                aria-label="Skip to next show"
                 className="flex h-8 sm:h-9 items-center gap-1.5 rounded-lg border border-amber-500/60 bg-amber-950/80 hover:bg-amber-900/90 text-amber-200 hover:text-white px-2.5 sm:px-3 text-xs font-mono font-bold tracking-wider shadow-lg transition-all active:scale-95 cursor-pointer touch-manipulation"
                 title="Skip commercial break and tune into next program"
               >
                 <FastForward className="h-3.5 w-3.5" />
-                <span className="hidden xs:inline sm:inline">Next Show</span>
+                <span className="hidden sm:inline">Next Show</span>
               </button>
             </>
           ) : (
@@ -835,7 +796,8 @@ export function VideoPlayer({
               {screenMode === "content" && (
                 <span className="flex h-8 sm:h-9 items-center gap-1 rounded-l-lg border-r border-neutral-800/80 px-2 sm:px-2.5 text-[10px] font-mono uppercase tracking-wider text-neutral-400">
                   <SatelliteDish className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0" />
-                  <span>{String(currentProviderIndex + 1).padStart(2, "0")}/{String(providerList.length).padStart(2, "0")}</span>
+                  <span className="hidden sm:inline">Feed {currentProviderIndex + 1}</span>
+                  <span className="sm:hidden">{currentProviderIndex + 1}</span>
                 </span>
               )}
 
@@ -935,7 +897,7 @@ export function VideoPlayer({
                   className="flex h-8 sm:h-9 items-center gap-1.5 border-l border-neutral-800/80 px-2 sm:px-2.5 text-[10px] sm:text-[11px] font-mono font-medium text-amber-300/90 hover:bg-white/10 hover:text-amber-200 transition-colors cursor-pointer touch-manipulation"
                 >
                   <Tv className="h-3.5 w-3.5 text-amber-400" />
-                  <span className="hidden sm:inline">Roll Ads</span>
+                  <span className="hidden sm:inline">Station Break</span>
                 </button>
               )}
             </div>
@@ -957,14 +919,6 @@ export function VideoPlayer({
 
       {/* ── Main Screen Body: Fits Remaining Viewport Below Header ── */}
       <main className="relative flex-1 min-h-0 w-full bg-black flex items-center justify-center overflow-hidden">
-        {/* Left Edge Gesture Strip for Touch Back Gestures */}
-        <div
-          className="absolute left-0 top-0 bottom-0 w-6 sm:w-8 z-20 touch-pan-y pointer-events-auto"
-          onTouchStart={handleTouchStart}
-          onTouchEnd={handleTouchEnd}
-          aria-hidden="true"
-        />
-
         {screenMode === "content" && !exhausted && hasLoadableSource && (
           <div className="relative h-full w-full flex items-center justify-center bg-black">
             <iframe

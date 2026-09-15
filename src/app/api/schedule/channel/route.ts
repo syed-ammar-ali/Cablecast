@@ -23,8 +23,21 @@ export async function GET(request: NextRequest) {
   }
 
   const channelNumber = Number(numberParam);
+  const tzOffsetParam = searchParams.get("tzOffset") ?? request.headers.get("x-timezone-offset");
+  const tzOffset = tzOffsetParam !== null ? Number(tzOffsetParam) : undefined;
   const now = new Date();
-  const todayDow = now.getDay();
+
+  let todayDow = now.getDay();
+  let currentHours = now.getHours();
+  let currentMinutes = now.getMinutes();
+
+  if (tzOffset !== undefined) {
+    const localMs = now.getTime() - tzOffset * 60 * 1000;
+    const local = new Date(localMs);
+    todayDow = local.getUTCDay();
+    currentHours = local.getUTCHours();
+    currentMinutes = local.getUTCMinutes();
+  }
 
   try {
     // Fetch all appointments for this channel across all days of the week
@@ -52,6 +65,7 @@ export async function GET(request: NextRequest) {
       isAppointmentLiveNow(
         { dayOfWeek: appt.dayOfWeek, blockStartMinutes: appt.blockStartMinutes, blockCount: appt.blockCount },
         now,
+        tzOffset,
       ),
     );
 
@@ -61,7 +75,7 @@ export async function GET(request: NextRequest) {
         blockStartMinutes: liveAppointment.blockStartMinutes,
         blockCount: liveAppointment.blockCount,
       };
-      const liveOffsetSeconds = getLiveOffsetForAppointment(timing, now);
+      const liveOffsetSeconds = getLiveOffsetForAppointment(timing, now, tzOffset);
 
       return NextResponse.json({
         channelNumber,
@@ -88,7 +102,7 @@ export async function GET(request: NextRequest) {
 
     // Nothing live right now — find the next upcoming airing this week
     // Build a list of upcoming "minute of week" values for each appointment
-    const nowMinuteOfWeek = todayDow * 1440 + now.getHours() * 60 + now.getMinutes();
+    const nowMinuteOfWeek = todayDow * 1440 + currentHours * 60 + currentMinutes;
 
     const withMinuteOfWeek = appointments.map((appt) => ({
       appt,
@@ -107,7 +121,7 @@ export async function GET(request: NextRequest) {
 
     // Compute wall-clock start time for the next airing
     const nextAppt = next.appt;
-    const startDate = getAppointmentStartDate({ blockStartMinutes: nextAppt.blockStartMinutes }, now);
+    const startDate = getAppointmentStartDate({ blockStartMinutes: nextAppt.blockStartMinutes }, now, tzOffset);
     // Adjust to correct day of week
     const dayDiff = (nextAppt.dayOfWeek - todayDow + 7) % 7;
     const nextDate = new Date(startDate.getTime() + dayDiff * 86400_000);

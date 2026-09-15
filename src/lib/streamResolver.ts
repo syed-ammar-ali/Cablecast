@@ -106,7 +106,7 @@ async function tryNicheSearch(params: StreamResolverParams): Promise<ResolvedStr
           const directStreamUrl = `https://archive.org/download/${doc.identifier}/${doc.identifier}.mp4`;
           return {
             url: directStreamUrl,
-            type: "hls",
+            type: "embed",
             provider: "Internet Archive",
             subtitles: [],
           };
@@ -165,8 +165,10 @@ function getMetaRouterEmbed(params: StreamResolverParams): ResolvedStream {
       ? `https://vidlink.pro/movie/${tmdbId}?primaryColor=6366f1&autoplay=true`
       : `https://vidlink.pro/tv/${tmdbId}/${season}/${episode}?primaryColor=6366f1&autoplay=true`;
 
+  // NOTE: anyEmbedUrl is always defined; zxcUrl/vidLinkUrl are reserved for
+  // future sequential fallback validation. Currently only primary is returned.
   return {
-    url: anyEmbedUrl || zxcUrl || vidLinkUrl,
+    url: anyEmbedUrl,
     type: "embed",
     provider: "AnyEmbed Matrix",
     subtitles: [],

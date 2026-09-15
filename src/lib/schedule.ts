@@ -41,11 +41,38 @@ export function getCurrentTimeSlot(referenceDate: Date = new Date()): TimeSlot {
 /**
  * Returns `count` consecutive 30-minute time slots starting at the current
  * slot (inclusive), correctly rolling over day/week boundaries.
+ * Supports optional `tzOffset` (in minutes from UTC) for server-side calculations.
  */
 export function getUpcomingTimeSlots(
   count: number,
   referenceDate: Date = new Date(),
+  tzOffset?: number,
 ): TimeSlot[] {
+  if (tzOffset !== undefined) {
+    const localMs = referenceDate.getTime() - tzOffset * 60 * 1000;
+    const local = new Date(localMs);
+    const totalMinutes = local.getUTCHours() * 60 + local.getUTCMinutes();
+    const flooredMinutes = Math.floor(totalMinutes / BLOCK_MINUTES) * BLOCK_MINUTES;
+    const y = local.getUTCFullYear();
+    const m = local.getUTCMonth();
+    const d = local.getUTCDate();
+    const firstUtcMs = Date.UTC(y, m, d, 0, flooredMinutes, 0) + tzOffset * 60 * 1000;
+
+    const slots: TimeSlot[] = [];
+    for (let i = 0; i < count; i++) {
+      const slotUtc = new Date(firstUtcMs + i * BLOCK_MINUTES * 60_000);
+      const slotLocal = new Date(slotUtc.getTime() - tzOffset * 60 * 1000);
+      const blockStartMinutes = slotLocal.getUTCHours() * 60 + slotLocal.getUTCMinutes();
+      slots.push({
+        dayOfWeek: slotLocal.getUTCDay(),
+        blockStartMinutes,
+        date: slotUtc,
+        label: formatSlotLabel(blockStartMinutes),
+      });
+    }
+    return slots;
+  }
+
   const first = getCurrentTimeSlot(referenceDate);
   const slots: TimeSlot[] = [];
 
@@ -91,11 +118,27 @@ interface AppointmentTiming {
   blockCount: number;
 }
 
-/** Whether an appointment (recurring weekly at dayOfWeek/blockStartMinutes) is airing right now. */
+/**
+ * Whether an appointment (recurring weekly at dayOfWeek/blockStartMinutes) is airing right now.
+ * Accepts an optional `tzOffset` (minutes from UTC, e.g. -330 for IST) for server environments.
+ */
 export function isAppointmentLiveNow(
   appointment: AppointmentTiming,
   now: Date = new Date(),
+  tzOffset?: number,
 ): boolean {
+  if (tzOffset !== undefined) {
+    const localMs = now.getTime() - tzOffset * 60 * 1000;
+    const local = new Date(localMs);
+    if (appointment.dayOfWeek !== local.getUTCDay()) return false;
+
+    const minutesNow = local.getUTCHours() * 60 + local.getUTCMinutes();
+    const start = appointment.blockStartMinutes;
+    const end = start + appointment.blockCount * BLOCK_MINUTES;
+
+    return minutesNow >= start && minutesNow < end;
+  }
+
   if (appointment.dayOfWeek !== now.getDay()) return false;
 
   const minutesNow = now.getHours() * 60 + now.getMinutes();
@@ -109,7 +152,19 @@ export function isAppointmentLiveNow(
 export function getAppointmentStartDate(
   appointment: Pick<AppointmentTiming, "blockStartMinutes">,
   now: Date = new Date(),
+  tzOffset?: number,
 ): Date {
+  if (tzOffset !== undefined) {
+    const localMs = now.getTime() - tzOffset * 60 * 1000;
+    const local = new Date(localMs);
+    const y = local.getUTCFullYear();
+    const m = local.getUTCMonth();
+    const d = local.getUTCDate();
+    return new Date(
+      Date.UTC(y, m, d, 0, appointment.blockStartMinutes, 0) + tzOffset * 60 * 1000,
+    );
+  }
+
   const startDate = new Date(now);
   startDate.setHours(
     Math.floor(appointment.blockStartMinutes / 60),
@@ -124,8 +179,9 @@ export function getAppointmentStartDate(
 export function getAppointmentEndDate(
   appointment: Pick<AppointmentTiming, "blockStartMinutes" | "blockCount">,
   now: Date = new Date(),
+  tzOffset?: number,
 ): Date {
-  const start = getAppointmentStartDate(appointment, now);
+  const start = getAppointmentStartDate(appointment, now, tzOffset);
   return new Date(start.getTime() + appointment.blockCount * BLOCK_MINUTES * 60_000);
 }
 
@@ -143,8 +199,18 @@ export function msUntilNextBlockBoundary(now: Date = new Date()): number {
 export function getLiveOffsetForAppointment(
   appointment: AppointmentTiming,
   now: Date = new Date(),
+  tzOffset?: number,
 ): number | null {
-  if (!isAppointmentLiveNow(appointment, now)) return null;
+  if (!isAppointmentLiveNow(appointment, now, tzOffset)) return null;
+
+  if (tzOffset !== undefined) {
+    const localMs = now.getTime() - tzOffset * 60 * 1000;
+    const local = new Date(localMs);
+    const minutesNow = local.getUTCHours() * 60 + local.getUTCMinutes();
+    const elapsedMinutes = minutesNow - appointment.blockStartMinutes;
+    return elapsedMinutes * 60 + local.getUTCSeconds();
+  }
+
   return calculateLiveOffset(
     getAppointmentStartDate(appointment, now),
     appointment.blockCount * BLOCK_MINUTES,

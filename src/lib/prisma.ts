@@ -2,7 +2,7 @@ import { PrismaClient } from "@prisma/client";
 
 /**
  * Prisma client singleton. Next.js dev mode hot-reloads server modules,
- * which would otherwise exhaust SQLite connections by re-instantiating
+ * which would otherwise exhaust the Postgres connection pool by re-instantiating
  * PrismaClient on every reload — so we cache it on the global object.
  */
 declare global {

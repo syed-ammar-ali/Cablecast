@@ -56,7 +56,14 @@ export function PlayerModal({
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
 
   const [season, setSeason] = useState(initialSeason ?? 1);
-  const episode = initialEpisode ?? 1;
+  const [episode, setEpisode] = useState(initialEpisode ?? 1);
+
+  // Reset episode to 1 when season changes (unless caller provided a specific episode)
+  useEffect(() => {
+    if (initialEpisode === undefined) {
+      setEpisode(1);
+    }
+  }, [season, initialEpisode]);
 
   const onCloseRef = useRef(onClose);
   useEffect(() => {

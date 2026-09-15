@@ -5,24 +5,21 @@ function sanitizeVapidKey(val?: string): string {
   return val.trim().replace(/^["']|["']$/g, "").trim();
 }
 
-export const DEFAULT_VAPID_PUBLIC_KEY =
-  "BDkweSurB0QTH8HH9yMgH1_bEiQdEMqqTW7fwlefnuAbtexNrSXwlRLv1sclHaa1dvIfbaTf4mqevj7ZS9ibUwk";
-export const DEFAULT_VAPID_PRIVATE_KEY =
-  "CviFIGj460TcI-jkvZZ1vLwapePJnmZrgK1VhoLpUos";
-
 export const VAPID_PUBLIC_KEY =
-  sanitizeVapidKey(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY) || DEFAULT_VAPID_PUBLIC_KEY;
+  sanitizeVapidKey(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY);
 export const VAPID_PRIVATE_KEY =
-  sanitizeVapidKey(process.env.VAPID_PRIVATE_KEY) || DEFAULT_VAPID_PRIVATE_KEY;
+  sanitizeVapidKey(process.env.VAPID_PRIVATE_KEY);
 export const VAPID_SUBJECT =
   sanitizeVapidKey(process.env.VAPID_SUBJECT) || "mailto:support@cablecast.tv";
 
 let isConfigured = false;
-try {
-  webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
-  isConfigured = true;
-} catch (err) {
-  console.error("[webpush] Failed to set VAPID details:", err);
+if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
+  try {
+    webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
+    isConfigured = true;
+  } catch (err) {
+    console.error("[webpush] Failed to set VAPID details:", err);
+  }
 }
 
 export interface PushNotificationAction {

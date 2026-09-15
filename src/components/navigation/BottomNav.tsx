@@ -33,26 +33,7 @@ export function BottomNav({
 }: BottomNavProps) {
   const pathname = usePathname();
   const isAdminActive = pathname === "/admin" || pathname?.startsWith("/admin");
-  const [isAdmin, setIsAdmin] = useState(isAdminProp ?? false);
-
-  useEffect(() => {
-    if (isAdminProp !== undefined) {
-      setIsAdmin(isAdminProp);
-      return;
-    }
-    let cancelled = false;
-    fetch("/api/auth/me")
-      .then((res) => res.json())
-      .then((data: { role?: string | null }) => {
-        if (!cancelled && data?.role === "admin") {
-          setIsAdmin(true);
-        }
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [isAdminProp]);
+  const isAdmin = isAdminProp ?? false;
 
   return (
     <nav
@@ -63,11 +44,12 @@ export function BottomNav({
         {/* 1. Home */}
         <button
           type="button"
+          aria-current={isHomeActive ? "page" : undefined}
           onClick={() => {
             triggerHaptic(10);
             onGoHome?.();
           }}
-          className={`group flex flex-col items-center justify-center py-1 transition-all duration-150 active:scale-95 cursor-pointer ${
+          className={`group flex flex-col items-center justify-center min-h-[44px] py-1 transition-all duration-150 active:scale-95 cursor-pointer ${
             isHomeActive
               ? "text-red-500 font-semibold"
               : "text-neutral-400 hover:text-red-400"
@@ -85,11 +67,12 @@ export function BottomNav({
         {/* 2. Broadcast */}
         <button
           type="button"
+          aria-current={isBroadcastStudioOpen ? "page" : undefined}
           onClick={() => {
             triggerHaptic(10);
             onOpenBroadcastStudio();
           }}
-          className={`group flex flex-col items-center justify-center py-1 transition-all duration-150 active:scale-95 cursor-pointer ${
+          className={`group flex flex-col items-center justify-center min-h-[44px] py-1 transition-all duration-150 active:scale-95 cursor-pointer ${
             isBroadcastStudioOpen
               ? "text-purple-400 font-semibold"
               : "text-neutral-400 hover:text-purple-400"
@@ -112,11 +95,12 @@ export function BottomNav({
         {/* 3. Library */}
         <button
           type="button"
+          aria-current={isLibraryOpen ? "page" : undefined}
           onClick={() => {
             triggerHaptic(10);
             onOpenLibrary();
           }}
-          className={`group flex flex-col items-center justify-center py-1 transition-all duration-150 active:scale-95 cursor-pointer ${
+          className={`group flex flex-col items-center justify-center min-h-[44px] py-1 transition-all duration-150 active:scale-95 cursor-pointer ${
             isLibraryOpen
               ? "text-yellow-400 font-semibold"
               : "text-neutral-400 hover:text-yellow-400"
@@ -134,11 +118,12 @@ export function BottomNav({
         {/* 4. Explore */}
         <button
           type="button"
+          aria-current={isSearchActive ? "page" : undefined}
           onClick={() => {
             triggerHaptic(10);
             onToggleSearch();
           }}
-          className={`group flex flex-col items-center justify-center py-1 transition-all duration-150 active:scale-95 cursor-pointer ${
+          className={`group flex flex-col items-center justify-center min-h-[44px] py-1 transition-all duration-150 active:scale-95 cursor-pointer ${
             isSearchActive
               ? "text-cyan-400 font-semibold"
               : "text-neutral-400 hover:text-cyan-400"
@@ -157,8 +142,9 @@ export function BottomNav({
         {isAdmin && (
           <Link
             href="/admin"
+            aria-current={isAdminActive ? "page" : undefined}
             onClick={() => triggerHaptic(10)}
-            className={`group flex flex-col items-center justify-center py-1 transition-all duration-150 active:scale-95 cursor-pointer ${
+            className={`group flex flex-col items-center justify-center min-h-[44px] py-1 transition-all duration-150 active:scale-95 cursor-pointer ${
               isAdminActive
                 ? "text-emerald-400 font-semibold"
                 : "text-neutral-400 hover:text-emerald-400"

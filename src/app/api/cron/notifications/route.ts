@@ -23,7 +23,7 @@ async function handleCron(request: NextRequest) {
     const authHeader = request.headers.get("authorization");
     const secretHeader = request.headers.get("x-cron-secret");
     const vercelCron = request.headers.get("x-vercel-cron");
-    const expectedSecret = process.env.CRON_SECRET || "cablecast-cron-secret-2026";
+    const expectedSecret = process.env.CRON_SECRET ?? null;
 
     const url = new URL(request.url);
     const queryKey = url.searchParams.get("key") || url.searchParams.get("secret");
@@ -34,19 +34,18 @@ async function handleCron(request: NextRequest) {
     const session = await getSession();
 
     // Flexible authorization: allow cron-job.org pings, Bearer tokens, custom headers, URL query keys (?key=...),
-    // authenticated sessions, development mode, OR standard external monitoring GET pings.
+    // authenticated sessions, or development mode.
     const isExplicitlyAuthorized =
       isCronJobOrg ||
       Boolean(session) ||
       Boolean(vercelCron) ||
-      authHeader === `Bearer ${expectedSecret}` ||
-      secretHeader === expectedSecret ||
-      queryKey === expectedSecret ||
-      queryKey === "cablecast-cron-secret-2026" ||
+      (expectedSecret !== null && authHeader === `Bearer ${expectedSecret}`) ||
+      (expectedSecret !== null && secretHeader === expectedSecret) ||
+      (expectedSecret !== null && queryKey === expectedSecret) ||
       process.env.NODE_ENV === "development";
 
-    // For POST requests, require authorization; for GET requests (used by cron-job.org / monitoring pings), allow execution.
-    if (!isExplicitlyAuthorized && request.method === "POST") {
+    // Require authorization for both GET and POST requests.
+    if (!isExplicitlyAuthorized) {
       return NextResponse.json({ error: "Unauthorized cron execution." }, { status: 401 });
     }
 

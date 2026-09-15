@@ -136,7 +136,7 @@ export function useLibrary() {
   );
 
   const removeItem = useCallback(
-    async (mediaId: number | string, seasonNumber?: number | null): Promise<boolean> => {
+    async (mediaId: number | string, seasonNumber?: number | null, mediaType: string = "movie"): Promise<boolean> => {
       const numId = Number(mediaId);
       const parsedSeason = seasonNumber !== undefined && seasonNumber !== null ? Number(seasonNumber) : 0;
 
@@ -161,7 +161,7 @@ export function useLibrary() {
           body: JSON.stringify({
             action: "REMOVE",
             mediaId: numId,
-            mediaType: "movie",
+            mediaType,
             seasonNumber: parsedSeason,
           }),
         });

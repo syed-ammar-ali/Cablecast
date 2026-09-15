@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, Check, Laptop, Loader2, Lock, Smartphone, User, KeyRound } from "lucide-react";
+import { ArrowLeft, Check, Eye, EyeOff, Laptop, Loader2, Lock, Smartphone, User, KeyRound } from "lucide-react";
 
 /** Uppercases as-typed and auto-inserts the "-" after 4 characters — mirrors the calendar's type-ahead formatting. */
 function formatCodeInput(raw: string): string {
@@ -19,6 +19,14 @@ interface ActiveSessionItem {
   isCurrentDevice?: boolean;
 }
 
+function getDeviceIcon(label: string) {
+  const lower = label.toLowerCase();
+  if (lower.includes("iphone") || lower.includes("android") || lower.includes("mobile")) {
+    return <Smartphone className="h-4 w-4" />;
+  }
+  return <Laptop className="h-4 w-4" />;
+}
+
 function GateForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -28,6 +36,7 @@ function GateForm() {
 
   const [mode, setMode] = useState<"viewer" | "admin">(initialAdmin ? "admin" : "viewer");
   const [step, setStep] = useState<"code" | "name" | "device_limit">("code");
+  const [showPassword, setShowPassword] = useState(false);
   const [targetRedirect, setTargetRedirect] = useState<string>(next);
 
   // Viewer state
@@ -283,7 +292,7 @@ function GateForm() {
                           : "border-neutral-800 bg-neutral-950 text-neutral-500"
                       }`}
                     >
-                      <Smartphone className="h-4 w-4" />
+                      {getDeviceIcon(session.deviceLabel)}
                     </div>
                     <div className="min-w-0">
                       <p className={`text-xs font-bold truncate ${isSelected ? "text-white" : "text-neutral-300"}`}>
@@ -429,7 +438,7 @@ function GateForm() {
             <div className="relative">
               <KeyRound className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-500" />
               <input
-                type="password"
+                type={showPassword ? "text" : "password"}
                 autoFocus
                 autoComplete="current-password"
                 value={adminPassword}
@@ -440,7 +449,18 @@ function GateForm() {
                 placeholder="Station Password"
                 className="w-full rounded-md border border-neutral-700 bg-neutral-950 py-3 pl-10 pr-10 text-center font-mono text-base text-neutral-100 placeholder:text-neutral-700 placeholder:font-sans focus:border-neutral-500 focus:outline-none"
               />
+              <button
+                type="button"
+                tabIndex={-1}
+                onClick={() => setShowPassword((v) => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-neutral-300 transition-colors cursor-pointer"
+                aria-label={showPassword ? "Hide password" : "Show password"}
+              >
+                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
             </div>
+
+            {error && <p className="text-center text-xs text-red-400" role="alert">{error}</p>}
 
             <button
               type="submit"
@@ -450,8 +470,6 @@ function GateForm() {
               {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Sign In"}
             </button>
           </form>
-
-          {error && <p className="mt-4 text-center text-xs text-red-400">{error}</p>}
 
           <p className="mt-8 text-center text-xs text-neutral-600">
             <button
@@ -514,6 +532,8 @@ function GateForm() {
             />
           </div>
 
+          {error && <p className="text-center text-xs text-red-400" role="alert">{error}</p>}
+
           <button
             type="submit"
             disabled={isSubmitting || !code.trim()}
@@ -522,8 +542,6 @@ function GateForm() {
             {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Tune In"}
           </button>
         </form>
-
-        {error && <p className="mt-4 text-center text-xs text-red-400">{error}</p>}
 
         <p className="mt-8 text-center text-xs text-neutral-600">
           Need an invite? Reach out to the station admin.

@@ -107,10 +107,11 @@ export function HeroBanner({
             >
               <Image
                 src={slide.backdropUrl}
-                alt={slide.title}
+                alt=""
+                aria-hidden="true"
                 fill
                 priority={idx === 0}
-                fetchPriority={idx === 0 ? "high" : "auto"}
+                fetchPriority={idx === 0 ? "high" : "low"}
                 sizes="100vw"
                 draggable={false}
                 className="object-cover object-[center_20%] sm:object-top"
@@ -162,9 +163,9 @@ export function HeroBanner({
               <p className="mb-0.5 sm:mb-1 text-[10px] sm:text-xs font-semibold uppercase tracking-widest text-amber-400">
                 Trending Now
               </p>
-              <h2 className="text-xl sm:text-4xl lg:text-5xl font-bold uppercase tracking-wide text-white line-clamp-2 drop-shadow-md">
+              <h1 className="text-xl sm:text-4xl lg:text-5xl font-bold uppercase tracking-wide text-white line-clamp-2 drop-shadow-md">
                 {featured.title}
-              </h2>
+              </h1>
               {featured.releaseYear && (
                 <p className="mt-1 sm:mt-1.5 flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs uppercase tracking-wide text-neutral-300">
                   <span className="rounded bg-white/15 px-1.5 py-0.5 font-mono text-[9px] sm:text-[10px] font-bold text-neutral-200">
@@ -252,6 +253,26 @@ export function HeroBanner({
           )}
         </div>
 
+        {/* Mobile Live badge — compact top-right pill, hidden on desktop */}
+        {liveNow && (
+          <div className="pointer-events-auto absolute top-3 right-3 z-20 flex sm:hidden items-center gap-1.5 rounded-full border border-red-500/40 bg-black/80 px-2.5 py-1 backdrop-blur-md shadow-lg">
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-red-500" />
+            <span className="text-[10px] font-bold uppercase tracking-widest text-white truncate max-w-[120px]">
+              {liveNow.showName}
+            </span>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onSelectLive(liveNow);
+              }}
+              className="ml-1 text-[9px] font-bold uppercase tracking-wider text-red-400 hover:text-red-300"
+            >
+              Tune In
+            </button>
+          </div>
+        )}
+
         {/* Live pill */}
         {liveNow && (
           <div className="pointer-events-auto hidden max-w-xs shrink-0 flex-col items-end gap-1 text-right sm:flex">
@@ -309,13 +330,6 @@ export function HeroBanner({
           })}
         </div>
       )}
-
-      <style>{`
-        @keyframes scanline-fill {
-          from { width: 0%; }
-          to   { width: 100%; }
-        }
-      `}</style>
     </div>
   );
 }

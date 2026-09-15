@@ -9,22 +9,25 @@ import type { CreateAppointmentInput, ScheduleEntry } from "@/types/schedule";
 
 const MINUTES_PER_DAY = 24 * 60;
 
-function enrichAppointment(appointment: {
-  id: string;
-  tmdbId: number;
-  mediaType: string;
-  title: string;
-  season: number | null;
-  episode: number | null;
-  channelNumber: number;
-  dayOfWeek: number;
-  blockStartMinutes: number;
-  blockCount: number;
-  runtimeMinutes: number | null;
-  posterPath: string | null;
-  createdAt: Date;
-  updatedAt: Date;
-}): ScheduleEntry {
+function enrichAppointment(
+  appointment: {
+    id: string;
+    tmdbId: number;
+    mediaType: string;
+    title: string;
+    season: number | null;
+    episode: number | null;
+    channelNumber: number;
+    dayOfWeek: number;
+    blockStartMinutes: number;
+    blockCount: number;
+    runtimeMinutes: number | null;
+    posterPath: string | null;
+    createdAt: Date;
+    updatedAt: Date;
+  },
+  tzOffset?: number,
+): ScheduleEntry {
   const channel = getChannel(appointment.channelNumber);
   const timing = {
     dayOfWeek: appointment.dayOfWeek,
@@ -50,8 +53,8 @@ function enrichAppointment(appointment: {
     channelName: channel?.name ?? `CH ${appointment.channelNumber}`,
     channelGenre: channel?.genre ?? "General",
     channelAccentColor: channel?.accentColor ?? "#22d3ee",
-    isLiveNow: isAppointmentLiveNow(timing),
-    liveOffsetSeconds: getLiveOffsetForAppointment(timing),
+    isLiveNow: isAppointmentLiveNow(timing, new Date(), tzOffset),
+    liveOffsetSeconds: getLiveOffsetForAppointment(timing, new Date(), tzOffset),
   };
 }
 
@@ -66,6 +69,8 @@ export async function GET(request: NextRequest) {
 
   const { searchParams } = new URL(request.url);
   const dayOfWeekParam = searchParams.get("dayOfWeek");
+  const tzOffsetParam = searchParams.get("tzOffset") ?? request.headers.get("x-timezone-offset");
+  const tzOffset = tzOffsetParam !== null ? Number(tzOffsetParam) : undefined;
 
   try {
     const where = {
@@ -79,7 +84,7 @@ export async function GET(request: NextRequest) {
     });
 
     return NextResponse.json({
-      appointments: appointments.map(enrichAppointment),
+      appointments: appointments.map((appt) => enrichAppointment(appt, tzOffset)),
     });
   } catch (error) {
     console.error("[api/schedule] GET error:", error);

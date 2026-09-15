@@ -79,11 +79,7 @@ async function sendToUserSubscriptions(
   return { sent, failed, cleaned };
 }
 
-/**
- * Calculates whether an appointment slot (recurring at slot.dayOfWeek and slot.blockStartMinutes
- * in the user's local timezone) airs in the upcoming 10-minute lookahead window (+/- 5 minutes)
- * relative to the current UTC timestamp `now`.
- */
+
 /**
  * Calculates whether an appointment slot (recurring at slot.dayOfWeek and slot.blockStartMinutes)
  * airs in the upcoming 10-minute lookahead window (+/- 5 minutes) relative to `now`.
@@ -115,9 +111,9 @@ export function isSlotStartingSoon(
     return { isStartingSoon: false, localIsoDate };
   }
 
-  // Lookahead window: slot starting within upcoming 25 minutes or started within the last 5 minutes
-  const targetMinStart = localMinutes - 5;
-  const targetMinEnd = localMinutes + 25;
+  // Lookahead window: slot starting within upcoming 10 minutes or started within the last 2 minutes
+  const targetMinStart = localMinutes - 2;
+  const targetMinEnd = localMinutes + 10;
 
   const isStartingSoon =
     slot.blockStartMinutes >= targetMinStart && slot.blockStartMinutes <= targetMinEnd;

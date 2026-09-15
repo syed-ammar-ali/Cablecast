@@ -133,6 +133,10 @@ export async function POST(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
+    const session = await getSession();
+    const userId = getPersistentUserId(session);
+    const userKeys = Array.from(new Set([userId, session?.id, session?.accessCodeId])).filter(Boolean) as string[];
+
     const body = (await request.json()) as { endpoint?: string };
 
     if (!body?.endpoint) {
@@ -140,7 +144,10 @@ export async function DELETE(request: NextRequest) {
     }
 
     await prisma.pushSubscription.deleteMany({
-      where: { endpoint: body.endpoint },
+      where: {
+        endpoint: body.endpoint,
+        userId: { in: userKeys },
+      },
     });
 
     return NextResponse.json({ success: true, message: "Unsubscribed successfully." });
