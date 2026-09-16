@@ -9,7 +9,9 @@ export async function GET() {
   try {
     const session = await getSession();
     const userId = getPersistentUserId(session);
-    const publicKey = VAPID_PUBLIC_KEY;
+    const publicKey =
+      (process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || "").trim().replace(/^["']|["']$/g, "").trim() ||
+      VAPID_PUBLIC_KEY;
 
     const userKeys = Array.from(new Set([userId, session?.id, session?.accessCodeId])).filter(Boolean) as string[];
 

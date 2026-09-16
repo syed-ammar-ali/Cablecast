@@ -13,13 +13,32 @@ export const VAPID_SUBJECT =
   sanitizeVapidKey(process.env.VAPID_SUBJECT) || "mailto:support@cablecast.tv";
 
 let isConfigured = false;
-if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
-  try {
-    webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
-    isConfigured = true;
-  } catch (err) {
-    console.error("[webpush] Failed to set VAPID details:", err);
+
+export function ensureVapidConfigured(): boolean {
+  if (isConfigured) return true;
+
+  const pubKey =
+    sanitizeVapidKey(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY) || VAPID_PUBLIC_KEY;
+  const privKey =
+    sanitizeVapidKey(process.env.VAPID_PRIVATE_KEY) || VAPID_PRIVATE_KEY;
+  const subject =
+    sanitizeVapidKey(process.env.VAPID_SUBJECT) || VAPID_SUBJECT || "mailto:support@cablecast.tv";
+
+  if (pubKey && privKey) {
+    try {
+      webpush.setVapidDetails(subject, pubKey, privKey);
+      isConfigured = true;
+      return true;
+    } catch (err) {
+      console.error("[webpush] Failed to set VAPID details:", err);
+      return false;
+    }
   }
+  return false;
+}
+
+if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
+  ensureVapidConfigured();
 }
 
 export interface PushNotificationAction {
@@ -63,8 +82,11 @@ export async function sendPushNotification(
   subscription: PushSubscriptionData,
   payload: PushNotificationPayload,
 ): Promise<{ success: boolean; statusCode?: number; shouldRemove?: boolean; error?: string }> {
-  if (!isConfigured) {
-    return { success: false, error: "WebPush not configured with valid VAPID keys." };
+  if (!ensureVapidConfigured()) {
+    return {
+      success: false,
+      error: "WebPush not configured with valid VAPID keys. Ensure VAPID_PRIVATE_KEY and NEXT_PUBLIC_VAPID_PUBLIC_KEY are configured in server environment variables.",
+    };
   }
 
   const pushSubscription = {

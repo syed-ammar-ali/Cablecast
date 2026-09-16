@@ -190,16 +190,20 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    const failureReason = errors[0] || "Unknown push error.";
+    const statusMessage =
+      sent > 0
+        ? `Successfully delivered test alert to ${sent} device(s).`
+        : `Failed to deliver test alert: ${failureReason}`;
+
     return NextResponse.json({
       success: sent > 0,
       sent,
       failed,
       totalTargets: subscriptions.length,
       errors: errors.length > 0 ? errors : undefined,
-      message:
-        sent > 0
-          ? `Successfully delivered test alert to ${sent} device(s).`
-          : `Failed to deliver test alert: ${errors[0] || "Unknown push error."}`,
+      error: sent > 0 ? undefined : statusMessage,
+      message: statusMessage,
     });
   } catch (error) {
     console.error("[api/notifications/test] Error sending test notification:", error);

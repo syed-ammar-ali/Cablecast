@@ -319,7 +319,12 @@ export function usePushNotifications() {
 
         const data = await res.json();
         if (!res.ok || !data.success) {
-          return { success: false, error: data.error || "Failed to deliver test alert." };
+          const detail =
+            data.error ||
+            data.message ||
+            (Array.isArray(data.errors) && data.errors[0]) ||
+            "Failed to deliver test alert.";
+          return { success: false, error: detail };
         }
         return { success: true, message: data.message || "Test alert delivered!" };
       } catch (err: unknown) {
