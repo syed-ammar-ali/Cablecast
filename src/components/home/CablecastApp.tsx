@@ -420,8 +420,8 @@ function CablecastAppContent({ initialView = "home" }: CablecastAppProps) {
               isLiveResolving={liveNow != null && resolver.resolvingId === liveNow.id}
               onRent={handleHeroRent}
               onBuy={handleHeroBuy}
-              isOwned={(tmdbId) => library.owned.some((item) => item.tmdbId === tmdbId)}
-              isRented={(tmdbId) => library.rented.some((item) => item.tmdbId === tmdbId)}
+              isOwned={(tmdbId) => (library.owned ?? []).some((item) => item.tmdbId === tmdbId)}
+              isRented={(tmdbId) => (library.rented ?? []).some((item) => item.tmdbId === tmdbId)}
               enabled={isScheduleEnabled}
             />
           </div>
@@ -489,9 +489,9 @@ function CablecastAppContent({ initialView = "home" }: CablecastAppProps) {
           setIsLibraryOpen(false);
           navigateTo("explore");
         }}
-        collection={library.collection}
-        owned={library.owned}
-        rented={library.rented}
+        collection={library.collection || []}
+        owned={library.owned || []}
+        rented={library.rented || []}
         onPlay={(media, season) => {
           setIsLibraryOpen(false);
           setPlayerTarget({
@@ -507,7 +507,7 @@ function CablecastAppContent({ initialView = "home" }: CablecastAppProps) {
         }}
         onRemoveItem={library.removeItem}
         isLoading={library.isLoading}
-        isScheduled={(tmdbId, season) => personalBroadcast.isScheduled(tmdbId, season)}
+        isScheduled={(tmdbId, season) => personalBroadcast.isScheduled?.(tmdbId, season) ?? false}
         onOpenBroadcastStudio={() => {
           setIsLibraryOpen(false);
           navigateTo("broadcast");
@@ -516,8 +516,8 @@ function CablecastAppContent({ initialView = "home" }: CablecastAppProps) {
           setIsLibraryOpen(false);
           setSelectedMedia({
             id: media.tmdbId,
-            type: media.mediaType.toUpperCase() as "MOVIE" | "TV",
-            title: media.title,
+            type: (media.mediaType || "movie").toUpperCase() as "MOVIE" | "TV",
+            title: media.title || "Untitled",
             posterUrl:
               media.posterUrl ||
               (media.posterPath ? `https://image.tmdb.org/t/p/w780${media.posterPath}` : null),

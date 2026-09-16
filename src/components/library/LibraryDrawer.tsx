@@ -46,7 +46,9 @@ interface LibraryDrawerProps {
 
 function formatRemainingTime(expiresAt?: string | null): string {
   if (!expiresAt) return "Active Rental";
-  const diff = new Date(expiresAt).getTime() - Date.now();
+  const expireTime = new Date(expiresAt).getTime();
+  if (isNaN(expireTime)) return "Active Rental";
+  const diff = expireTime - Date.now();
   if (diff <= 0) return "Expired";
   const totalHours = Math.max(1, Math.ceil(diff / (1000 * 60 * 60)));
   return `${totalHours} hr remaining`;
@@ -55,9 +57,9 @@ function formatRemainingTime(expiresAt?: string | null): string {
 export function LibraryDrawer({
   isOpen,
   onClose,
-  collection,
-  owned,
-  rented,
+  collection = [],
+  owned = [],
+  rented = [],
   onPlay,
   onAddToBroadcast,
   onRemoveItem,
@@ -65,7 +67,7 @@ export function LibraryDrawer({
   onOpenBroadcastStudio,
   onSelectMedia,
   onExplore,
-  isLoading,
+  isLoading = false,
 }: LibraryDrawerProps) {
   const { toast, confirm } = useToast();
   const [activeTab, setActiveTab] = useState<LibraryTabKey>("COLLECTION");
@@ -108,32 +110,40 @@ export function LibraryDrawer({
 
   // Active items list based on tab
   const activeItems = useMemo(() => {
+    let list: LibraryMediaItem[];
     switch (activeTab) {
       case "COLLECTION":
-        return collection;
+        list = collection || [];
+        break;
       case "OWNED":
-        return owned;
+        list = owned || [];
+        break;
       case "RENTED":
-        return rented;
+        list = rented || [];
+        break;
       default:
-        return collection;
+        list = collection || [];
     }
+    return Array.isArray(list) ? list : [];
   }, [activeTab, collection, owned, rented]);
 
   const filteredItems = useMemo(
     () =>
-      activeItems.filter((item) =>
-        item.title.toLowerCase().includes(filterQuery.toLowerCase())
-      ),
+      activeItems.filter((item) => {
+        if (!item) return false;
+        const title = (item.title || "").toLowerCase();
+        return title.includes((filterQuery || "").toLowerCase());
+      }),
     [activeItems, filterQuery]
   );
 
   const handleDeleteItem = async (item: LibraryMediaItem) => {
     const isRented = item.ownershipType === "RENTED";
+    const titleText = item.title || "Untitled";
     const itemDisplayName =
       item.mediaType === "tv" && item.seasonNumber && item.seasonNumber > 0
-        ? `${item.title} (Season ${item.seasonNumber})`
-        : item.title;
+        ? `${titleText} (Season ${item.seasonNumber})`
+        : titleText;
 
     const ok = await confirm({
       title: isRented ? "Return Rental Tape" : "Remove from Vault",
@@ -329,12 +339,14 @@ export function LibraryDrawer({
             <div key={activeTab} className="grid grid-cols-1 gap-3.5 animate-in fade-in duration-150">
               {filteredItems.map((item) => {
                 const media = toMediaSearchResult(item);
-                const isTv = item.mediaType === "tv";
-                const posterUrl = item.posterPath
+                const isTv = item.mediaType === "tv" || (item.mediaType as string) === "TV";
+                const posterUrl = item.posterPath && typeof item.posterPath === "string"
                   ? item.posterPath.startsWith("http")
                     ? item.posterPath
                     : `https://image.tmdb.org/t/p/w185${item.posterPath}`
-                  : item.backdropUrl;
+                  : typeof item.backdropUrl === "string"
+                    ? item.backdropUrl
+                    : null;
 
                 const isRented = item.ownershipType === "RENTED";
                 const isOwned = item.ownershipType === "OWNED";
@@ -358,8 +370,9 @@ export function LibraryDrawer({
                           {posterUrl ? (
                             <Image
                               src={posterUrl}
-                              alt={item.title}
+                              alt={item.title || "Poster"}
                               fill
+                              unoptimized
                               sizes="44px"
                               className="object-cover object-center"
                             />
@@ -402,8 +415,8 @@ export function LibraryDrawer({
 
                           {/* 2. Movie or Series Name with Season */}
                           <h4 className="text-sm font-bold text-white truncate group-hover/info:text-amber-400 transition-colors">
-                            <span>{item.title}</span>
-                            {isTv && item.seasonNumber && item.seasonNumber > 0 && !/season\s*\d+/i.test(item.title) ? (
+                            <span>{item.title || "Untitled"}</span>
+                            {isTv && item.seasonNumber && item.seasonNumber > 0 && !/season\s*\d+/i.test(item.title || "") ? (
                               <span className="text-neutral-400 font-normal ml-1.5 text-xs">
                                 (Season {item.seasonNumber})
                               </span>
@@ -413,12 +426,12 @@ export function LibraryDrawer({
                           {/* 3. Year of Release & Rating */}
                           <div className="flex items-center gap-2 text-xs text-neutral-400 flex-wrap">
                             <span>{item.releaseYear ?? "—"}</span>
-                            {item.voteAverage ? (
+                            {item.voteAverage != null && !isNaN(Number(item.voteAverage)) ? (
                               <>
                                 <span className="text-neutral-600">•</span>
                                 <span className="flex items-center gap-1 font-medium text-amber-400">
                                   <Star className="h-3 w-3 fill-amber-400" />
-                                  {item.voteAverage.toFixed(1)} Rating
+                                  {Number(item.voteAverage).toFixed(1)} Rating
                                 </span>
                               </>
                             ) : null}

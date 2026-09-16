@@ -49,19 +49,20 @@ export interface WatchHistoryItem {
 }
 
 export function toMediaSearchResult(item: FavoriteItem | WatchHistoryItem | LibraryMediaItem): MediaSearchResult {
+  const posterPath = typeof item.posterPath === "string" ? item.posterPath : null;
   return {
     tmdbId: item.tmdbId,
     mediaType: item.mediaType,
-    title: item.title,
+    title: item.title || "Untitled",
     releaseYear: item.releaseYear ?? null,
-    posterPath: item.posterPath ?? null,
-    posterUrl: item.posterPath
-      ? item.posterPath.startsWith("http")
-        ? item.posterPath
-        : `https://image.tmdb.org/t/p/w342${item.posterPath}`
-      : null,
-    backdropUrl: item.backdropUrl ?? null,
-    overview: ("overview" in item ? item.overview : "") ?? "",
-    voteAverage: ("voteAverage" in item ? item.voteAverage : 0) ?? 0,
+    posterPath,
+    posterUrl: posterPath
+      ? posterPath.startsWith("http")
+        ? posterPath
+        : `https://image.tmdb.org/t/p/w342${posterPath}`
+      : typeof item.backdropUrl === "string" ? item.backdropUrl : null,
+    backdropUrl: typeof item.backdropUrl === "string" ? item.backdropUrl : null,
+    overview: ("overview" in item && typeof item.overview === "string" ? item.overview : "") ?? "",
+    voteAverage: ("voteAverage" in item && item.voteAverage != null && !isNaN(Number(item.voteAverage)) ? Number(item.voteAverage) : 0),
   };
 }

@@ -27,6 +27,12 @@ export default function GlobalError({
         <p className="mt-2 text-xs leading-relaxed text-neutral-400">
           An unexpected glitch occurred in the transmission feed. Try reloading the feed or tune back to the live guide.
         </p>
+        {(error?.message || error?.digest) && (
+          <div className="mt-4 rounded-lg border border-red-900/50 bg-red-950/30 p-2.5 text-left font-mono text-[11px] text-red-300">
+            {error.message && <p className="font-semibold break-words">{error.message}</p>}
+            {error.digest && <p className="mt-1 text-[9px] text-red-400/70">Digest: {error.digest}</p>}
+          </div>
+        )}
 
         <div className="mt-6 flex items-center justify-center gap-3">
           <button

@@ -307,7 +307,7 @@ export function usePersonalBroadcast() {
   const isScheduled = useCallback(
     (tmdbId: number | string, seasonNumber?: number) => {
       const numId = Number(tmdbId);
-      return schedule.some(
+      return (schedule || []).some(
         (item) =>
           item.tmdbId === numId &&
           (seasonNumber == null || item.mediaType !== "tv" || item.currentSeason === seasonNumber),
@@ -319,7 +319,7 @@ export function usePersonalBroadcast() {
   const getScheduledDays = useCallback(
     (tmdbId: number | string): number[] => {
       const numId = Number(tmdbId);
-      return schedule.filter((item) => item.tmdbId === numId).map((item) => item.dayOfWeek);
+      return (schedule || []).filter((item) => item.tmdbId === numId).map((item) => item.dayOfWeek);
     },
     [schedule],
   );
