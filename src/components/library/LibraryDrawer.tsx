@@ -92,8 +92,6 @@ export function LibraryDrawer({
     };
   }, [isOpen, onClose]);
 
-  if (!isOpen) return null;
-
   // Dynamic search placeholder based on active tab
   const getSearchPlaceholder = () => {
     switch (activeTab) {
@@ -136,6 +134,8 @@ export function LibraryDrawer({
       }),
     [activeItems, filterQuery]
   );
+
+  if (!isOpen) return null;
 
   const handleDeleteItem = async (item: LibraryMediaItem) => {
     const isRented = item.ownershipType === "RENTED";
