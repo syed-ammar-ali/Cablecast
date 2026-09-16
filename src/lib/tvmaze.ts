@@ -93,7 +93,7 @@ export async function getScheduleForCountryAndDate(
     try {
       res = await fetch(url.toString(), {
         headers: { Accept: "application/json" },
-        next: { revalidate: 60 },
+        next: { revalidate: 3600 },
         signal: AbortSignal.timeout(6000),
       });
     } catch (error) {

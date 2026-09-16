@@ -963,6 +963,10 @@ export function VideoPlayer({
               muted={isBumperMuted}
               playsInline
               onEnded={handleBumperEnded}
+              onError={() => {
+                console.warn("[VideoPlayer] Bumper failed to load, skipping to program.");
+                handleBumperEnded();
+              }}
             />
             {/* CRT Scanline and Phosphor Glow Layer for authentic broadcast feel */}
             <div

@@ -20,6 +20,9 @@ const cspHeader = `
   .trim();
 
 const nextConfig: NextConfig = {
+  experimental: {
+    optimizePackageImports: ["lucide-react"],
+  },
   // Remote image patterns & modern AVIF/WebP optimization
   images: {
     formats: ["image/avif", "image/webp"],

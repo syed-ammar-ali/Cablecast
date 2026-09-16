@@ -36,7 +36,16 @@ export function HeroBanner({
   const [isPaused, setIsPaused] = useState(false);
   const [timerEpoch, setTimerEpoch] = useState(0);
   const [isBuying, setIsBuying] = useState(false);
+  const [isTabVisible, setIsTabVisible] = useState(true);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      setIsTabVisible(document.visibilityState === "visible");
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, []);
 
   useEffect(() => {
     if (!enabled) return;
@@ -53,6 +62,10 @@ export function HeroBanner({
   }, [enabled]);
 
   const goToSlide = useCallback((nextIndex: number) => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
     setActiveIndex(nextIndex);
     setTimerEpoch((e) => e + 1);
   }, []);
@@ -73,19 +86,19 @@ export function HeroBanner({
   });
 
   useEffect(() => {
-    if (slides.length <= 1 || isPaused) {
+    if (slides.length <= 1 || isPaused || !isTabVisible) {
       if (intervalRef.current) clearInterval(intervalRef.current);
       return;
     }
     intervalRef.current = setInterval(goNext, SLIDE_DURATION_MS);
     return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
-  }, [slides.length, isPaused, goNext]);
+  }, [slides.length, isPaused, isTabVisible, goNext]);
 
   const featured = slides[activeIndex] ?? null;
 
   return (
     <div
-      className="group relative h-[38vh] min-h-[270px] sm:h-[60vh] sm:min-h-[440px] lg:h-[64vh] lg:min-h-[480px] max-h-[640px] w-full overflow-hidden rounded-md border border-neutral-800 bg-black select-none"
+      className="group relative h-[38vh] min-h-[300px] sm:h-[60vh] sm:min-h-[440px] lg:h-[64vh] lg:min-h-[480px] max-h-[640px] w-full overflow-hidden rounded-md border border-neutral-800 bg-black select-none"
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
       onTouchStart={handleTouchStart}
@@ -155,7 +168,7 @@ export function HeroBanner({
       )}
 
       {/* Bottom content */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex items-end justify-between gap-4 px-4 pt-4 pb-8 sm:px-8 sm:pt-8 sm:pb-14 lg:px-10 lg:pb-16">
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex items-end justify-between gap-4 px-4 pt-4 pb-7 sm:px-8 sm:pt-8 sm:pb-14 lg:px-10 lg:pb-16">
         {/* Title + Watch Now */}
         <div className="max-w-xl sm:max-w-2xl w-full">
           {featured ? (

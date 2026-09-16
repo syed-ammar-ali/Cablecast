@@ -10,9 +10,8 @@ import { TvGrid } from "@/components/schedule/TvGrid";
 import { BottomNav } from "@/components/navigation/BottomNav";
 import { useBroadcastSchedule } from "@/lib/useBroadcastSchedule";
 import { useBroadcastResolver } from "@/lib/useBroadcastResolver";
-import { useLibrary } from "@/lib/useLibrary";
-import { usePersonalBroadcast } from "@/lib/usePersonalBroadcast";
 import { formatLocalDate, isBroadcastLiveNow } from "@/lib/broadcastLive";
+import { AppDataProvider, useAppData } from "@/lib/AppDataContext";
 import { useToast } from "@/components/ui/ToastProvider";
 import { notifyLibraryMutation, notifyBroadcastMutation } from "@/lib/syncEvents";
 import { NotificationPermissionPrompt } from "@/components/notifications/NotificationPermissionPrompt";
@@ -57,7 +56,7 @@ const DontDeleteModal = dynamic(
   { ssr: false }
 );
 
-const CLOCK_TICK_MS = 10_000;
+const CLOCK_TICK_MS = 60_000;
 
 export type AppView = "home" | "explore" | "broadcast" | "library";
 
@@ -74,7 +73,7 @@ interface CablecastAppProps {
   initialView?: AppView;
 }
 
-export function CablecastApp({ initialView = "home" }: CablecastAppProps) {
+function CablecastAppContent({ initialView = "home" }: CablecastAppProps) {
   const { toast, confirm } = useToast();
 
   // World Guide's own controls — date/region drive the broadcast fetch.
@@ -82,13 +81,12 @@ export function CablecastApp({ initialView = "home" }: CablecastAppProps) {
   const [selectedCountry, setSelectedCountry] = useState("US");
   const [now, setNow] = useState(() => new Date());
 
-  // Library & Favourites state
-  const library = useLibrary();
+  // Shared Library & Favourites & Broadcast state from AppDataContext
+  const { library, personalBroadcast } = useAppData();
   const [isLibraryOpen, setIsLibraryOpen] = useState(initialView === "library");
   const [isAdmin, setIsAdmin] = useState(false);
 
   // Personalized Broadcast Schedule state
-  const personalBroadcast = usePersonalBroadcast();
   const [isBroadcastStudioOpen, setIsBroadcastStudioOpen] = useState(initialView === "broadcast");
   const [broadcastInitialTab, setBroadcastInitialTab] = useState<"grid" | "lineup" | "missed" | "calendar" | undefined>(undefined);
   const [broadcastTargetMissedId, setBroadcastTargetMissedId] = useState<string | null>(null);
@@ -263,21 +261,6 @@ export function CablecastApp({ initialView = "home" }: CablecastAppProps) {
     parseDeepLinks();
   }, []);
 
-  useEffect(() => {
-    let cancelled = false;
-    fetch("/api/auth/me")
-      .then((res) => res.json())
-      .then((data: { role?: string | null }) => {
-        if (!cancelled && data?.role === "admin") {
-          setIsAdmin(true);
-        }
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
   const liveNow = useMemo(
     () => schedule.find((item) => isBroadcastLiveNow(item, now)) ?? null,
     [schedule, now],
@@ -376,6 +359,7 @@ export function CablecastApp({ initialView = "home" }: CablecastAppProps) {
 
   const handleHomeClick = useCallback(() => {
     setSelectedDate(formatLocalDate(new Date()));
+    setSelectedCountry("US");
     setSelectedMedia(null);
     setIsModalOpen(false);
     setDetailsTarget(null);
@@ -387,28 +371,33 @@ export function CablecastApp({ initialView = "home" }: CablecastAppProps) {
     navigateTo("home");
   }, [navigateTo]);
 
+  // Hide the main AppHeader whenever the player is fullscreen — it has its own header bar.
+  const isPlayerOpen = Boolean(playerTarget) || Boolean(directBroadcastTarget);
+
   return (
     <main className="min-h-screen bg-black pb-0">
-      {/* Top Header */}
-      <div className="sticky top-0 md:relative md:top-auto z-50 bg-black">
-        <AppHeader
-          searchQuery={query}
-          onSearchQueryChange={handleSearchQueryChange}
-          isSearchLoading={isSearchLoading}
-          selectedDate={selectedDate}
-          onDateChange={setSelectedDate}
-          selectedCountry={selectedCountry}
-          onCountryChange={setSelectedCountry}
-          now={now}
-          onOpenLibrary={() => navigateTo("library")}
-          onOpenBroadcastStudio={() => navigateTo("broadcast")}
-          onOpenExplore={handleOpenExplore}
-          isExploreActive={isExploreOpen}
-          missedBroadcastCount={personalBroadcast.missed.length}
-          onHomeClick={handleHomeClick}
-          onAuthLoaded={(role) => setIsAdmin(role === "admin")}
-        />
-      </div>
+      {/* Top Header — hidden when the fullscreen player is open to prevent double-header stacking */}
+      {!isPlayerOpen && (
+        <div className="sticky top-0 md:relative md:top-auto z-50 bg-black">
+          <AppHeader
+            searchQuery={query}
+            onSearchQueryChange={handleSearchQueryChange}
+            isSearchLoading={isSearchLoading}
+            selectedDate={selectedDate}
+            onDateChange={setSelectedDate}
+            selectedCountry={selectedCountry}
+            onCountryChange={setSelectedCountry}
+            now={now}
+            onOpenLibrary={() => navigateTo("library")}
+            onOpenBroadcastStudio={() => navigateTo("broadcast")}
+            onOpenExplore={handleOpenExplore}
+            isExploreActive={isExploreOpen}
+            missedBroadcastCount={personalBroadcast.missed.length}
+            onHomeClick={handleHomeClick}
+            onAuthLoaded={(role) => setIsAdmin(role === "admin")}
+          />
+        </div>
+      )}
 
       {isExploreOpen ? (
         <div key="explore-view" className="animate-in fade-in duration-150">
@@ -496,6 +485,10 @@ export function CablecastApp({ initialView = "home" }: CablecastAppProps) {
       <LibraryDrawer
         isOpen={isLibraryOpen}
         onClose={() => navigateTo("home")}
+        onExplore={() => {
+          setIsLibraryOpen(false);
+          navigateTo("explore");
+        }}
         collection={library.collection}
         owned={library.owned}
         rented={library.rented}
@@ -660,7 +653,7 @@ export function CablecastApp({ initialView = "home" }: CablecastAppProps) {
         )}
 
       {/* Mobile Bottom Navigation Bar (Stuck across Home, Broadcast, Library, and Explore) */}
-      {!playerTarget && !directBroadcastTarget && (
+      {!playerTarget && !directBroadcastTarget && !isLibraryOpen && !isBroadcastStudioOpen && (
         <BottomNav
           isAdmin={isAdmin}
           onGoHome={handleHomeClick}
@@ -690,5 +683,13 @@ export function CablecastApp({ initialView = "home" }: CablecastAppProps) {
         onClose={() => setIsDontDeleteOpen(false)}
       />
     </main>
+  );
+}
+
+export function CablecastApp(props: CablecastAppProps) {
+  return (
+    <AppDataProvider>
+      <CablecastAppContent {...props} />
+    </AppDataProvider>
   );
 }

@@ -91,6 +91,11 @@ export function TvGrid({
     return selectedDate === todayStr;
   }, [selectedDate, now]);
 
+  const isFutureDate = useMemo(() => {
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    return selectedDate > todayStr;
+  }, [selectedDate, now]);
+
   const [isAwayFromLive, setIsAwayFromLive] = useState(false);
 
   // Clear unavailable cache whenever the date changes — a show unavailable on
@@ -259,7 +264,7 @@ export function TvGrid({
         <button
           type="button"
           onClick={handleJumpToLive}
-          className="fixed bottom-[max(4.75rem,calc(env(safe-area-inset-bottom)+4.25rem))] md:bottom-8 left-1/2 -translate-x-1/2 z-[70] flex items-center gap-2 rounded-full border border-red-500/60 bg-neutral-950/95 px-3.5 py-1.5 text-xs font-bold uppercase tracking-wider text-white shadow-2xl shadow-red-950/80 backdrop-blur-md transition-all hover:bg-red-950/70 hover:border-red-400 active:scale-95 animate-in fade-in slide-in-from-bottom-3 duration-200 cursor-pointer whitespace-nowrap select-none"
+          className="fixed bottom-[max(4.75rem,calc(env(safe-area-inset-bottom)+4.25rem))] md:bottom-8 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-2 rounded-full border border-red-500/60 bg-neutral-950/95 px-3.5 py-1.5 text-xs font-bold uppercase tracking-wider text-white shadow-2xl shadow-red-950/80 backdrop-blur-md transition-all hover:bg-red-950/70 hover:border-red-400 active:scale-95 animate-in fade-in slide-in-from-bottom-3 duration-200 cursor-pointer whitespace-nowrap select-none"
           title="Jump to current live time on schedule"
         >
           <span className="relative flex h-2 w-2 shrink-0">
@@ -340,6 +345,8 @@ export function TvGrid({
               accentColor="purple"
               isOwner={true}
               now={now}
+              isToday={isToday}
+              isFutureDate={isFutureDate}
               onPlay={(target) => onPlayPersonalBroadcast?.(target)}
             />
 
@@ -354,6 +361,8 @@ export function TvGrid({
                   accentColor="cyan"
                   isOwner={false}
                   now={now}
+                  isToday={isToday}
+                  isFutureDate={isFutureDate}
                   onPlay={(target) => onPlayPersonalBroadcast?.(target)}
                 />
               );
@@ -365,6 +374,8 @@ export function TvGrid({
                 network={network}
                 items={items}
                 now={now}
+                isToday={isToday}
+                isFutureDate={isFutureDate}
                 resolvingId={resolvingId}
                 unavailableIds={unavailableIds}
                 onSlotClick={handleSlotClick}
@@ -410,6 +421,8 @@ function PersonalChannelRow({
   accentColor = "purple",
   isOwner = true,
   now,
+  isToday = true,
+  isFutureDate = false,
   onPlay,
 }: {
   items: PersonalScheduleItem[];
@@ -417,6 +430,8 @@ function PersonalChannelRow({
   accentColor?: "purple" | "cyan";
   isOwner?: boolean;
   now: Date;
+  isToday?: boolean;
+  isFutureDate?: boolean;
   onPlay: (target: {
     media: MediaSearchResult;
     season?: number;
@@ -485,8 +500,10 @@ function PersonalChannelRow({
               }
 
               const endMinutes = startMinutes + totalMinutes;
-              const isLive = startMinutes <= nowMinutes && endMinutes > nowMinutes;
-              const isFuture = !isLive && startMinutes > nowMinutes;
+              // Only mark as live when viewing today — on past/future dates the airtime
+              // comparison against wall-clock is meaningless.
+              const isLive = isToday && startMinutes <= nowMinutes && endMinutes > nowMinutes;
+              const isFuture = isFutureDate || (isToday && !isLive && startMinutes > nowMinutes);
 
               if (isLive) {
                 return (
@@ -595,6 +612,8 @@ function NetworkRow({
   network,
   items,
   now,
+  isToday = true,
+  isFutureDate = false,
   resolvingId,
   unavailableIds,
   onSlotClick,
@@ -602,6 +621,8 @@ function NetworkRow({
   network: string;
   items: BroadcastScheduleItem[];
   now: Date;
+  isToday?: boolean;
+  isFutureDate?: boolean;
   resolvingId: number | null;
   unavailableIds: Set<number>;
   onSlotClick: (item: BroadcastScheduleItem) => void;
@@ -695,6 +716,8 @@ function NetworkRow({
             startMinutes={startMinutes}
             runtimeMinutes={runtimeMinutes}
             now={now}
+            isToday={isToday}
+            isFutureDate={isFutureDate}
             isResolving={resolvingId === item.id}
             isUnavailable={unavailableIds.has(item.id)}
             onSlotClick={onSlotClick}
@@ -710,6 +733,8 @@ function ProgramCard({
   startMinutes,
   runtimeMinutes,
   now,
+  isToday = true,
+  isFutureDate = false,
   isResolving,
   isUnavailable,
   onSlotClick,
@@ -718,6 +743,8 @@ function ProgramCard({
   startMinutes: number;
   runtimeMinutes: number;
   now: Date;
+  isToday?: boolean;
+  isFutureDate?: boolean;
   isResolving: boolean;
   isUnavailable: boolean;
   onSlotClick: (item: BroadcastScheduleItem) => void;
@@ -725,10 +752,10 @@ function ProgramCard({
   const nowMinutes = now.getHours() * 60 + now.getMinutes();
   const endMinutes = startMinutes + runtimeMinutes;
 
-  // Live = wall clock falls inside this show's airtime, on ANY date.
-  // If your clock says 8 PM, airtime "20:00" shows are live — always.
-  const isLive = startMinutes <= nowMinutes && endMinutes > nowMinutes;
-  const isFuture = !isLive && startMinutes > nowMinutes;
+  // Only show as live when viewing today — on past/future dates wall-clock
+  // comparison is meaningless and would show wrong shows as "ON AIR NOW".
+  const isLive = isToday && startMinutes <= nowMinutes && endMinutes > nowMinutes;
+  const isFuture = isFutureDate || (isToday && !isLive && startMinutes > nowMinutes);
   const category = classifyBroadcast(item.showType);
 
   const canTuneIn = isLive && !isUnavailable && !isResolving;

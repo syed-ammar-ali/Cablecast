@@ -174,16 +174,21 @@ export function ChannelRemote({ onTuneIn, onNavigateDate, onLongPress }: Channel
     clearAll();
   }, [clearAll]);
 
-  // Close on outside click
+  // Close on outside click (mouse) or outside tap (touch)
   useEffect(() => {
     if (!isOpen) return;
-    function onPointerDown(e: MouseEvent) {
-      if (remoteRef.current && !remoteRef.current.contains(e.target as Node)) {
+    function onPointerDown(e: MouseEvent | TouchEvent) {
+      const target = e instanceof TouchEvent ? e.touches[0]?.target : e.target;
+      if (remoteRef.current && target && !remoteRef.current.contains(target as Node)) {
         handleClose();
       }
     }
-    document.addEventListener("mousedown", onPointerDown);
-    return () => document.removeEventListener("mousedown", onPointerDown);
+    document.addEventListener("mousedown", onPointerDown as EventListener);
+    document.addEventListener("touchstart", onPointerDown as EventListener, { passive: true });
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown as EventListener);
+      document.removeEventListener("touchstart", onPointerDown as EventListener);
+    };
   }, [isOpen, handleClose]);
 
   // Close on Escape key

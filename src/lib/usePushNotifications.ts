@@ -94,20 +94,27 @@ export function usePushNotifications() {
 
     async function checkSubscription() {
       try {
-        let registration = await navigator.serviceWorker.getRegistration();
-        if (!registration) {
-          registration = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
-        }
-        const readyReg = await Promise.race([
-          navigator.serviceWorker.ready,
-          new Promise<ServiceWorkerRegistration | null>((_, reject) =>
-            setTimeout(() => reject(new Error("ServiceWorker ready timeout")), 4000),
-          ),
-        ]).catch(() => null);
-
         let localSub: PushSubscription | null = null;
-        if (readyReg) {
-          localSub = await readyReg.pushManager.getSubscription();
+        if (navigator.serviceWorker.controller) {
+          const reg = await navigator.serviceWorker.getRegistration();
+          if (reg) {
+            localSub = await reg.pushManager.getSubscription();
+          }
+        } else {
+          let registration = await navigator.serviceWorker.getRegistration();
+          if (!registration) {
+            registration = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
+          }
+          const readyReg = await Promise.race([
+            navigator.serviceWorker.ready,
+            new Promise<ServiceWorkerRegistration | null>((_, reject) =>
+              setTimeout(() => reject(new Error("ServiceWorker ready timeout")), 4000),
+            ),
+          ]).catch(() => null);
+
+          if (readyReg) {
+            localSub = await readyReg.pushManager.getSubscription();
+          }
         }
 
         // Query backend subscription state

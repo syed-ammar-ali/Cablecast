@@ -320,7 +320,7 @@ export function PersonalBroadcastModal({
       aria-modal="true"
       aria-labelledby="personal-broadcast-title"
       onClick={onClose}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-0 sm:p-6 backdrop-blur-md animate-in fade-in"
+      className="fixed inset-0 z-[80] flex items-center justify-center bg-black/85 p-0 sm:p-6 backdrop-blur-md animate-in fade-in"
     >
       <div
         onClick={(e) => e.stopPropagation()}

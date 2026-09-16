@@ -5,7 +5,7 @@ import { BLOCK_MINUTES } from "@/lib/runtime";
 import { DAYS_OF_WEEK, formatBlockTime } from "@/types/broadcast";
 import type { CreatePersonalScheduleInput, PersonalScheduleItem } from "@/types/broadcast";
 import type { MediaType } from "@/types/media";
-import { checkMediaOwnership, getBroadcastSlotStatus } from "@/lib/mediaOwnership";
+import { checkMediaOwnership, getBroadcastSlotStatus, type BroadcastSlotStatus } from "@/lib/mediaOwnership";
 import { getShowDetails, getMovieDetails } from "@/lib/tmdb";
 
 /**
@@ -142,6 +142,54 @@ function findNextOpenSlotForDay(
   return null;
 }
 
+async function healScheduleItems(
+  itemsNeedingSync: Array<{
+    id: string;
+    tmdbId: number;
+    currentSeason: number;
+    totalEpisodes: number | null;
+    runtimeMinutes: number | null;
+    blockCount: number;
+  }>
+) {
+  const uniqueTmdbIds = Array.from(new Set(itemsNeedingSync.map((it) => it.tmdbId)));
+  await Promise.allSettled(
+    uniqueTmdbIds.map(async (tmdbId) => {
+      try {
+        const details = await getShowDetails(tmdbId);
+        const epRuntime = details.defaultRuntime?.exactMinutes || 25;
+        const newBlockCount = details.defaultRuntime?.blockCount ?? Math.max(1, Math.ceil(epRuntime / BLOCK_MINUTES));
+        const relevantItems = itemsNeedingSync.filter((it) => it.tmdbId === tmdbId);
+
+        for (const relItem of relevantItems) {
+          const sMatch = details.seasons?.find((s) => s.seasonNumber === relItem.currentSeason);
+          const realTotalEpisodes = sMatch?.episodeCount || details.numberOfEpisodes || relItem.totalEpisodes;
+
+          if (
+            relItem.runtimeMinutes !== epRuntime ||
+            relItem.blockCount !== newBlockCount ||
+            relItem.totalEpisodes !== realTotalEpisodes
+          ) {
+            await prisma.userPersonalSchedule.update({
+              where: { id: relItem.id },
+              data: {
+                totalEpisodes: realTotalEpisodes,
+                runtimeMinutes: epRuntime,
+                blockCount: newBlockCount,
+              },
+            });
+            relItem.totalEpisodes = realTotalEpisodes;
+            relItem.runtimeMinutes = epRuntime;
+            relItem.blockCount = newBlockCount;
+          }
+        }
+      } catch (err) {
+        console.debug?.("[api/broadcast/personal] Self-healing skipped for show:", tmdbId, err);
+      }
+    }),
+  );
+}
+
 export async function GET(request: NextRequest) {
   try {
     const session = await getSession();
@@ -165,20 +213,18 @@ export async function GET(request: NextRequest) {
     let userTzOffset: number | null =
       tzQuery !== null && !isNaN(Number(tzQuery)) ? Number(tzQuery) : null;
 
-    // Fetch user channel settings (prefer persistent userId, fallback to any session key)
-    let channelSettings = await prisma.userChannelSettings.findFirst({
-      where: { sessionId: { in: userKeys } },
-    });
-    if (!channelSettings) {
-      channelSettings = await prisma.userChannelSettings.create({
-        data: { sessionId: userId, channelName: "My Lineup" },
-      });
-    }
-
-    const items = await prisma.userPersonalSchedule.findMany({
-      where: { sessionId: { in: userKeys } },
-      orderBy: [{ dayOfWeek: "asc" }, { blockStartMinutes: "asc" }],
-    });
+    // Fetch user channel settings and personal schedule items in parallel
+    const [channelSettings, items] = await Promise.all([
+      prisma.userChannelSettings.upsert({
+        where: { sessionId: userId },
+        update: {},
+        create: { sessionId: userId, channelName: "My Lineup" },
+      }),
+      prisma.userPersonalSchedule.findMany({
+        where: { sessionId: { in: userKeys } },
+        orderBy: [{ dayOfWeek: "asc" }, { blockStartMinutes: "asc" }],
+      }),
+    ]);
 
     if (userTzOffset === null) {
       const itemWithTz = items.find((it) => typeof it.timezoneOffset === "number");
@@ -334,113 +380,116 @@ export async function GET(request: NextRequest) {
     });
 
     if (itemsNeedingSync.length > 0) {
-      const uniqueTmdbIds = Array.from(new Set(itemsNeedingSync.map((it) => it.tmdbId)));
-      await Promise.allSettled(
-        uniqueTmdbIds.map(async (tmdbId) => {
-          try {
-            const details = await getShowDetails(tmdbId);
-            const epRuntime = details.defaultRuntime?.exactMinutes || 25;
-            const newBlockCount = details.defaultRuntime?.blockCount ?? Math.max(1, Math.ceil(epRuntime / BLOCK_MINUTES));
-            const relevantItems = itemsNeedingSync.filter((it) => it.tmdbId === tmdbId);
-
-            for (const relItem of relevantItems) {
-              const sMatch = details.seasons?.find((s) => s.seasonNumber === relItem.currentSeason);
-              const realTotalEpisodes = sMatch?.episodeCount || details.numberOfEpisodes || relItem.totalEpisodes;
-
-              if (
-                relItem.runtimeMinutes !== epRuntime ||
-                relItem.blockCount !== newBlockCount ||
-                relItem.totalEpisodes !== realTotalEpisodes
-              ) {
-                await prisma.userPersonalSchedule.update({
-                  where: { id: relItem.id },
-                  data: {
-                    totalEpisodes: realTotalEpisodes,
-                    runtimeMinutes: epRuntime,
-                    blockCount: newBlockCount,
-                  },
-                });
-                relItem.totalEpisodes = realTotalEpisodes;
-                relItem.runtimeMinutes = epRuntime;
-                relItem.blockCount = newBlockCount;
-              }
-            }
-          } catch (err) {
-            console.debug?.("[api/broadcast/personal] Self-healing skipped for show:", tmdbId, err);
-          }
-        }),
-      );
+      void healScheduleItems(itemsNeedingSync).catch(() => {});
     }
 
-    // Dynamically evaluate slot status for all schedule items
-    const schedule: PersonalScheduleItem[] = await Promise.all(
-      updatedItems.map(async (item) => {
-        const itemTz = typeof item.timezoneOffset === "number" ? item.timezoneOffset : userTzOffset;
-        const liveState = computeLiveState(item.dayOfWeek, item.blockStartMinutes, item.blockCount, now, itemTz);
-        const dayName = DAYS_OF_WEEK.find((d) => d.day === item.dayOfWeek)?.name ?? `Day ${item.dayOfWeek}`;
-        const targetAirDate = getNextAirDate(item.dayOfWeek, item.blockStartMinutes, now, itemTz);
+    // ── Bulk ownership pre-fetch (replaces N×2 DB queries) ──────────────────
+    const allTmdbIds = Array.from(new Set(updatedItems.map((it) => it.tmdbId)));
 
-        const slotStatus = await getBroadcastSlotStatus(
-          userId,
-          item.tmdbId,
-          item.mediaType === "tv" ? item.currentSeason : 0,
-          targetAirDate
-        );
+    const [ownedItems, activeRentals] = await Promise.all([
+      prisma.libraryItem.findMany({
+        where: { userId: { in: userKeys }, mediaId: { in: allTmdbIds } },
+        select: { mediaId: true, seasonNumber: true },
+      }),
+      prisma.rental.findMany({
+        where: { userId: { in: userKeys }, mediaId: { in: allTmdbIds } },
+        orderBy: { expiresAt: "desc" },
+        select: { mediaId: true, seasonNumber: true, expiresAt: true },
+      }),
+    ]);
 
-        const isExpired = slotStatus === "RETURNED_EXPIRED";
-        const isRerun = Boolean(item.isRerun || item.title.includes("(Rerun)"));
-
-        return {
-          id: item.id,
-          sessionId: item.sessionId,
-          tmdbId: item.tmdbId,
-          mediaType: item.mediaType as MediaType,
-          title: item.title,
-          posterPath: item.posterPath,
-          backdropUrl: item.backdropUrl,
-          runtimeMinutes: item.runtimeMinutes,
-          dayOfWeek: item.dayOfWeek,
-          dayName,
-          blockStartMinutes: item.blockStartMinutes,
-          blockCount: item.blockCount,
-          timeLabel: formatBlockTime(item.blockStartMinutes),
-          currentSeason: item.currentSeason,
-          currentEpisode: item.currentEpisode,
-          totalEpisodes: item.totalEpisodes,
-          lastAiredDate: item.lastAiredDate,
-          lastAiredSeason: item.lastAiredSeason,
-          lastAiredEpisode: item.lastAiredEpisode,
-          wasWatched: item.wasWatched,
-          isRerun,
-          isLiveNow: liveState.isLiveNow && !isExpired,
-          liveOffsetSeconds: isExpired ? null : liveState.liveOffsetSeconds,
-          slotStatus,
-          isExpired,
-          createdAt: item.createdAt.toISOString(),
-          updatedAt: item.updatedAt.toISOString(),
-        };
-      })
+    // Build lookup maps for O(1) access
+    const ownedSet = new Set(
+      ownedItems.map((o) => `${o.mediaId}:${o.seasonNumber ?? 0}`)
     );
+    const rentalMap = new Map<string, Date>();
+    for (const r of activeRentals) {
+      const key = `${r.mediaId}:${r.seasonNumber ?? 0}`;
+      if (!rentalMap.has(key)) rentalMap.set(key, r.expiresAt);
+    }
 
-    // Fetch unresolved missed broadcasts
-    const missed = await prisma.userMissedBroadcast.findMany({
-      where: { sessionId: { in: userKeys }, isResolved: false },
-      orderBy: { createdAt: "desc" },
+    function getBatchedSlotStatus(
+      tmdbId: number,
+      season: number,
+      targetDate: Date
+    ): BroadcastSlotStatus {
+      const key = `${tmdbId}:${season}`;
+      if (ownedSet.has(key)) return "OWNED";
+      const expiresAt = rentalMap.get(key);
+      if (expiresAt && (expiresAt.getTime() > Date.now() || targetDate.getTime() <= expiresAt.getTime())) {
+        return "RENTED_VALID";
+      }
+      return "RETURNED_EXPIRED";
+    }
+
+    // Dynamically evaluate slot status for all schedule items in-memory
+    const schedule: PersonalScheduleItem[] = updatedItems.map((item) => {
+      const itemTz = typeof item.timezoneOffset === "number" ? item.timezoneOffset : userTzOffset;
+      const liveState = computeLiveState(item.dayOfWeek, item.blockStartMinutes, item.blockCount, now, itemTz);
+      const dayName = DAYS_OF_WEEK.find((d) => d.day === item.dayOfWeek)?.name ?? `Day ${item.dayOfWeek}`;
+      const targetAirDate = getNextAirDate(item.dayOfWeek, item.blockStartMinutes, now, itemTz);
+
+      const slotStatus = getBatchedSlotStatus(
+        item.tmdbId,
+        item.mediaType === "tv" ? item.currentSeason : 0,
+        targetAirDate
+      );
+
+      const isExpired = slotStatus === "RETURNED_EXPIRED";
+      const isRerun = Boolean(item.isRerun || item.title.includes("(Rerun)"));
+
+      return {
+        id: item.id,
+        sessionId: item.sessionId,
+        tmdbId: item.tmdbId,
+        mediaType: item.mediaType as MediaType,
+        title: item.title,
+        posterPath: item.posterPath,
+        backdropUrl: item.backdropUrl,
+        runtimeMinutes: item.runtimeMinutes,
+        dayOfWeek: item.dayOfWeek,
+        dayName,
+        blockStartMinutes: item.blockStartMinutes,
+        blockCount: item.blockCount,
+        timeLabel: formatBlockTime(item.blockStartMinutes),
+        currentSeason: item.currentSeason,
+        currentEpisode: item.currentEpisode,
+        totalEpisodes: item.totalEpisodes,
+        lastAiredDate: item.lastAiredDate,
+        lastAiredSeason: item.lastAiredSeason,
+        lastAiredEpisode: item.lastAiredEpisode,
+        wasWatched: item.wasWatched,
+        isRerun,
+        isLiveNow: liveState.isLiveNow && !isExpired,
+        liveOffsetSeconds: isExpired ? null : liveState.liveOffsetSeconds,
+        slotStatus,
+        isExpired,
+        createdAt: item.createdAt.toISOString(),
+        updatedAt: item.updatedAt.toISOString(),
+      };
     });
 
-    // Fetch season completed alerts
-    const seasonAlerts = await prisma.userSeasonCompletedAlert.findMany({
-      where: { sessionId: { in: userKeys }, isDismissed: false },
-      orderBy: { createdAt: "desc" },
-    });
-
-    // Fetch any date-specific calendar entries scheduled for today
-    const calendarEntries = await prisma.calendarEntry.findMany({
-      where: {
-        sessionId: { in: userKeys },
-        scheduledDate: todayIsoDate,
-      },
-    });
+    // Fetch unresolved missed broadcasts, season alerts, calendar entries, and subscribed channels in parallel
+    const [missed, seasonAlerts, calendarEntries, subscribedChannelsData] = await Promise.all([
+      prisma.userMissedBroadcast.findMany({
+        where: { sessionId: { in: userKeys }, isResolved: false },
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.userSeasonCompletedAlert.findMany({
+        where: { sessionId: { in: userKeys }, isDismissed: false },
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.calendarEntry.findMany({
+        where: {
+          sessionId: { in: userKeys },
+          scheduledDate: todayIsoDate,
+        },
+      }),
+      prisma.subscribedChannel.findMany({
+        where: { subscriberSessionId: { in: userKeys } },
+        orderBy: { createdAt: "asc" },
+      }),
+    ]);
 
     const calendarItems: PersonalScheduleItem[] = calendarEntries.map((c) => {
       const liveState = computeLiveState(todayDayOfWeek, c.blockStartMinutes, c.blockCount, now, userTzOffset);
@@ -469,12 +518,6 @@ export async function GET(request: NextRequest) {
         createdAt: c.createdAt.toISOString(),
         updatedAt: (c.updatedAt ?? c.createdAt).toISOString(),
       };
-    });
-
-    // Fetch subscribed channels
-    const subscribedChannelsData = await prisma.subscribedChannel.findMany({
-      where: { subscriberSessionId: { in: userKeys } },
-      orderBy: { createdAt: "asc" },
     });
 
     interface SnapshotScheduleItem {

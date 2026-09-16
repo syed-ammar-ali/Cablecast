@@ -65,21 +65,39 @@ function safeSetStorage<T>(key: string, value: T): void {
 }
 
 export function usePersonalBroadcast() {
-  const [schedule, setSchedule] = useState<PersonalScheduleItem[]>(getInitialSchedule);
-  const [missed, setMissed] = useState<MissedBroadcastItem[]>(getInitialMissed);
-  const [channelName, setChannelName] = useState<string>(getInitialChannelName);
-  const [subscribedChannels, setSubscribedChannels] = useState<SubscribedChannel[]>(getInitialSubscribedChannels);
+  const [schedule, setSchedule] = useState<PersonalScheduleItem[]>([]);
+  const [missed, setMissed] = useState<MissedBroadcastItem[]>([]);
+  const [channelName, setChannelName] = useState<string>("My Lineup");
+  const [subscribedChannels, setSubscribedChannels] = useState<SubscribedChannel[]>([]);
   const [seasonAlerts, setSeasonAlerts] = useState<SeasonCompletedAlertItem[]>([]);
   const [liveNow, setLiveNow] = useState<PersonalScheduleItem | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Client-side hydration from localStorage after mount to ensure SSR & client render consistency
+  useEffect(() => {
+    try {
+      const cachedSchedule = getInitialSchedule();
+      if (cachedSchedule.length > 0) setSchedule(cachedSchedule);
+      const cachedMissed = getInitialMissed();
+      if (cachedMissed.length > 0) setMissed(cachedMissed);
+      const cachedName = getInitialChannelName();
+      if (cachedName && cachedName !== "My Lineup") setChannelName(cachedName);
+      const cachedSub = getInitialSubscribedChannels();
+      if (cachedSub.length > 0) setSubscribedChannels(cachedSub);
+    } catch {
+      // ignore
+    }
+  }, []);
+
   // Synchronize broadcast schedule quietly from server
   const syncFromServer = useCallback(async (signal?: AbortSignal) => {
+    setIsLoading(true);
     try {
       const tzOffset = typeof window !== "undefined" ? new Date().getTimezoneOffset() : -330;
       const res = await fetch(`/api/broadcast/personal?tzOffset=${tzOffset}`, { signal });
       if (res.ok) {
+        setError(null);
         const data = await res.json();
         if (Array.isArray(data.schedule)) {
           setSchedule(data.schedule);
@@ -101,9 +119,12 @@ export function usePersonalBroadcast() {
           safeSetStorage(LOCAL_SUBSCRIBED_CHANNELS_KEY, data.subscribedChannels);
         }
         setLiveNow(data.liveNow ?? null);
+      } else {
+        setError("Failed to sync personal broadcast lineup");
       }
     } catch (e: unknown) {
       if (e instanceof Error && e.name === "AbortError") return;
+      setError("Network error syncing broadcast lineup");
       console.debug?.("[PersonalBroadcast] Sync error:", e);
     } finally {
       setIsLoading(false);

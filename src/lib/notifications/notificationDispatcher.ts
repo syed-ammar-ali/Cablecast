@@ -27,6 +27,7 @@ async function sendToUserSubscriptions(
         where: {
           OR: [{ id: userId }, { accessCodeId: userId }],
         },
+        select: { id: true, accessCodeId: true, role: true },
       });
     } catch {
       session = null;
@@ -34,6 +35,9 @@ async function sendToUserSubscriptions(
     if (session) {
       if (session.id && !userKeys.includes(session.id)) userKeys.push(session.id);
       if (session.accessCodeId && !userKeys.includes(session.accessCodeId)) userKeys.push(session.accessCodeId);
+      // Admin subscriptions are stored as userId="admin" by getPersistentUserId().
+      // Schedule slots store the actual session.id, so we must add "admin" here.
+      if (session.role === "admin" && !userKeys.includes("admin")) userKeys.push("admin");
     }
 
     subscriptions = (await prisma.pushSubscription.findMany({
@@ -51,28 +55,41 @@ async function sendToUserSubscriptions(
   let failed = 0;
   let cleaned = 0;
 
-  for (const sub of subscriptions) {
-    const res = await sendPushNotification(
-      {
-        endpoint: sub.endpoint,
-        p256dh: sub.p256dh,
-        auth: sub.auth,
-      },
-      payload,
-    );
+  const results = await Promise.allSettled(
+    subscriptions.map((sub) =>
+      sendPushNotification(
+        {
+          endpoint: sub.endpoint,
+          p256dh: sub.p256dh,
+          auth: sub.auth,
+        },
+        payload,
+      ),
+    ),
+  );
 
-    if (res.success) {
+  const toDelete: string[] = [];
+  for (let i = 0; i < results.length; i++) {
+    const result = results[i];
+    if (result.status === "fulfilled" && result.value.success) {
       sent++;
     } else {
       failed++;
-      if (res.shouldRemove) {
-        try {
-          await prisma.pushSubscription.delete({ where: { id: sub.id } });
-        } catch {
-          // Ignore deletion error
-        }
-        cleaned++;
+      const shouldRemove = result.status === "fulfilled" && result.value.shouldRemove;
+      if (shouldRemove) {
+        toDelete.push(subscriptions[i].id);
       }
+    }
+  }
+
+  if (toDelete.length > 0) {
+    try {
+      await prisma.pushSubscription.deleteMany({
+        where: { id: { in: toDelete } },
+      });
+      cleaned += toDelete.length;
+    } catch {
+      // Ignore batch deletion error
     }
   }
 
@@ -148,9 +165,14 @@ export function getNotificationImages(
  * Lookahead window: slots starting between now - 2 mins and now + 20 mins in the user's local timezone.
  */
 export async function dispatchStartingSoonAlerts(now: Date = new Date()): Promise<{ count: number; failed: number; cleaned: number }> {
-  // Fetch active schedules, user subscriptions, and session aliases
+  // Candidate days across all possible global timezones (-12h to +14h)
+  const candidateDays = Array.from(new Set([(now.getUTCDay() + 6) % 7, now.getUTCDay(), (now.getUTCDay() + 1) % 7]));
+
+  // Fetch active schedules for relevant days, user subscriptions, and session aliases
   const [upcomingSlots, subscriptions, sessions] = await Promise.all([
-    prisma.userPersonalSchedule.findMany() || [],
+    prisma.userPersonalSchedule.findMany({
+      where: { dayOfWeek: { in: candidateDays } },
+    }) || [],
     prisma.pushSubscription.findMany({ select: { userId: true, timezoneOffset: true } }) || [],
     prisma.session.findMany({ select: { id: true, accessCodeId: true } }) || [],
   ]);
@@ -167,9 +189,12 @@ export async function dispatchStartingSoonAlerts(now: Date = new Date()): Promis
     }
   }
 
-  let count = 0;
-  let failed = 0;
-  let cleaned = 0;
+  // Identify candidate slots starting soon in memory first before firing any DB queries
+  const candidateSlots: Array<{
+    slot: (typeof upcomingSlots)[number];
+    localIsoDate: string;
+    referenceId: string;
+  }> = [];
 
   for (const slot of upcomingSlots) {
     const effectiveOffset =
@@ -180,42 +205,74 @@ export async function dispatchStartingSoonAlerts(now: Date = new Date()): Promis
     const { isStartingSoon, localIsoDate } = isSlotStartingSoon(slot, effectiveOffset, now);
     if (!isStartingSoon) continue;
 
-    const referenceId = `${slot.id}_${localIsoDate}`;
-
-    // 1. Deduplication check
-    const alreadyLogged = await prisma.notificationLog.findUnique({
-      where: {
-        userId_type_referenceId: {
-          userId: slot.sessionId,
-          type: "STARTING_SOON",
-          referenceId,
-        },
-      },
+    candidateSlots.push({
+      slot,
+      localIsoDate,
+      referenceId: `${slot.id}_${localIsoDate}`,
     });
-    if (alreadyLogged) continue;
+  }
 
-    // 2. Rental expiration check: only skip if user held a rental for this item that explicitly expired
+  if (candidateSlots.length === 0) {
+    return { count: 0, failed: 0, cleaned: 0 };
+  }
+
+  // Pre-fetch all deduplication logs, rentals, and owned items for candidate slots in bulk
+  const refIds = candidateSlots.map((c) => c.referenceId);
+  const userIds = Array.from(new Set(candidateSlots.map((c) => c.slot.sessionId)));
+  const tmdbIds = Array.from(new Set(candidateSlots.map((c) => c.slot.tmdbId)));
+
+  const [existingLogs, rentals, ownedItems] = await Promise.all([
+    prisma.notificationLog.findMany({
+      where: {
+        userId: { in: userIds },
+        type: "STARTING_SOON",
+        referenceId: { in: refIds },
+      },
+      select: { userId: true, referenceId: true },
+    }),
+    prisma.rental.findMany({
+      where: {
+        userId: { in: userIds },
+        mediaId: { in: tmdbIds },
+      },
+      orderBy: { expiresAt: "desc" },
+      select: { userId: true, mediaId: true, seasonNumber: true, expiresAt: true },
+    }),
+    prisma.libraryItem.findMany({
+      where: {
+        userId: { in: userIds },
+        mediaId: { in: tmdbIds },
+      },
+      select: { userId: true, mediaId: true, seasonNumber: true },
+    }),
+  ]);
+
+  const loggedSet = new Set(existingLogs.map((l) => `${l.userId}_${l.referenceId}`));
+  const ownedSet = new Set(ownedItems.map((o) => `${o.userId}_${o.mediaId}_${o.seasonNumber ?? 0}`));
+  const rentalMap = new Map<string, Date>();
+  for (const r of rentals) {
+    const key = `${r.userId}_${r.mediaId}_${r.seasonNumber ?? 0}`;
+    if (!rentalMap.has(key)) rentalMap.set(key, r.expiresAt);
+  }
+
+  let count = 0;
+  let failed = 0;
+  let cleaned = 0;
+
+  for (const { slot, referenceId } of candidateSlots) {
+    // 1. Deduplication check (in-memory O(1))
+    if (loggedSet.has(`${slot.sessionId}_${referenceId}`)) continue;
+
+    // 2. Rental expiration check (in-memory O(1))
     const slotAirDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     slotAirDate.setHours(Math.floor(slot.blockStartMinutes / 60), slot.blockStartMinutes % 60, 0, 0);
 
-    const latestRental = await prisma.rental.findFirst({
-      where: {
-        userId: slot.sessionId,
-        mediaId: slot.tmdbId,
-        ...(slot.mediaType === "tv" && slot.currentSeason ? { seasonNumber: slot.currentSeason } : {}),
-      },
-      orderBy: { expiresAt: "desc" },
-    });
+    const seasonNum = slot.mediaType === "tv" && slot.currentSeason ? slot.currentSeason : 0;
+    const itemKey = `${slot.sessionId}_${slot.tmdbId}_${seasonNum}`;
+    const latestRentalExpiry = rentalMap.get(itemKey);
 
-    if (latestRental && slotAirDate.getTime() > latestRental.expiresAt.getTime()) {
-      const owned = await prisma.libraryItem.findFirst({
-        where: {
-          userId: slot.sessionId,
-          mediaId: slot.tmdbId,
-          ...(slot.mediaType === "tv" && slot.currentSeason ? { seasonNumber: slot.currentSeason } : {}),
-        },
-      });
-      if (!owned) {
+    if (latestRentalExpiry && slotAirDate.getTime() > latestRentalExpiry.getTime()) {
+      if (!ownedSet.has(itemKey)) {
         continue; // Rental expired and not owned
       }
     }

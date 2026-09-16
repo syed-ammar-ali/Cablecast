@@ -22,7 +22,8 @@ import type {
 const TMDB_BASE_URL = "https://api.tmdb.org/3";
 
 const POSTER_SIZE = "w342";
-const BACKDROP_SIZE = "w1280";
+const BACKDROP_SIZE = "w780";
+const BACKDROP_SIZE_LARGE = "w1280";
 const STILL_SIZE = "w300";
 const PROFILE_SIZE = "w185";
 
@@ -133,7 +134,10 @@ function extractYear(dateString: string | undefined | null): string | null {
   return /^\d{4}$/.test(year) ? year : null;
 }
 
-function normalizeSearchResult(raw: TmdbSearchResultRaw): MediaSearchResult | null {
+function normalizeSearchResult(
+  raw: TmdbSearchResultRaw,
+  backdropSize: string = BACKDROP_SIZE,
+): MediaSearchResult | null {
   const mediaType = raw.media_type;
   if (mediaType !== "movie" && mediaType !== "tv") {
     // Skip "person" results and anything else /search/multi returns.
@@ -152,7 +156,7 @@ function normalizeSearchResult(raw: TmdbSearchResultRaw): MediaSearchResult | nu
     ),
     posterPath: raw.poster_path,
     posterUrl: buildImageUrl(raw.poster_path, POSTER_SIZE),
-    backdropUrl: buildImageUrl(raw.backdrop_path, BACKDROP_SIZE),
+    backdropUrl: buildImageUrl(raw.backdrop_path, backdropSize),
     overview: raw.overview ?? "",
     voteAverage: raw.vote_average ?? 0,
   };
@@ -177,11 +181,11 @@ export async function searchMedia(
       page,
       include_adult: "false",
     },
-    { cache: "no-store" },
+    { revalidate: 1800 },
   );
 
   const results = raw.results
-    .map(normalizeSearchResult)
+    .map((item) => normalizeSearchResult(item))
     .filter((item): item is MediaSearchResult => item !== null);
 
   return {
@@ -196,7 +200,8 @@ export async function searchMedia(
 export async function getTrendingMedia(): Promise<MediaSearchResult[]> {
   const raw = await tmdbFetch<TmdbSearchResponseRaw>("/trending/all/day");
   return raw.results
-    .map(normalizeSearchResult)
+    // Use large (w1280) backdrops for hero banner — only fetched for ~5 slides
+    .map((item) => normalizeSearchResult(item, BACKDROP_SIZE_LARGE))
     .filter((item): item is MediaSearchResult => item !== null);
 }
 

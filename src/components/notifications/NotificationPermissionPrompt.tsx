@@ -9,11 +9,11 @@ const PROMPT_STORAGE_KEY = "cablecast_notification_prompt_seen";
 export function NotificationPermissionPrompt() {
   const [isVisible, setIsVisible] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { isSupported, isSubscribed, subscribe } = usePushNotifications();
+  const { isSupported, isSubscribed, subscribe, isLoading } = usePushNotifications();
 
   useEffect(() => {
-    // Only prompt if push is supported, user has not subscribed yet, and hasn't dismissed before
-    if (!isSupported || isSubscribed) return;
+    // Only prompt if push check has finished loading, push is supported, user has not subscribed yet, and hasn't dismissed before
+    if (isLoading || !isSupported || isSubscribed) return;
     if (typeof window === "undefined" || !("Notification" in window)) return;
     if (Notification.permission !== "default") return;
 
@@ -30,7 +30,7 @@ export function NotificationPermissionPrompt() {
     }, 1800);
 
     return () => clearTimeout(timer);
-  }, [isSupported, isSubscribed]);
+  }, [isLoading, isSupported, isSubscribed]);
 
   const handleDismiss = () => {
     try {
@@ -63,7 +63,7 @@ export function NotificationPermissionPrompt() {
   return (
     <aside
       aria-label="Notification permission prompt"
-      className="fixed top-[max(0.75rem,env(safe-area-inset-top))] md:top-auto md:bottom-6 right-3 sm:right-6 z-50 max-w-sm w-[calc(100vw-1.5rem)] sm:w-96 rounded-2xl border border-amber-500/30 bg-neutral-950/95 p-4 sm:p-5 shadow-2xl shadow-black/80 backdrop-blur-xl animate-in fade-in slide-in-from-top-4 md:slide-in-from-bottom-5 duration-300"
+      className="fixed bottom-[max(5rem,calc(env(safe-area-inset-bottom)+4.5rem))] md:bottom-6 right-3 sm:right-6 z-[60] max-w-sm w-[calc(100vw-1.5rem)] sm:w-96 rounded-2xl border border-amber-500/30 bg-neutral-950/95 p-4 sm:p-5 shadow-2xl shadow-black/80 backdrop-blur-xl animate-in fade-in slide-in-from-bottom-5 duration-300"
     >
       <button
         type="button"

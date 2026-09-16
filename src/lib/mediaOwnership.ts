@@ -71,39 +71,40 @@ export async function checkMediaOwnership(
     };
   }
 
-  // 2. Active Rental check (unexpired)
-  const activeRental = await prisma.rental.findFirst({
-    where: {
-      ...whereFilter,
-      expiresAt: { gt: now },
-    },
+  // 2. Single Rental check: get the latest rental regardless of expiry status
+  const latestRental = await prisma.rental.findFirst({
+    where: whereFilter,
     orderBy: { expiresAt: "desc" },
   });
 
-  if (activeRental) {
+  if (!latestRental) {
+    return {
+      isOwned: false,
+      isRented: false,
+      isValid: false,
+      status: "NONE",
+      expiresAt: null,
+    };
+  }
+
+  if (latestRental.expiresAt > now) {
     return {
       isOwned: false,
       isRented: true,
       isValid: true,
       status: "RENTED",
-      expiresAt: activeRental.expiresAt,
-      rental: activeRental,
+      expiresAt: latestRental.expiresAt,
+      rental: latestRental,
     };
   }
-
-  // 3. Expired rental check (if any existed in the past)
-  const expiredRental = await prisma.rental.findFirst({
-    where: whereFilter,
-    orderBy: { expiresAt: "desc" },
-  });
 
   return {
     isOwned: false,
     isRented: false,
     isValid: false,
-    status: expiredRental ? "EXPIRED" : "NONE",
-    expiresAt: expiredRental?.expiresAt ?? null,
-    rental: expiredRental ?? undefined,
+    status: "EXPIRED",
+    expiresAt: latestRental.expiresAt,
+    rental: latestRental,
   };
 }
 

@@ -40,6 +40,8 @@ interface LibraryDrawerProps {
   isScheduled?: (tmdbId: number, seasonNumber?: number) => boolean;
   onOpenBroadcastStudio?: () => void;
   onSelectMedia?: (media: MediaSearchResult, season?: number) => void;
+  /** Called when user clicks "Explore Catalog" empty-state button — should close the drawer AND open Explore. */
+  onExplore?: () => void;
 }
 
 function formatRemainingTime(expiresAt?: string | null): string {
@@ -62,6 +64,7 @@ export function LibraryDrawer({
   isScheduled,
   onOpenBroadcastStudio,
   onSelectMedia,
+  onExplore,
   isLoading,
 }: LibraryDrawerProps) {
   const { toast, confirm } = useToast();
@@ -104,7 +107,7 @@ export function LibraryDrawer({
   };
 
   // Active items list based on tab
-  const getActiveItems = () => {
+  const activeItems = useMemo(() => {
     switch (activeTab) {
       case "COLLECTION":
         return collection;
@@ -115,14 +118,14 @@ export function LibraryDrawer({
       default:
         return collection;
     }
-  };
+  }, [activeTab, collection, owned, rented]);
 
   const filteredItems = useMemo(
     () =>
-      getActiveItems().filter((item) =>
+      activeItems.filter((item) =>
         item.title.toLowerCase().includes(filterQuery.toLowerCase())
       ),
-    [activeTab, filterQuery, collection, owned, rented]
+    [activeItems, filterQuery]
   );
 
   const handleDeleteItem = async (item: LibraryMediaItem) => {
@@ -162,7 +165,7 @@ export function LibraryDrawer({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex justify-end bg-black/85 backdrop-blur-md animate-in fade-in"
+      className="fixed inset-0 z-[80] flex justify-end bg-black/85 backdrop-blur-md animate-in fade-in"
       role="dialog"
       aria-modal="true"
       aria-labelledby="library-drawer-title"
@@ -308,7 +311,7 @@ export function LibraryDrawer({
 
         {/* Content List Area */}
         <div className="no-scrollbar flex-1 overflow-y-auto p-4 sm:p-6 pb-[max(6rem,env(safe-area-inset-bottom)+5rem)] space-y-3.5 flex flex-col">
-          {isLoading && filteredItems.length === 0 ? (
+          {isLoading && activeItems.length === 0 ? (
             <div className="space-y-3 p-2">
               {[...Array(4)].map((_, i) => (
                 <div key={i} className="flex items-center gap-3 animate-pulse p-2 rounded-xl border border-neutral-900 bg-neutral-950">
@@ -321,7 +324,7 @@ export function LibraryDrawer({
               ))}
             </div>
           ) : filteredItems.length === 0 ? (
-            <EmptyState tabKey={activeTab} hasQuery={Boolean(filterQuery)} onExplore={onClose} />
+            <EmptyState tabKey={activeTab} hasQuery={Boolean(filterQuery)} onExplore={onExplore || onClose} />
           ) : (
             <div key={activeTab} className="grid grid-cols-1 gap-3.5 animate-in fade-in duration-150">
               {filteredItems.map((item) => {

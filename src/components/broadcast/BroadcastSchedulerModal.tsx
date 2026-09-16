@@ -1062,7 +1062,7 @@ export function BroadcastSchedulerModal({
       role="dialog"
       aria-modal="true"
       aria-labelledby="scheduler-modal-title"
-      className="fixed inset-0 z-[70] flex items-center justify-center bg-black/85 p-0 sm:p-4 backdrop-blur-md select-none animate-in fade-in duration-200"
+      className="fixed inset-0 z-[90] flex items-center justify-center bg-black/85 p-0 sm:p-4 backdrop-blur-md select-none animate-in fade-in duration-200"
       onClick={onClose}
     >
       <div

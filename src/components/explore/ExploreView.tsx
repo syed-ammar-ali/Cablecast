@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import {
   ArrowLeft,
@@ -24,8 +23,7 @@ import { MoreFiltersPanel } from "./MoreFiltersPanel";
 import { EpisodeCard } from "./EpisodeCard";
 import { VhsShelf } from "@/components/vhs/VhsShelf";
 import { MediaCard } from "@/components/search/MediaCard";
-import { useLibrary } from "@/lib/useLibrary";
-import { usePersonalBroadcast } from "@/lib/usePersonalBroadcast";
+import { useAppData } from "@/lib/AppDataContext";
 
 const VhsModal = dynamic(
   () => import("@/components/vhs/VhsModal").then((mod) => mod.VhsModal),
@@ -76,9 +74,7 @@ export function ExploreView({
   onLoadingChange,
   isEmbedded = false,
 }: ExploreViewProps = {}) {
-  const router = useRouter();
-  const library = useLibrary();
-  const personalBroadcast = usePersonalBroadcast();
+  const { library, personalBroadcast } = useAppData();
 
   // Search & Filter state
   const [query, setQuery] = useState(searchQuery !== undefined ? searchQuery : initialQuery);
@@ -143,13 +139,13 @@ export function ExploreView({
         if (onClose) {
           onClose();
         } else {
-          router.push("/home");
+          window.history.pushState({}, "", "/home");
         }
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, onClose, router]);
+  }, [isOpen, onClose]);
 
   // Debounce search input
   useEffect(() => {

@@ -31,24 +31,17 @@ export function useLibrary() {
   const refreshCollection = useCallback(async (signal?: AbortSignal) => {
     setIsLoading(true);
     try {
-      const [favRes, colRes] = await Promise.all([
-        fetch("/api/library/favorites", { signal }),
-        fetch("/api/library/collection", { signal }),
-      ]);
+      const res = await fetch("/api/library/all", { signal });
 
-      if (favRes.ok) {
-        const favData = await favRes.json();
-        if (Array.isArray(favData.favorites)) {
-          setFavorites(favData.favorites);
-          safeSetStorage(LOCAL_FAVORITES_KEY, favData.favorites);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.favorites)) {
+          setFavorites(data.favorites);
+          safeSetStorage(LOCAL_FAVORITES_KEY, data.favorites);
         }
-      }
-
-      if (colRes.ok) {
-        const colData = await colRes.json();
-        setOwned(colData.owned || []);
-        setRented(colData.rented || []);
-        setCollection(colData.collection || []);
+        setOwned(data.owned || []);
+        setRented(data.rented || []);
+        setCollection(data.collection || []);
       }
     } catch (e: unknown) {
       if (e instanceof Error && e.name === "AbortError") return;

@@ -37,7 +37,7 @@ async function handleCron(request: NextRequest) {
     // authenticated sessions, or development mode.
     const isExplicitlyAuthorized =
       isCronJobOrg ||
-      Boolean(session) ||
+      session?.role === "admin" ||
       Boolean(vercelCron) ||
       (expectedSecret !== null && authHeader === `Bearer ${expectedSecret}`) ||
       (expectedSecret !== null && secretHeader === expectedSecret) ||
