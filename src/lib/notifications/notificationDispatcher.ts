@@ -96,6 +96,27 @@ async function sendToUserSubscriptions(
   return { sent, failed, cleaned };
 }
 
+/**
+ * Resolves a map of session IDs to canonical persistent user IDs (e.g. "admin" for admin sessions, accessCodeId for users).
+ */
+async function getCanonicalUserMap(sessionIds: string[]): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+  if (!sessionIds || sessionIds.length === 0) return map;
+  try {
+    const sessions = await prisma.session.findMany({
+      where: { id: { in: sessionIds } },
+      select: { id: true, accessCodeId: true, role: true },
+    });
+    for (const s of sessions) {
+      const canonical = s.role === "admin" ? "admin" : (s.accessCodeId || s.id);
+      map.set(s.id, canonical);
+    }
+  } catch {
+    // Ignore and fallback to raw sessionId
+  }
+  return map;
+}
+
 
 /**
  * Calculates whether an appointment slot (recurring at slot.dayOfWeek and slot.blockStartMinutes)
@@ -174,8 +195,17 @@ export async function dispatchStartingSoonAlerts(now: Date = new Date()): Promis
       where: { dayOfWeek: { in: candidateDays } },
     }) || [],
     prisma.pushSubscription.findMany({ select: { userId: true, timezoneOffset: true } }) || [],
-    prisma.session.findMany({ select: { id: true, accessCodeId: true } }) || [],
+    prisma.session.findMany({ select: { id: true, accessCodeId: true, role: true } }) || [],
   ]);
+
+  const sessionCanonicalMap = new Map<string, string>();
+  for (const s of sessions) {
+    sessionCanonicalMap.set(s.id, s.role === "admin" ? "admin" : (s.accessCodeId || s.id));
+    if (s.accessCodeId) {
+      sessionCanonicalMap.set(s.accessCodeId, s.role === "admin" ? "admin" : s.accessCodeId);
+    }
+  }
+  const getCanonicalId = (id: string) => sessionCanonicalMap.get(id) || id;
 
   const userTimezoneMap = new Map<string, number>();
   for (const sub of subscriptions) {
@@ -218,7 +248,7 @@ export async function dispatchStartingSoonAlerts(now: Date = new Date()): Promis
 
   // Pre-fetch all deduplication logs, rentals, and owned items for candidate slots in bulk
   const refIds = candidateSlots.map((c) => c.referenceId);
-  const userIds = Array.from(new Set(candidateSlots.map((c) => c.slot.sessionId)));
+  const userIds = Array.from(new Set(candidateSlots.flatMap((c) => [c.slot.sessionId, getCanonicalId(c.slot.sessionId)])));
   const tmdbIds = Array.from(new Set(candidateSlots.map((c) => c.slot.tmdbId)));
 
   const [existingLogs, rentals, ownedItems] = await Promise.all([
@@ -260,8 +290,10 @@ export async function dispatchStartingSoonAlerts(now: Date = new Date()): Promis
   let cleaned = 0;
 
   for (const { slot, referenceId } of candidateSlots) {
+    const canonUserId = getCanonicalId(slot.sessionId);
+
     // 1. Deduplication check (in-memory O(1))
-    if (loggedSet.has(`${slot.sessionId}_${referenceId}`)) continue;
+    if (loggedSet.has(`${slot.sessionId}_${referenceId}`) || loggedSet.has(`${canonUserId}_${referenceId}`)) continue;
 
     // 2. Rental expiration check (in-memory O(1))
     const slotAirDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -314,7 +346,7 @@ export async function dispatchStartingSoonAlerts(now: Date = new Date()): Promis
       try {
         await prisma.notificationLog.create({
           data: {
-            userId: slot.sessionId,
+            userId: canonUserId,
             type: "STARTING_SOON",
             referenceId,
           },
@@ -347,17 +379,20 @@ export async function dispatchMissedBroadcastAlerts(): Promise<{ count: number; 
   let failed = 0;
   let cleaned = 0;
 
+  const missedSessionIds = Array.from(new Set(missedItems.map((m) => m.sessionId)));
+  const canonicalMap = await getCanonicalUserMap(missedSessionIds);
+  const getCanon = (id: string) => canonicalMap.get(id) || id;
+
   for (const item of missedItems) {
     const referenceId = item.id;
+    const canonUserId = getCanon(item.sessionId);
 
     // 1. Deduplication check
-    const alreadyLogged = await prisma.notificationLog.findUnique({
+    const alreadyLogged = await prisma.notificationLog.findFirst({
       where: {
-        userId_type_referenceId: {
-          userId: item.sessionId,
-          type: "MISSED_BROADCAST",
-          referenceId,
-        },
+        userId: { in: [item.sessionId, canonUserId] },
+        type: "MISSED_BROADCAST",
+        referenceId,
       },
     });
     if (alreadyLogged) continue;
@@ -395,7 +430,7 @@ export async function dispatchMissedBroadcastAlerts(): Promise<{ count: number; 
       try {
         await prisma.notificationLog.create({
           data: {
-            userId: item.sessionId,
+            userId: canonUserId,
             type: "MISSED_BROADCAST",
             referenceId,
           },
@@ -431,17 +466,20 @@ export async function dispatchTapeExpiringAlerts(now: Date = new Date()): Promis
   let failed = 0;
   let cleaned = 0;
 
+  const rentalUserIds = Array.from(new Set(expiringRentals.map((r) => r.userId)));
+  const canonicalMap = await getCanonicalUserMap(rentalUserIds);
+  const getCanon = (id: string) => canonicalMap.get(id) || id;
+
   for (const rental of expiringRentals) {
     const referenceId = rental.id;
+    const canonUserId = getCanon(rental.userId);
 
     // 1. Deduplication check
-    const alreadyLogged = await prisma.notificationLog.findUnique({
+    const alreadyLogged = await prisma.notificationLog.findFirst({
       where: {
-        userId_type_referenceId: {
-          userId: rental.userId,
-          type: "TAPE_EXPIRING",
-          referenceId,
-        },
+        userId: { in: [rental.userId, canonUserId] },
+        type: "TAPE_EXPIRING",
+        referenceId,
       },
     });
     if (alreadyLogged) continue;
@@ -499,7 +537,7 @@ export async function dispatchTapeExpiringAlerts(now: Date = new Date()): Promis
       try {
         await prisma.notificationLog.create({
           data: {
-            userId: rental.userId,
+            userId: canonUserId,
             type: "TAPE_EXPIRING",
             referenceId,
           },

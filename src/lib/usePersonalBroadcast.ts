@@ -171,16 +171,24 @@ export function usePersonalBroadcast() {
 
   const dismissSeasonAlert = useCallback(
     async (alertId: string) => {
-      setSeasonAlerts((prev) => prev.filter((a) => a.id !== alertId));
-      notifyBroadcastMutation();
+      let previousAlerts: typeof seasonAlerts = [];
+      setSeasonAlerts((prev) => {
+        previousAlerts = prev;
+        return prev.filter((a) => a.id !== alertId);
+      });
+
       try {
-        await fetch("/api/broadcast/personal", {
+        const res = await fetch("/api/broadcast/personal", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ action: "dismissSeasonAlert", alertId }),
         });
+        if (!res.ok) {
+          setSeasonAlerts(previousAlerts);
+        }
       } catch (e) {
         console.error("Failed to dismiss season alert:", e);
+        setSeasonAlerts(previousAlerts);
       }
     },
     [],

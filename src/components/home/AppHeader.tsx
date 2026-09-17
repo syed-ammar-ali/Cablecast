@@ -7,11 +7,13 @@ import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   Bookmark,
+  Compass,
   LogOut,
   Loader2,
   Radio,
   Search,
   ShieldCheck,
+  Tv,
   X,
 } from "lucide-react";
 const CountryPicker = dynamic(
@@ -228,22 +230,55 @@ export function AppHeader({
           />
         </div>
 
-        <div className="flex w-full max-w-md items-center gap-2 justify-self-center sm:w-[32rem]">
-          {onOpenBroadcastStudio && (
+        <div className="flex w-full max-w-2xl items-center gap-3 justify-self-center">
+          {/* Desktop Navigation Links (Full parity with mobile BottomNav) */}
+          <nav aria-label="Desktop Navigation" className="flex items-center gap-1 shrink-0">
             <button
               type="button"
-              onClick={onOpenBroadcastStudio}
-              title="Broadcast Studio (My Lineup & Reruns)"
-              className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-neutral-700 bg-transparent text-neutral-300 transition-colors hover:border-purple-400/60 hover:text-purple-400"
+              onClick={() => {
+                onSearchQueryChange("");
+                onHomeClick?.();
+              }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                !isExploreActive && !searchQuery.trim()
+                  ? "bg-neutral-800 text-white shadow ring-1 ring-neutral-700"
+                  : "text-neutral-400 hover:text-white hover:bg-neutral-900"
+              }`}
+              title="Home (Live TV & Guide)"
             >
-              <Radio className="h-4 w-4" />
-              {missedBroadcastCount != null && missedBroadcastCount > 0 && (
-                <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-600 px-1 font-mono text-[9px] font-bold text-white shadow animate-pulse">
-                  {missedBroadcastCount}
-                </span>
-              )}
+              <Tv className="h-3.5 w-3.5 text-red-500" />
+              <span>Home</span>
             </button>
-          )}
+
+            {onOpenBroadcastStudio && (
+              <button
+                type="button"
+                onClick={onOpenBroadcastStudio}
+                className="relative flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider text-neutral-400 hover:text-purple-300 hover:bg-purple-950/40 transition-all cursor-pointer"
+                title="Broadcast Studio (My Lineup & Reruns)"
+              >
+                <Radio className="h-3.5 w-3.5 text-purple-400" />
+                <span>Broadcast</span>
+                {missedBroadcastCount != null && missedBroadcastCount > 0 && (
+                  <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-red-600 px-1 font-mono text-[9px] font-bold text-white shadow animate-pulse">
+                    {missedBroadcastCount}
+                  </span>
+                )}
+              </button>
+            )}
+
+            {onOpenLibrary && (
+              <button
+                type="button"
+                onClick={onOpenLibrary}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider text-neutral-400 hover:text-yellow-300 hover:bg-yellow-950/30 transition-all cursor-pointer"
+                title="My Library (Personal Vault)"
+              >
+                <Bookmark className="h-3.5 w-3.5 text-yellow-400" />
+                <span>Library</span>
+              </button>
+            )}
+          </nav>
 
           <form
             onSubmit={(e) => {
@@ -301,17 +336,6 @@ export function AppHeader({
               <Loader2 className="pointer-events-none absolute right-3.5 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-neutral-500" />
             ) : null}
           </form>
-
-          {onOpenLibrary && (
-            <button
-              type="button"
-              onClick={onOpenLibrary}
-              title="My Library (Favorites & History)"
-              className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-neutral-700 bg-transparent text-neutral-300 transition-colors hover:border-yellow-400/50 hover:text-yellow-400"
-            >
-              <Bookmark className="h-4 w-4" />
-            </button>
-          )}
         </div>
 
         <div className="flex items-center justify-end gap-3 justify-self-end sm:gap-4">

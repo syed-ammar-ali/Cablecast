@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import {
   ArrowLeft,
@@ -73,22 +73,68 @@ export function LibraryDrawer({
   const [activeTab, setActiveTab] = useState<LibraryTabKey>("COLLECTION");
   const [filterQuery, setFilterQuery] = useState("");
   const [deletingKey, setDeletingKey] = useState<string | null>(null);
-  // Lock body scroll and handle Escape key
+  const drawerRef = useRef<HTMLDivElement | null>(null);
+
+  // Lock body scroll, handle Escape key, and trap focus inside the drawer (WCAG 2.1)
   useEffect(() => {
     if (!isOpen) return;
 
     document.body.style.overflow = "hidden";
+    const previousActiveElement = document.activeElement as HTMLElement | null;
+
+    // Auto-focus the first interactive element inside drawer
+    const focusTimer = setTimeout(() => {
+      if (drawerRef.current) {
+        const focusables = drawerRef.current.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        );
+        if (focusables.length > 0) {
+          focusables[0].focus();
+        }
+      }
+    }, 60);
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         onClose();
+        return;
+      }
+
+      if (event.key === "Tab" && drawerRef.current) {
+        const focusableElements = Array.from(
+          drawerRef.current.querySelectorAll<HTMLElement>(
+            'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+          )
+        ).filter((el) => el.offsetParent !== null);
+
+        if (focusableElements.length === 0) {
+          event.preventDefault();
+          return;
+        }
+
+        const firstElement = focusableElements[0];
+        const lastElement = focusableElements[focusableElements.length - 1];
+
+        if (event.shiftKey) {
+          if (document.activeElement === firstElement || !drawerRef.current.contains(document.activeElement)) {
+            event.preventDefault();
+            lastElement.focus();
+          }
+        } else {
+          if (document.activeElement === lastElement || !drawerRef.current.contains(document.activeElement)) {
+            event.preventDefault();
+            firstElement.focus();
+          }
+        }
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => {
+      clearTimeout(focusTimer);
       document.body.style.overflow = "";
       window.removeEventListener("keydown", handleKeyDown);
+      previousActiveElement?.focus?.();
     };
   }, [isOpen, onClose]);
 
@@ -188,7 +234,10 @@ export function LibraryDrawer({
         aria-label="Close library drawer"
       />
 
-      <div className="relative z-10 flex h-full w-full max-w-full sm:max-w-xl flex-col border-0 sm:border-l border-neutral-800 bg-neutral-950 shadow-2xl animate-in slide-in-from-right">
+      <div
+        ref={drawerRef}
+        className="relative z-10 flex h-full w-full max-w-full sm:max-w-xl flex-col border-0 sm:border-l border-neutral-800 bg-neutral-950 shadow-2xl animate-in slide-in-from-right"
+      >
         {/* Top Header - Unified Breadcrumb & Subtitle matching Cablecast Admin & Broadcast Studio */}
         <header className="border-b border-neutral-900 bg-neutral-950/90 backdrop-blur-md px-4 sm:px-6 pt-[max(0.75rem,env(safe-area-inset-top))] pb-3 sm:py-4 shrink-0">
           <div className="flex items-center justify-between gap-3 mb-3">

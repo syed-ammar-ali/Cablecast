@@ -39,6 +39,7 @@ export async function GET() {
     // In-memory cache for TMDB responses to prevent duplicate calls in the same request
     const showDetailsCache = new Map<number, any>();
     const movieDetailsCache = new Map<number, any>();
+    const pendingPersistTasks: Promise<void>[] = [];
 
     async function resolveMetadata(
       mediaId: number,
@@ -120,7 +121,7 @@ export async function GET() {
           };
 
           if (persistCallback && resolved.title) {
-            void persistCallback(resolved).catch(() => {});
+            pendingPersistTasks.push(persistCallback(resolved).catch(() => {}));
           }
 
           return resolved;
@@ -142,7 +143,7 @@ export async function GET() {
           };
 
           if (persistCallback && resolved.title) {
-            void persistCallback(resolved).catch(() => {});
+            pendingPersistTasks.push(persistCallback(resolved).catch(() => {}));
           }
 
           return resolved;
@@ -283,12 +284,18 @@ export async function GET() {
 
     const collection: LibraryMediaItem[] = [...owned, ...rented, ...saved];
 
-    return NextResponse.json({
+    if (pendingPersistTasks.length > 0) {
+      await Promise.allSettled(pendingPersistTasks);
+    }
+
+    const response = NextResponse.json({
       favorites: favoriteRecords,
       owned,
       rented,
       collection,
     });
+    response.headers.set("Cache-Control", "private, no-store, must-revalidate");
+    return response;
   } catch (error) {
     console.error("[api/library/all] GET error:", error);
     return NextResponse.json(

@@ -85,6 +85,24 @@ function deny(request: NextRequest, status: 401 | 403, message: string): NextRes
   return response;
 }
 
+interface CachedProxySession {
+  session: any;
+  cachedAt: number;
+}
+
+// Short-lived in-memory cache to avoid querying Neon Postgres on every single navigation/asset request.
+// Provides 0ms sub-millisecond response while maintaining tight 20-second revocation latency.
+const proxySessionCache = new Map<string, CachedProxySession>();
+const SESSION_CACHE_TTL_MS = 20_000;
+
+export function invalidateProxySessionCache(token?: string) {
+  if (token) {
+    proxySessionCache.delete(token);
+  } else {
+    proxySessionCache.clear();
+  }
+}
+
 export async function proxy(request: NextRequest) {
   try {
     const { pathname } = request.nextUrl;
@@ -125,12 +143,27 @@ export async function proxy(request: NextRequest) {
       return deny(request, 401, "Sign-in required.");
     }
 
-    const session = await prisma.session.findUnique({
-      where: { token },
-      include: { accessCode: { select: { revoked: true, expiresAt: true } } },
-    });
+    const now = Date.now();
+    const cached = proxySessionCache.get(token);
+    let session = cached && now - cached.cachedAt < SESSION_CACHE_TTL_MS ? cached.session : null;
+
+    if (!session) {
+      session = await prisma.session.findUnique({
+        where: { token },
+        include: { accessCode: { select: { revoked: true, expiresAt: true } } },
+      });
+
+      if (session && isSessionActive(session)) {
+        proxySessionCache.set(token, { session, cachedAt: now });
+        if (proxySessionCache.size > 1000) {
+          const oldestKey = proxySessionCache.keys().next().value;
+          if (oldestKey) proxySessionCache.delete(oldestKey);
+        }
+      }
+    }
 
     if (!session || !isSessionActive(session)) {
+      proxySessionCache.delete(token);
       return deny(request, 401, "Sign-in required.");
     }
 
