@@ -1,5 +1,5 @@
 // Cablecast Progressive Web App Service Worker
-const CACHE_NAME = "cablecast-v10";
+const CACHE_NAME = "cablecast-v11";
 const STATIC_ASSETS = [
   "/",
   "/offline.html",

@@ -16,7 +16,7 @@ function computeLiveState(
   blockStartMinutes: number,
   blockCount: number,
   now: Date = new Date(),
-  tzOffset: number = -330,
+  tzOffset: number = 0,
 ) {
   const localMs = now.getTime() - tzOffset * 60 * 1000;
   const local = new Date(localMs);
@@ -41,7 +41,7 @@ function getNextAirDate(
   dayOfWeek: number,
   blockStartMinutes: number,
   now: Date,
-  tzOffset: number = -330,
+  tzOffset: number = 0,
 ): Date {
   const localMs = now.getTime() - tzOffset * 60 * 1000;
   const local = new Date(localMs);
@@ -77,7 +77,7 @@ function getMostRecentPastOccurrence(
   blockCount: number,
   createdAt: Date,
   now: Date,
-  tzOffset: number = -330,
+  tzOffset: number = 0,
 ): PastOccurrence | null {
   const localMs = now.getTime() - tzOffset * 60 * 1000;
   const local = new Date(localMs);
@@ -234,7 +234,7 @@ export async function GET(request: NextRequest) {
         const sub = await prisma.pushSubscription.findFirst({
           where: { userId: { in: userKeys }, timezoneOffset: { not: null } },
         });
-        userTzOffset = sub && typeof sub.timezoneOffset === "number" ? sub.timezoneOffset : -330;
+        userTzOffset = sub && typeof sub.timezoneOffset === "number" ? sub.timezoneOffset : 0;
       }
     }
 
@@ -869,7 +869,7 @@ export async function POST(request: NextRequest) {
             currentSeason: targetSeason,
             currentEpisode: episodeNum,
             totalEpisodes: totalEpisodes ?? (input.mediaType === "tv" ? 12 : null),
-            timezoneOffset: typeof input.timezoneOffset === "number" ? input.timezoneOffset : -330,
+            timezoneOffset: typeof input.timezoneOffset === "number" ? input.timezoneOffset : 0,
           },
         });
         created.push(item);

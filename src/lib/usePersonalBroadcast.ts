@@ -94,7 +94,7 @@ export function usePersonalBroadcast() {
   const syncFromServer = useCallback(async (signal?: AbortSignal) => {
     setIsLoading(true);
     try {
-      const tzOffset = typeof window !== "undefined" ? new Date().getTimezoneOffset() : -330;
+      const tzOffset = typeof window !== "undefined" ? new Date().getTimezoneOffset() : 0;
       const res = await fetch(`/api/broadcast/personal?tzOffset=${tzOffset}`, { signal });
       if (res.ok) {
         setError(null);

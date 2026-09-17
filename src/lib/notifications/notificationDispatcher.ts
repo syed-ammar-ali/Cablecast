@@ -108,13 +108,13 @@ export function isSlotStartingSoon(
   userOffsetMinutes?: number | null,
   now: Date = new Date(),
 ): { isStartingSoon: boolean; localIsoDate: string } {
-  // Effective offset: slot offset -> userOffsetMinutes -> default IST (-330)
+  // Effective offset: slot offset -> userOffsetMinutes -> default UTC (0)
   const effectiveOffset =
     typeof slot.timezoneOffset === "number"
       ? slot.timezoneOffset
       : typeof userOffsetMinutes === "number"
         ? userOffsetMinutes
-        : -330;
+        : 0;
 
   // Local time for user = UTC time - effectiveOffset (Date.prototype.getTimezoneOffset convention: UTC - Local)
   const localTimeMs = now.getTime() - effectiveOffset * 60_000;
@@ -200,7 +200,7 @@ export async function dispatchStartingSoonAlerts(now: Date = new Date()): Promis
     const effectiveOffset =
       typeof slot.timezoneOffset === "number"
         ? slot.timezoneOffset
-        : (userTimezoneMap.get(slot.sessionId) ?? -330);
+        : (userTimezoneMap.get(slot.sessionId) ?? 0);
 
     const { isStartingSoon, localIsoDate } = isSlotStartingSoon(slot, effectiveOffset, now);
     if (!isStartingSoon) continue;
@@ -309,20 +309,22 @@ export async function dispatchStartingSoonAlerts(now: Date = new Date()): Promis
     failed += res.failed;
     cleaned += res.cleaned;
 
-    // 4. Record idempotency log
-    try {
-      await prisma.notificationLog.create({
-        data: {
-          userId: slot.sessionId,
-          type: "STARTING_SOON",
-          referenceId,
-        },
-      });
-    } catch {
-      // Ignore duplicate log insertion error
-    }
+    // 4. Record idempotency log only if push was actually sent
+    if (res.sent > 0) {
+      try {
+        await prisma.notificationLog.create({
+          data: {
+            userId: slot.sessionId,
+            type: "STARTING_SOON",
+            referenceId,
+          },
+        });
+      } catch {
+        // Ignore duplicate log insertion error
+      }
 
-    count++;
+      count++;
+    }
   }
 
   return { count, failed, cleaned };
@@ -388,20 +390,22 @@ export async function dispatchMissedBroadcastAlerts(): Promise<{ count: number; 
     failed += res.failed;
     cleaned += res.cleaned;
 
-    // 3. Record log
-    try {
-      await prisma.notificationLog.create({
-        data: {
-          userId: item.sessionId,
-          type: "MISSED_BROADCAST",
-          referenceId,
-        },
-      });
-    } catch {
-      // Ignore duplicate log insertion error
-    }
+    // 3. Record log only if push was actually sent
+    if (res.sent > 0) {
+      try {
+        await prisma.notificationLog.create({
+          data: {
+            userId: item.sessionId,
+            type: "MISSED_BROADCAST",
+            referenceId,
+          },
+        });
+      } catch {
+        // Ignore duplicate log insertion error
+      }
 
-    count++;
+      count++;
+    }
   }
 
   return { count, failed, cleaned };
@@ -490,20 +494,22 @@ export async function dispatchTapeExpiringAlerts(now: Date = new Date()): Promis
     failed += res.failed;
     cleaned += res.cleaned;
 
-    // 4. Record log
-    try {
-      await prisma.notificationLog.create({
-        data: {
-          userId: rental.userId,
-          type: "TAPE_EXPIRING",
-          referenceId,
-        },
-      });
-    } catch {
-      // Ignore duplicate log insertion error
-    }
+    // 4. Record log only if push was actually sent
+    if (res.sent > 0) {
+      try {
+        await prisma.notificationLog.create({
+          data: {
+            userId: rental.userId,
+            type: "TAPE_EXPIRING",
+            referenceId,
+          },
+        });
+      } catch {
+        // Ignore duplicate log insertion error
+      }
 
-    count++;
+      count++;
+    }
   }
 
   return { count, failed, cleaned };
