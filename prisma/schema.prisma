@@ -241,6 +241,7 @@ model UserPersonalSchedule {
   @@unique([sessionId, dayOfWeek, blockStartMinutes])
   @@index([sessionId])
   @@index([sessionId, dayOfWeek])
+  @@index([dayOfWeek])
 }
 
 /// Log of missed or unwatched broadcasts available for repeat rescheduling

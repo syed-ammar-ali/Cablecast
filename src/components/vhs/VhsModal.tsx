@@ -160,6 +160,59 @@ function VhsSleeveSkeleton({
   );
 }
 
+/**
+ * Atmospheric retro VHS back-sleeve skeleton loader.
+ * Displays pulsing synopsis bars, episode cards, and cast blocks while metadata loads.
+ */
+function VhsBackSleeveSkeleton({ isTv }: { isTv: boolean }) {
+  return (
+    <div className="flex-1 min-h-0 flex flex-col gap-3 overflow-hidden animate-pulse">
+      {/* Synopsis skeleton */}
+      <div className="space-y-1.5 shrink-0">
+        <div className="h-2.5 w-28 bg-amber-500/20 rounded" />
+        <div className="space-y-1 pt-0.5">
+          <div className="h-2 w-full bg-neutral-800/80 rounded" />
+          <div className="h-2 w-11/12 bg-neutral-800/70 rounded" />
+          <div className="h-2 w-4/5 bg-neutral-800/60 rounded" />
+        </div>
+      </div>
+
+      {/* Episode directory skeleton for TV */}
+      {isTv && (
+        <div className="flex-1 min-h-[90px] flex flex-col space-y-1.5 overflow-hidden">
+          <div className="h-2.5 w-36 bg-neutral-800/90 rounded" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pt-0.5">
+            {[1, 2, 3, 4, 5, 6].map((idx) => (
+              <div
+                key={idx}
+                className="h-7 rounded bg-neutral-900/80 border border-neutral-800/60 flex items-center justify-between px-2"
+              >
+                <div className="flex items-center gap-2">
+                  <div className="h-2 w-2 rounded-full bg-amber-500/30" />
+                  <div className="h-2 w-20 bg-neutral-800 rounded" />
+                </div>
+                <div className="h-2 w-6 bg-neutral-800/60 rounded" />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Cast & Credits skeleton */}
+      <div className="shrink-0 pt-2 border-t border-neutral-800/80 space-y-1.5">
+        <div className="flex items-center gap-2">
+          <div className="h-2 w-16 bg-neutral-800/70 rounded" />
+          <div className="h-2 w-32 bg-neutral-800/50 rounded" />
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="h-2 w-16 bg-neutral-800/70 rounded" />
+          <div className="h-2 w-48 bg-neutral-800/50 rounded" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function VhsModal({
   isOpen,
   onClose,
@@ -1027,102 +1080,106 @@ export function VhsModal({
                   </span>
                 </div>
 
-                <div className="flex-1 min-h-0 flex flex-col gap-2 overflow-hidden">
-                  <div className="space-y-0.5 shrink-0">
-                    <span className="text-[9px] font-mono font-bold uppercase tracking-wider text-amber-400 block">
-                      {"// PROGRAM SYNOPSIS"}
-                    </span>
-                    <p className="text-[11px] leading-relaxed text-neutral-300 font-sans line-clamp-3">
-                      {metadata?.synopsis || "No program synopsis provided on sleeve jacket."}
-                    </p>
-                  </div>
+                {isLoadingMetadata && !metadata ? (
+                  <VhsBackSleeveSkeleton isTv={isTv} />
+                ) : (
+                  <div className="flex-1 min-h-0 flex flex-col gap-2 overflow-hidden">
+                    <div className="space-y-0.5 shrink-0">
+                      <span className="text-[9px] font-mono font-bold uppercase tracking-wider text-amber-400 block">
+                        {"// PROGRAM SYNOPSIS"}
+                      </span>
+                      <p className="text-[11px] leading-relaxed text-neutral-300 font-sans line-clamp-3">
+                        {metadata?.synopsis || "No program synopsis provided on sleeve jacket."}
+                      </p>
+                    </div>
 
-                  {isTv && metadata?.episodes && metadata.episodes.length > 0 && (
-                    <div className="flex-1 min-h-0 flex flex-col space-y-1 overflow-hidden">
-                      <div className="flex items-center justify-between text-[9px] font-mono font-bold uppercase tracking-wider text-neutral-400 border-b border-neutral-900 pb-0.5 shrink-0">
-                        {isAccessible ? (
-                          <span className="text-amber-400 flex items-center gap-1">
-                            <Play className="h-2.5 w-2.5 fill-amber-400 text-amber-400" />
-                            {"// EPISODE DIRECTORY · CLICK TO PLAY"}
-                          </span>
-                        ) : (
-                          <span>{"// EPISODE DIRECTORY"}</span>
-                        )}
-                        {isAccessible ? (
-                          <span className="text-emerald-400 font-mono text-[8px] bg-emerald-950/80 px-1.5 py-0.5 rounded border border-emerald-500/40">
-                            UNLOCKED
-                          </span>
-                        ) : (
-                          <span className="text-neutral-500 flex items-center gap-1 text-[8px]">
-                            <Lock className="h-2.5 w-2.5 text-neutral-500" />
-                            RENT/BUY TO PLAY
-                          </span>
-                        )}
-                      </div>
+                    {isTv && metadata?.episodes && metadata.episodes.length > 0 && (
+                      <div className="flex-1 min-h-0 flex flex-col space-y-1 overflow-hidden">
+                        <div className="flex items-center justify-between text-[9px] font-mono font-bold uppercase tracking-wider text-neutral-400 border-b border-neutral-900 pb-0.5 shrink-0">
+                          {isAccessible ? (
+                            <span className="text-amber-400 flex items-center gap-1">
+                              <Play className="h-2.5 w-2.5 fill-amber-400 text-amber-400" />
+                              {"// EPISODE DIRECTORY · CLICK TO PLAY"}
+                            </span>
+                          ) : (
+                            <span>{"// EPISODE DIRECTORY"}</span>
+                          )}
+                          {isAccessible ? (
+                            <span className="text-emerald-400 font-mono text-[8px] bg-emerald-950/80 px-1.5 py-0.5 rounded border border-emerald-500/40">
+                              UNLOCKED
+                            </span>
+                          ) : (
+                            <span className="text-neutral-500 flex items-center gap-1 text-[8px]">
+                              <Lock className="h-2.5 w-2.5 text-neutral-500" />
+                              RENT/BUY TO PLAY
+                            </span>
+                          )}
+                        </div>
 
-                      <div className="flex-1 min-h-[90px] overflow-y-auto pr-1 grid grid-cols-1 sm:grid-cols-2 gap-1 font-mono text-[11px] scrollbar-none [&::-webkit-scrollbar]:hidden">
-                        {metadata.episodes.map((ep) => {
-                          if (isAccessible) {
+                        <div className="flex-1 min-h-[90px] overflow-y-auto pr-1 grid grid-cols-1 sm:grid-cols-2 gap-1 font-mono text-[11px] scrollbar-none [&::-webkit-scrollbar]:hidden">
+                          {metadata.episodes.map((ep) => {
+                            if (isAccessible) {
+                              return (
+                                <button
+                                  key={ep.episodeNumber}
+                                  type="button"
+                                  onClick={() => handleEpisodeClick(ep.episodeNumber)}
+                                  title={`Play Episode ${ep.episodeNumber}: ${ep.name}`}
+                                  className="group/ep flex items-center justify-between gap-1.5 rounded bg-neutral-900/90 hover:bg-amber-950/60 py-1.5 px-2 border border-neutral-800 hover:border-amber-500/60 text-[11px] transition-all cursor-pointer text-left active:scale-[0.98]"
+                                >
+                                  <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                                    <Play className="h-2.5 w-2.5 text-amber-400 shrink-0 fill-transparent group-hover/ep:fill-amber-400 transition-colors" />
+                                    <span className="text-amber-400 font-bold shrink-0 font-mono">
+                                      {String(ep.episodeNumber).padStart(2, "0")}.
+                                    </span>
+                                    <span className="text-neutral-200 truncate font-sans text-[11px] group-hover/ep:text-white">
+                                      {ep.name}
+                                    </span>
+                                  </div>
+                                  <span className="text-neutral-500 text-[9px] shrink-0 font-mono group-hover/ep:text-neutral-300">
+                                    {ep.runtime}m
+                                  </span>
+                                </button>
+                              );
+                            }
                             return (
-                              <button
+                              <div
                                 key={ep.episodeNumber}
-                                type="button"
-                                onClick={() => handleEpisodeClick(ep.episodeNumber)}
-                                title={`Play Episode ${ep.episodeNumber}: ${ep.name}`}
-                                className="group/ep flex items-center justify-between gap-1.5 rounded bg-neutral-900/90 hover:bg-amber-950/60 py-1.5 px-2 border border-neutral-800 hover:border-amber-500/60 text-[11px] transition-all cursor-pointer text-left active:scale-[0.98]"
+                                title="Rent or buy this tape to watch"
+                                className="flex items-center justify-between gap-1.5 rounded bg-neutral-900/40 py-1 px-2 border border-neutral-800/40 text-[11px] opacity-75 select-none"
                               >
-                                <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                                  <Play className="h-2.5 w-2.5 text-amber-400 shrink-0 fill-transparent group-hover/ep:fill-amber-400 transition-colors" />
-                                  <span className="text-amber-400 font-bold shrink-0 font-mono">
-                                    {String(ep.episodeNumber).padStart(2, "0")}.
-                                  </span>
-                                  <span className="text-neutral-200 truncate font-sans text-[11px] group-hover/ep:text-white">
-                                    {ep.name}
-                                  </span>
-                                </div>
-                                <span className="text-neutral-500 text-[9px] shrink-0 font-mono group-hover/ep:text-neutral-300">
+                                <span className="text-neutral-500 font-bold shrink-0 font-mono">
+                                  {String(ep.episodeNumber).padStart(2, "0")}.
+                                </span>
+                                <span className="text-neutral-400 truncate font-sans text-[11px] flex-1">
+                                  {ep.name}
+                                </span>
+                                <span className="text-neutral-600 text-[9px] shrink-0 font-mono">
                                   {ep.runtime}m
                                 </span>
-                              </button>
+                              </div>
                             );
-                          }
-                          return (
-                            <div
-                              key={ep.episodeNumber}
-                              title="Rent or buy this tape to watch"
-                              className="flex items-center justify-between gap-1.5 rounded bg-neutral-900/40 py-1 px-2 border border-neutral-800/40 text-[11px] opacity-75 select-none"
-                            >
-                              <span className="text-neutral-500 font-bold shrink-0 font-mono">
-                                {String(ep.episodeNumber).padStart(2, "0")}.
-                              </span>
-                              <span className="text-neutral-400 truncate font-sans text-[11px] flex-1">
-                                {ep.name}
-                              </span>
-                              <span className="text-neutral-600 text-[9px] shrink-0 font-mono">
-                                {ep.runtime}m
-                              </span>
-                            </div>
-                          );
-                        })}
+                          })}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )}
 
-                  <div className="shrink-0 pt-2 border-t border-neutral-800/80 text-[10.5px] font-mono text-neutral-400 leading-snug space-y-0.5">
-                    <p className="flex items-center gap-1 truncate">
-                      <span className="text-neutral-500 uppercase font-semibold text-[9.5px]">Created By: </span>
-                      <span className="text-neutral-300 truncate">
-                        {metadata?.credits?.creators?.join(", ") || "Production Team"}
-                      </span>
-                    </p>
-                    <p className="leading-relaxed line-clamp-2">
-                      <span className="text-neutral-500 uppercase font-semibold text-[9.5px]">Featuring: </span>
-                      <span className="text-neutral-300">
-                        {metadata?.credits?.mainCast?.join(", ") || "Cast"}
-                      </span>
-                    </p>
+                    <div className="shrink-0 pt-2 border-t border-neutral-800/80 text-[10.5px] font-mono text-neutral-400 leading-snug space-y-0.5">
+                      <p className="flex items-center gap-1 truncate">
+                        <span className="text-neutral-500 uppercase font-semibold text-[9.5px]">Created By: </span>
+                        <span className="text-neutral-300 truncate">
+                          {metadata?.credits?.creators?.join(", ") || "Production Team"}
+                        </span>
+                      </p>
+                      <p className="leading-relaxed line-clamp-2">
+                        <span className="text-neutral-500 uppercase font-semibold text-[9.5px]">Featuring: </span>
+                        <span className="text-neutral-300">
+                          {metadata?.credits?.mainCast?.join(", ") || "Cast"}
+                        </span>
+                      </p>
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {/* Fixed Pinned Barcode at Bottom */}
                 <div className="absolute bottom-0 inset-x-0 p-2 sm:p-2.5 bg-neutral-950 border-t border-neutral-900 z-20">
@@ -1343,112 +1400,116 @@ export function VhsModal({
                           </span>
                         </div>
 
-                        <div className="flex-1 min-h-0 flex flex-col gap-2 overflow-hidden">
-                          <div className="space-y-0.5 shrink-0">
-                            <span className="text-[9px] font-mono font-bold uppercase tracking-wider text-amber-400 block">
-                              {"// PROGRAM SYNOPSIS"}
-                            </span>
-                            <p className="text-[11px] leading-relaxed text-neutral-300 font-sans line-clamp-3">
-                              {activeSeasonData?.synopsis || "No program synopsis provided on sleeve jacket."}
-                            </p>
-                          </div>
-
-                          {activeSeasonData?.guestStars && activeSeasonData.guestStars.length > 0 && (
-                            <div className="rounded-lg border border-amber-900/50 bg-amber-950/20 p-2 space-y-0.5 shrink-0">
-                              <div className="flex items-center gap-1.5 text-amber-300 text-[9px] font-mono font-bold uppercase tracking-wider">
-                                <Sparkles className="h-3 w-3" />
-                                <span>Special Guest Appearances:</span>
-                              </div>
-                              <p className="text-[10.5px] text-neutral-300 font-medium leading-snug">
-                                {activeSeasonData.guestStars.join(" • ")}
+                        {isLoadingMetadata && !activeSeasonData ? (
+                          <VhsBackSleeveSkeleton isTv={isTv} />
+                        ) : (
+                          <div className="flex-1 min-h-0 flex flex-col gap-2 overflow-hidden">
+                            <div className="space-y-0.5 shrink-0">
+                              <span className="text-[9px] font-mono font-bold uppercase tracking-wider text-amber-400 block">
+                                {"// PROGRAM SYNOPSIS"}
+                              </span>
+                              <p className="text-[11px] leading-relaxed text-neutral-300 font-sans line-clamp-3">
+                                {activeSeasonData?.synopsis || "No program synopsis provided on sleeve jacket."}
                               </p>
                             </div>
-                          )}
 
-                          <div className="flex-1 min-h-0 flex flex-col space-y-1 overflow-hidden">
-                            <div className="flex items-center justify-between text-[9px] font-mono font-bold uppercase tracking-wider text-neutral-400 border-b border-neutral-900 pb-0.5 shrink-0">
-                              {isAccessible ? (
-                                <span className="text-amber-400 flex items-center gap-1">
-                                  <Play className="h-2.5 w-2.5 fill-amber-400 text-amber-400" />
-                                  {"// EPISODE DIRECTORY · CLICK TO PLAY"}
-                                </span>
-                              ) : (
-                                <span>{"// EPISODE DIRECTORY"}</span>
-                              )}
-                              {isAccessible ? (
-                                <span className="text-emerald-400 font-mono text-[8px] bg-emerald-950/80 px-1.5 py-0.5 rounded border border-emerald-500/40">
-                                  UNLOCKED
-                                </span>
-                              ) : (
-                                <span className="text-neutral-500 flex items-center gap-1 text-[8px]">
-                                  <Lock className="h-2.5 w-2.5 text-neutral-500" />
-                                  RENT/BUY TO PLAY
-                                </span>
-                              )}
-                            </div>
+                            {activeSeasonData?.guestStars && activeSeasonData.guestStars.length > 0 && (
+                              <div className="rounded-lg border border-amber-900/50 bg-amber-950/20 p-2 space-y-0.5 shrink-0">
+                                <div className="flex items-center gap-1.5 text-amber-300 text-[9px] font-mono font-bold uppercase tracking-wider">
+                                  <Sparkles className="h-3 w-3" />
+                                  <span>Special Guest Appearances:</span>
+                                </div>
+                                <p className="text-[10.5px] text-neutral-300 font-medium leading-snug">
+                                  {activeSeasonData.guestStars.join(" • ")}
+                                </p>
+                              </div>
+                            )}
 
-                            <div className="flex-1 min-h-[100px] overflow-y-auto pr-1 grid grid-cols-1 sm:grid-cols-2 gap-1 font-mono text-[11px] scrollbar-none [&::-webkit-scrollbar]:hidden">
-                              {activeSeasonData?.episodes?.map((ep) => {
-                                if (isAccessible) {
+                            <div className="flex-1 min-h-0 flex flex-col space-y-1 overflow-hidden">
+                              <div className="flex items-center justify-between text-[9px] font-mono font-bold uppercase tracking-wider text-neutral-400 border-b border-neutral-900 pb-0.5 shrink-0">
+                                {isAccessible ? (
+                                  <span className="text-amber-400 flex items-center gap-1">
+                                    <Play className="h-2.5 w-2.5 fill-amber-400 text-amber-400" />
+                                    {"// EPISODE DIRECTORY · CLICK TO PLAY"}
+                                  </span>
+                                ) : (
+                                  <span>{"// EPISODE DIRECTORY"}</span>
+                                )}
+                                {isAccessible ? (
+                                  <span className="text-emerald-400 font-mono text-[8px] bg-emerald-950/80 px-1.5 py-0.5 rounded border border-emerald-500/40">
+                                    UNLOCKED
+                                  </span>
+                                ) : (
+                                  <span className="text-neutral-500 flex items-center gap-1 text-[8px]">
+                                    <Lock className="h-2.5 w-2.5 text-neutral-500" />
+                                    RENT/BUY TO PLAY
+                                  </span>
+                                )}
+                              </div>
+
+                              <div className="flex-1 min-h-[100px] overflow-y-auto pr-1 grid grid-cols-1 sm:grid-cols-2 gap-1 font-mono text-[11px] scrollbar-none [&::-webkit-scrollbar]:hidden">
+                                {activeSeasonData?.episodes?.map((ep) => {
+                                  if (isAccessible) {
+                                    return (
+                                      <button
+                                        key={ep.episodeNumber}
+                                        type="button"
+                                        onClick={() => handleEpisodeClick(ep.episodeNumber)}
+                                        title={`Play Episode ${ep.episodeNumber}: ${ep.name}`}
+                                        className="group/ep flex items-center justify-between gap-1.5 rounded bg-neutral-900/90 hover:bg-amber-950/60 py-1.5 px-2 border border-neutral-800 hover:border-amber-500/60 text-[11px] transition-all cursor-pointer text-left active:scale-[0.98]"
+                                      >
+                                        <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                                          <Play className="h-2.5 w-2.5 text-amber-400 shrink-0 fill-transparent group-hover/ep:fill-amber-400 transition-colors" />
+                                          <span className="text-amber-400 font-bold shrink-0 font-mono">
+                                            {String(ep.episodeNumber).padStart(2, "0")}.
+                                          </span>
+                                          <span className="text-neutral-200 truncate font-sans text-[11px] group-hover/ep:text-white">
+                                            {ep.name}
+                                          </span>
+                                        </div>
+                                        <span className="text-neutral-500 text-[9px] shrink-0 font-mono group-hover/ep:text-neutral-300">
+                                          {ep.runtime}m
+                                        </span>
+                                      </button>
+                                    );
+                                  }
                                   return (
-                                    <button
+                                    <div
                                       key={ep.episodeNumber}
-                                      type="button"
-                                      onClick={() => handleEpisodeClick(ep.episodeNumber)}
-                                      title={`Play Episode ${ep.episodeNumber}: ${ep.name}`}
-                                      className="group/ep flex items-center justify-between gap-1.5 rounded bg-neutral-900/90 hover:bg-amber-950/60 py-1.5 px-2 border border-neutral-800 hover:border-amber-500/60 text-[11px] transition-all cursor-pointer text-left active:scale-[0.98]"
+                                      title="Rent or buy this tape to watch"
+                                      className="flex items-center justify-between gap-1.5 rounded bg-neutral-900/40 py-1 px-2 border border-neutral-800/40 text-[11px] opacity-75 select-none"
                                     >
-                                      <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                                        <Play className="h-2.5 w-2.5 text-amber-400 shrink-0 fill-transparent group-hover/ep:fill-amber-400 transition-colors" />
-                                        <span className="text-amber-400 font-bold shrink-0 font-mono">
-                                          {String(ep.episodeNumber).padStart(2, "0")}.
-                                        </span>
-                                        <span className="text-neutral-200 truncate font-sans text-[11px] group-hover/ep:text-white">
-                                          {ep.name}
-                                        </span>
-                                      </div>
-                                      <span className="text-neutral-500 text-[9px] shrink-0 font-mono group-hover/ep:text-neutral-300">
+                                      <span className="text-neutral-500 font-bold shrink-0 font-mono">
+                                        {String(ep.episodeNumber).padStart(2, "0")}.
+                                      </span>
+                                      <span className="text-neutral-400 truncate font-sans text-[11px] flex-1">
+                                        {ep.name}
+                                      </span>
+                                      <span className="text-neutral-600 text-[9px] shrink-0 font-mono">
                                         {ep.runtime}m
                                       </span>
-                                    </button>
+                                    </div>
                                   );
-                                }
-                                return (
-                                  <div
-                                    key={ep.episodeNumber}
-                                    title="Rent or buy this tape to watch"
-                                    className="flex items-center justify-between gap-1.5 rounded bg-neutral-900/40 py-1 px-2 border border-neutral-800/40 text-[11px] opacity-75 select-none"
-                                  >
-                                    <span className="text-neutral-500 font-bold shrink-0 font-mono">
-                                      {String(ep.episodeNumber).padStart(2, "0")}.
-                                    </span>
-                                    <span className="text-neutral-400 truncate font-sans text-[11px] flex-1">
-                                      {ep.name}
-                                    </span>
-                                    <span className="text-neutral-600 text-[9px] shrink-0 font-mono">
-                                      {ep.runtime}m
-                                    </span>
-                                  </div>
-                                );
-                              })}
+                                })}
+                              </div>
+                            </div>
+
+                            <div className="shrink-0 pt-1.5 border-t border-neutral-800/80 text-[10.5px] font-mono text-neutral-400 leading-snug space-y-0.5">
+                              <p className="flex items-center gap-1 truncate">
+                                <span className="text-neutral-500 uppercase font-semibold text-[9.5px]">Created By: </span>
+                                <span className="text-neutral-300 truncate">
+                                  {activeSeasonData?.credits?.creators?.join(", ") || "Production Team"}
+                                </span>
+                              </p>
+                              <p className="leading-relaxed line-clamp-2">
+                                <span className="text-neutral-500 uppercase font-semibold text-[9.5px]">Featuring: </span>
+                                <span className="text-neutral-300">
+                                  {activeSeasonData?.credits?.mainCast?.join(", ") || "Cast"}
+                                </span>
+                              </p>
                             </div>
                           </div>
-
-                          <div className="shrink-0 pt-1.5 border-t border-neutral-800/80 text-[10.5px] font-mono text-neutral-400 leading-snug space-y-0.5">
-                            <p className="flex items-center gap-1 truncate">
-                              <span className="text-neutral-500 uppercase font-semibold text-[9.5px]">Created By: </span>
-                              <span className="text-neutral-300 truncate">
-                                {activeSeasonData?.credits?.creators?.join(", ") || "Production Team"}
-                              </span>
-                            </p>
-                            <p className="leading-relaxed line-clamp-2">
-                              <span className="text-neutral-500 uppercase font-semibold text-[9.5px]">Featuring: </span>
-                              <span className="text-neutral-300">
-                                {activeSeasonData?.credits?.mainCast?.join(", ") || "Cast"}
-                              </span>
-                            </p>
-                          </div>
-                        </div>
+                        )}
 
                         {/* Fixed Pinned Barcode at Bottom */}
                         <div className="absolute bottom-0 inset-x-0 p-2 sm:p-2.5 bg-neutral-950 border-t border-neutral-900 z-20">

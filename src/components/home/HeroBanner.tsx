@@ -172,7 +172,7 @@ export function HeroBanner({
         {/* Title + Watch Now */}
         <div className="max-w-xl sm:max-w-2xl w-full">
           {featured ? (
-            <div key={featured.tmdbId} className="animate-in fade-in duration-200">
+            <div className="transition-opacity duration-300 ease-in-out">
               <p className="mb-0.5 sm:mb-1 text-[10px] sm:text-xs font-semibold uppercase tracking-widest text-amber-400">
                 Trending Now
               </p>

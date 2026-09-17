@@ -598,23 +598,30 @@ export async function GET(request: NextRequest) {
     const combinedSchedule = [...schedule, ...calendarItems];
     const liveNow = combinedSchedule.find((item) => item.isLiveNow) ?? null;
 
-    return NextResponse.json({
-      schedule: combinedSchedule,
-      missed: missed.map((m) => ({
-        ...m,
-        mediaType: m.mediaType as MediaType,
-        runtimeMinutes: m.runtimeMinutes,
-        blockCount: m.blockCount,
-        createdAt: m.createdAt.toISOString(),
-      })),
-      seasonAlerts: seasonAlerts.map((a) => ({
-        ...a,
-        createdAt: a.createdAt.toISOString(),
-      })),
-      channelName: channelSettings.channelName,
-      subscribedChannels,
-      liveNow,
-    });
+    return NextResponse.json(
+      {
+        schedule: combinedSchedule,
+        missed: missed.map((m) => ({
+          ...m,
+          mediaType: m.mediaType as MediaType,
+          runtimeMinutes: m.runtimeMinutes,
+          blockCount: m.blockCount,
+          createdAt: m.createdAt.toISOString(),
+        })),
+        seasonAlerts: seasonAlerts.map((a) => ({
+          ...a,
+          createdAt: a.createdAt.toISOString(),
+        })),
+        channelName: channelSettings.channelName,
+        subscribedChannels,
+        liveNow,
+      },
+      {
+        headers: {
+          "Cache-Control": "private, no-store, must-revalidate",
+        },
+      }
+    );
   } catch (error) {
     console.error("[api/broadcast/personal] GET error:", error);
     return NextResponse.json({ error: "Failed to fetch personal schedule." }, { status: 500 });

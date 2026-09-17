@@ -295,7 +295,7 @@ export function TvGrid({
       <div
         ref={gridScrollRef}
         onScroll={checkLiveDistance}
-        className="no-scrollbar relative h-auto overflow-x-auto border-b border-neutral-900 bg-neutral-950/40 pb-20 md:pb-0 overscroll-x-contain"
+        className="no-scrollbar relative h-auto overflow-x-auto border-b border-neutral-900 bg-neutral-950/40 pb-20 md:pb-0 overscroll-x-contain snap-x snap-proximity md:snap-none"
         style={{ WebkitOverflowScrolling: "touch" }}
       >
         <div className="relative min-w-max">
@@ -323,7 +323,7 @@ export function TvGrid({
                 return (
                   <div
                     key={blockStart}
-                    className={`flex shrink-0 items-center justify-center border-r border-neutral-900 bg-black text-[9px] md:text-[11px] uppercase tracking-wide transition-colors px-0.5 truncate ${isCurrent
+                    className={`flex shrink-0 snap-start items-center justify-center border-r border-neutral-900 bg-black text-[9px] md:text-[11px] uppercase tracking-wide transition-colors px-0.5 truncate ${isCurrent
                         ? "bg-neutral-800 text-white font-bold"
                         : "text-neutral-500 hover:text-neutral-300"
                       }`}

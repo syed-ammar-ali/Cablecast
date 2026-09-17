@@ -8,6 +8,7 @@ import type { EpisodeSelection } from "@/components/media/MediaDetailsModal";
 import type { DirectBroadcast } from "@/components/player/PlayerModal";
 import { TvGrid } from "@/components/schedule/TvGrid";
 import { BottomNav } from "@/components/navigation/BottomNav";
+import { PullToRefresh } from "@/components/ui/PullToRefresh";
 import { useBroadcastSchedule } from "@/lib/useBroadcastSchedule";
 import { useBroadcastResolver } from "@/lib/useBroadcastResolver";
 import { formatLocalDate, isBroadcastLiveNow } from "@/lib/broadcastLive";
@@ -374,6 +375,13 @@ function CablecastAppContent({ initialView = "home" }: CablecastAppProps) {
   // Hide the main AppHeader whenever the player is fullscreen — it has its own header bar.
   const isPlayerOpen = Boolean(playerTarget) || Boolean(directBroadcastTarget);
 
+  const handlePullRefresh = useCallback(async () => {
+    await Promise.allSettled([
+      personalBroadcast.refresh(),
+      library.refreshCollection(),
+    ]);
+  }, [personalBroadcast, library]);
+
   return (
     <main className="min-h-screen bg-black pb-0">
       {/* Top Header — hidden when the fullscreen player is open to prevent double-header stacking */}
@@ -412,45 +420,47 @@ function CablecastAppContent({ initialView = "home" }: CablecastAppProps) {
           />
         </div>
       ) : (
-        <div key="home-view" className="animate-[fadeIn_150ms_cubic-bezier(0.16,1,0.3,1)] [will-change:auto]">
-          <div className="sticky top-[calc(3.5rem+env(safe-area-inset-top,0px))] sm:top-[calc(4rem+env(safe-area-inset-top,0px))] md:top-0 z-10 px-3 pt-2 sm:px-4 sm:pt-3">
-            <HeroBanner
-              liveNow={liveNow}
-              onSelectLive={(item) => resolver.resolveBroadcast(item, now)}
-              isLiveResolving={liveNow != null && resolver.resolvingId === liveNow.id}
-              onRent={handleHeroRent}
-              onBuy={handleHeroBuy}
-              isOwned={(tmdbId) => (library.owned ?? []).some((item) => item.tmdbId === tmdbId)}
-              isRented={(tmdbId) => (library.rented ?? []).some((item) => item.tmdbId === tmdbId)}
-              enabled={isScheduleEnabled}
-            />
-          </div>
-
-          <div className="relative z-20 h-auto">
-            <div id="broadcast-schedule-grid" className="scroll-mt-14 sm:scroll-mt-16 md:scroll-mt-0 bg-black px-0 md:px-4 pb-0 pt-2 h-auto shadow-[0_-8px_20px_rgba(0,0,0,0.9)]">
-              <TvGrid
-                schedule={schedule}
-                isLoading={isGuideLoading}
-                error={guideError}
-                selectedDate={selectedDate}
-                onDateChange={setSelectedDate}
-                now={now}
-                resolver={resolver}
-                personalSchedule={personalBroadcast.schedule}
-                subscribedChannels={personalBroadcast.subscribedChannels}
-                channelName={personalBroadcast.channelName}
-                onPlayPersonalBroadcast={({ media, season, episode, startOffsetSeconds }) =>
-                  setPlayerTarget({
-                    media,
-                    initialSeason: season,
-                    initialEpisode: episode,
-                    startOffsetSeconds,
-                  })
-                }
+        <PullToRefresh onRefresh={handlePullRefresh}>
+          <div key="home-view" className="animate-[fadeIn_150ms_cubic-bezier(0.16,1,0.3,1)] [will-change:auto]">
+            <div className="sticky top-[calc(3.5rem+env(safe-area-inset-top,0px))] sm:top-[calc(4rem+env(safe-area-inset-top,0px))] md:top-0 z-10 px-3 pt-2 sm:px-4 sm:pt-3">
+              <HeroBanner
+                liveNow={liveNow}
+                onSelectLive={(item) => resolver.resolveBroadcast(item, now)}
+                isLiveResolving={liveNow != null && resolver.resolvingId === liveNow.id}
+                onRent={handleHeroRent}
+                onBuy={handleHeroBuy}
+                isOwned={(tmdbId) => (library.owned ?? []).some((item) => item.tmdbId === tmdbId)}
+                isRented={(tmdbId) => (library.rented ?? []).some((item) => item.tmdbId === tmdbId)}
+                enabled={isScheduleEnabled}
               />
             </div>
+
+            <div className="relative z-20 h-auto">
+              <div id="broadcast-schedule-grid" className="scroll-mt-14 sm:scroll-mt-16 md:scroll-mt-0 bg-black px-0 md:px-4 pb-0 pt-2 h-auto shadow-[0_-8px_20px_rgba(0,0,0,0.9)]">
+                <TvGrid
+                  schedule={schedule}
+                  isLoading={isGuideLoading}
+                  error={guideError}
+                  selectedDate={selectedDate}
+                  onDateChange={setSelectedDate}
+                  now={now}
+                  resolver={resolver}
+                  personalSchedule={personalBroadcast.schedule}
+                  subscribedChannels={personalBroadcast.subscribedChannels}
+                  channelName={personalBroadcast.channelName}
+                  onPlayPersonalBroadcast={({ media, season, episode, startOffsetSeconds }) =>
+                    setPlayerTarget({
+                      media,
+                      initialSeason: season,
+                      initialEpisode: episode,
+                      startOffsetSeconds,
+                    })
+                  }
+                />
+              </div>
+            </div>
           </div>
-        </div>
+        </PullToRefresh>
       )}
 
       {/* Media Details Modal */}
