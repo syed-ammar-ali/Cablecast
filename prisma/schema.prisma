@@ -435,3 +435,24 @@ model SubscribedChannel {
   @@index([subscriberSessionId])
 }
 
+/// Stores a user's phone number and preferences for Twilio-powered reminders.
+/// Voice call fires 10 min before a scheduled show starts (hardest to miss).
+/// SMS fires when a broadcast is missed or a rental is about to expire.
+model UserPhoneSettings {
+  id          String    @id @default(cuid())
+  /// Canonical user id (accessCodeId, "admin", or sessionId)
+  userId      String    @unique
+  /// E.164 format, e.g. "+12015551234"
+  phoneNumber String
+  /// Send a voice call 10 min before a scheduled show starts
+  callEnabled Boolean   @default(true)
+  /// Send an SMS when a broadcast is missed or rental is expiring
+  smsEnabled  Boolean   @default(true)
+  /// Set after the user verifies they own this number via OTP
+  verifiedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([userId])
+}
+

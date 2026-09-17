@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { sendPushNotification } from "./webpush";
 import type { PushNotificationPayload } from "./webpush";
+import { sendSms, makeCall, isTwilioConfigured } from "./twilio";
 
 export interface DispatchSummary {
   startingSoon: number;
@@ -117,6 +118,29 @@ async function getCanonicalUserMap(sessionIds: string[]): Promise<Map<string, st
   return map;
 }
 
+
+/**
+ * Bulk-fetches phone settings for a list of canonical user IDs.
+ * Returns a Map keyed by userId → { phoneNumber, callEnabled, smsEnabled, verifiedAt }
+ */
+async function getPhoneSettingsMap(
+  userIds: string[],
+): Promise<Map<string, { phoneNumber: string; callEnabled: boolean; smsEnabled: boolean; verifiedAt: Date | null }>> {
+  const map = new Map<string, { phoneNumber: string; callEnabled: boolean; smsEnabled: boolean; verifiedAt: Date | null }>();
+  if (!isTwilioConfigured() || userIds.length === 0) return map;
+  try {
+    const rows = await prisma.userPhoneSettings.findMany({
+      where: { userId: { in: userIds } },
+      select: { userId: true, phoneNumber: true, callEnabled: true, smsEnabled: true, verifiedAt: true },
+    });
+    for (const row of rows) {
+      if (row.phoneNumber) map.set(row.userId, row);
+    }
+  } catch {
+    // Non-fatal — Twilio delivery is best-effort
+  }
+  return map;
+}
 
 /**
  * Calculates whether an appointment slot (recurring at slot.dayOfWeek and slot.blockStartMinutes)
@@ -246,6 +270,12 @@ export async function dispatchStartingSoonAlerts(now: Date = new Date()): Promis
     return { count: 0, failed: 0, cleaned: 0 };
   }
 
+  // Pre-fetch phone settings for all candidate users (for voice call delivery)
+  const candidateCanonicalIds = Array.from(
+    new Set(candidateSlots.map((c) => getCanonicalId(c.slot.sessionId))),
+  );
+  const phoneSettingsMap = await getPhoneSettingsMap(candidateCanonicalIds);
+
   // Pre-fetch all deduplication logs, rentals, and owned items for candidate slots in bulk
   const refIds = candidateSlots.map((c) => c.referenceId);
   const userIds = Array.from(new Set(candidateSlots.flatMap((c) => [c.slot.sessionId, getCanonicalId(c.slot.sessionId)])));
@@ -341,8 +371,34 @@ export async function dispatchStartingSoonAlerts(now: Date = new Date()): Promis
     failed += res.failed;
     cleaned += res.cleaned;
 
-    // 4. Record idempotency log only if push was actually sent
-    if (res.sent > 0) {
+    // 4. Voice call and/or SMS via Twilio (reliable phone reminder — fires regardless of web-push)
+    const phoneSettings = phoneSettingsMap.get(canonUserId);
+    if (phoneSettings?.phoneNumber) {
+      const showLabel =
+        slot.mediaType === "tv" && slot.currentSeason && slot.currentEpisode
+          ? `${slot.title}, Season ${slot.currentSeason}, Episode ${slot.currentEpisode}`
+          : slot.title;
+
+      if (phoneSettings.callEnabled) {
+        const callMessage = `This is Cablecast. Your show, ${showLabel}, is starting in 10 minutes. Tune in now!`;
+        makeCall(phoneSettings.phoneNumber, callMessage).catch((e) =>
+          console.error("[Twilio] Starting-soon call failed:", e),
+        );
+      }
+
+      if (phoneSettings.smsEnabled) {
+        const smsMessage = `📺 Cablecast: "${showLabel}" is starting in 10 minutes. Tune in live!`;
+        sendSms(phoneSettings.phoneNumber, smsMessage).catch((e) =>
+          console.error("[Twilio] Starting-soon SMS failed:", e),
+        );
+      }
+    }
+
+    // 5. Record idempotency log — log if push sent OR Twilio alert was triggered
+    const twilioFired = Boolean(
+      phoneSettings?.phoneNumber && (phoneSettings.callEnabled || phoneSettings.smsEnabled),
+    );
+    if (res.sent > 0 || twilioFired) {
       try {
         await prisma.notificationLog.create({
           data: {
@@ -425,8 +481,29 @@ export async function dispatchMissedBroadcastAlerts(): Promise<{ count: number; 
     failed += res.failed;
     cleaned += res.cleaned;
 
-    // 3. Record log only if push was actually sent
-    if (res.sent > 0) {
+    // 3. SMS via Twilio for missed broadcast
+    let missedTwilioFired = false;
+    if (isTwilioConfigured()) {
+      try {
+        const phoneSetting = await prisma.userPhoneSettings.findUnique({
+          where: { userId: canonUserId },
+          select: { phoneNumber: true, smsEnabled: true },
+        });
+        if (phoneSetting?.smsEnabled && phoneSetting.phoneNumber) {
+          const epDetails = item.season && item.episode ? ` (S${item.season}E${item.episode})` : "";
+          sendSms(
+            phoneSetting.phoneNumber,
+            `📼 Cablecast: You missed "${item.title}"${epDetails}. Open the app to reschedule a rerun.`,
+          ).catch((e) => console.error("[Twilio] Missed-broadcast SMS failed:", e));
+          missedTwilioFired = true;
+        }
+      } catch {
+        // Non-fatal
+      }
+    }
+
+    // 4. Record log if push sent OR SMS triggered
+    if (res.sent > 0 || missedTwilioFired) {
       try {
         await prisma.notificationLog.create({
           data: {
@@ -532,8 +609,28 @@ export async function dispatchTapeExpiringAlerts(now: Date = new Date()): Promis
     failed += res.failed;
     cleaned += res.cleaned;
 
-    // 4. Record log only if push was actually sent
-    if (res.sent > 0) {
+    // 4. SMS via Twilio for expiring rental
+    let expiringTwilioFired = false;
+    if (isTwilioConfigured()) {
+      try {
+        const phoneSetting = await prisma.userPhoneSettings.findUnique({
+          where: { userId: canonUserId },
+          select: { phoneNumber: true, smsEnabled: true },
+        });
+        if (phoneSetting?.smsEnabled && phoneSetting.phoneNumber) {
+          sendSms(
+            phoneSetting.phoneNumber,
+            `⏳ Cablecast: Your rental of "${title}" expires in 2 hours. Open the app to watch or renew.`,
+          ).catch((e) => console.error("[Twilio] Rental-expiring SMS failed:", e));
+          expiringTwilioFired = true;
+        }
+      } catch {
+        // Non-fatal
+      }
+    }
+
+    // 5. Record log if push was sent OR SMS triggered
+    if (res.sent > 0 || expiringTwilioFired) {
       try {
         await prisma.notificationLog.create({
           data: {
