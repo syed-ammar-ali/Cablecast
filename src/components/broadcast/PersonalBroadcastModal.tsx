@@ -29,7 +29,6 @@ import { ChannelShareModal } from "@/components/social/ChannelShareHub";
 import { BroadcastSlotCard } from "./BroadcastSlotCard";
 import { BroadcastSchedulerModal } from "./BroadcastSchedulerModal";
 import { usePushNotifications } from "@/lib/usePushNotifications";
-import { PhoneReminderSettings } from "@/components/notifications/PhoneReminderSettings";
 import type {
   CalendarEntry,
   MissedBroadcastItem,
@@ -83,7 +82,7 @@ interface PersonalBroadcastModalProps {
   }) => void;
 }
 
-type TabKey = "grid" | "lineup" | "missed" | "calendar" | "reminders";
+type TabKey = "grid" | "lineup" | "missed" | "calendar";
 
 const HALF_DAY_SLOTS = [
   { hour12: 12, minute: 0, label: "12:00" },
@@ -665,21 +664,7 @@ export function PersonalBroadcastModal({
               )}
             </button>
 
-            <button
-              type="button"
-              onClick={() => setActiveTab("reminders")}
-              className={`flex flex-1 sm:flex-initial justify-center items-center gap-1.5 sm:gap-2 whitespace-nowrap rounded-lg px-2.5 sm:px-4 py-2 text-[11px] sm:text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
-                activeTab === "reminders"
-                  ? "bg-neutral-800 text-white shadow-md ring-1 ring-neutral-700"
-                  : "text-neutral-400 hover:text-neutral-200"
-              }`}
-              id="tab-reminders"
-              title="Set up call & text reminders for your scheduled shows"
-            >
-              <Bell className={`h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0 ${activeTab === "reminders" ? "text-amber-400" : "text-neutral-500"}`} />
-              <span className="hidden sm:inline">Reminders</span>
-              <span className="sm:hidden">Alerts</span>
-            </button>
+
           </div>
         </div>
 
@@ -1400,25 +1385,7 @@ export function PersonalBroadcastModal({
             </div>
           )}
 
-          {/* Tab 5: Reminders (Call & Text) */}
-          {activeTab === "reminders" && (
-            <div key="reminders" className="space-y-4 animate-in fade-in duration-150">
-              <div className="rounded-2xl border border-neutral-800 bg-neutral-900/30 p-4 sm:p-5 shadow-sm">
-                <div className="flex items-start gap-3 mb-4 pb-4 border-b border-neutral-800/80">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-amber-500/30 bg-amber-950/30 text-amber-400 shadow">
-                    <Bell className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-bold uppercase tracking-wider text-white">Phone Reminders</h3>
-                    <p className="text-xs text-neutral-400 mt-1">
-                      Get a <strong className="text-amber-300">voice call</strong> and/or an <strong className="text-green-300">SMS text</strong> 10 min before your scheduled show starts, plus alerts for missed shows and expiring tapes. Works reliably on any phone, even when your browser is closed.
-                    </p>
-                  </div>
-                </div>
-                <PhoneReminderSettings />
-              </div>
-            </div>
-          )}
+
         </div>
 
         {/* Reschedule Rerun Modal */}

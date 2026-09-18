@@ -355,7 +355,7 @@ export function NotificationsManager() {
         </div>
       </div>
 
-      {/* Card 3: Automated Cron Dispatcher & Triggers */}
+      {/* Card 3: Automated Notification Sweep Dispatcher */}
       <div className="rounded-2xl border border-neutral-800 bg-neutral-900/50 p-5 sm:p-6 backdrop-blur">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
           <div className="flex items-center gap-3">
@@ -364,10 +364,10 @@ export function NotificationsManager() {
             </div>
             <div>
               <h3 className="text-sm sm:text-base font-bold uppercase tracking-wider text-white">
-                Scheduled Cron Dispatcher
+                Notification Sweep Dispatcher
               </h3>
               <p className="text-xs text-neutral-400">
-                The cron checks for: 1) Starting Soon (10 min lookahead), 2) Missed broadcasts, and
+                Sweeps and delivers pending alerts for: 1) Starting Soon, 2) Missed broadcasts, and
                 3) VHS rentals expiring within 2 hours.
               </p>
             </div>
@@ -384,7 +384,7 @@ export function NotificationsManager() {
             ) : (
               <Play className="h-4 w-4 fill-purple-400" />
             )}
-            <span>{isRunningCron ? "Executing Cron..." : "Run Cron Dispatcher Now"}</span>
+            <span>{isRunningCron ? "Executing Sweep..." : "Run Notification Sweep Now"}</span>
           </button>
         </div>
 

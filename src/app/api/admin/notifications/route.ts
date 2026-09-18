@@ -140,13 +140,13 @@ export async function POST(request: Request) {
 
     const body = (await request.json().catch(() => ({}))) as { action?: string };
 
-    if (body.action === "run_cron") {
+    if (body.action === "run_cron" || body.action === "trigger_sweep") {
       const summary = await runAllNotificationDispatchers(new Date());
       return NextResponse.json({
         success: true,
-        action: "run_cron",
+        action: "trigger_sweep",
         summary,
-        message: `Cron job executed successfully. Starting soon: ${summary.startingSoon}, Missed: ${summary.missedBroadcast}, Expiring tapes: ${summary.tapeExpiring}`,
+        message: `Notification sweep dispatched successfully. Starting soon: ${summary.startingSoon}, Missed: ${summary.missedBroadcast}, Expiring tapes: ${summary.tapeExpiring}`,
       });
     }
 

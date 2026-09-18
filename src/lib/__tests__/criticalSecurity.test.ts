@@ -67,73 +67,68 @@ describe("Batch 1: Critical Security Fixes", () => {
     });
   });
 
-  describe("Fix 2 & Fix 3: cron/notifications/route.ts authentication", () => {
-    it("rejects unauthenticated GET requests with 401", async () => {
+  describe("Fix 2 & Fix 3: QStash dispatch-appointment webhook security", () => {
+    it("rejects unauthenticated requests in production with 401 when signature is missing", async () => {
       (process.env as Record<string, string | undefined>).NODE_ENV = "production";
-      const { GET } = await import("@/app/api/cron/notifications/route");
+      process.env.QSTASH_CURRENT_SIGNING_KEY = "sig_current";
+      process.env.QSTASH_NEXT_SIGNING_KEY = "sig_next";
+      const { POST } = await import("@/app/api/notifications/dispatch-appointment/route");
 
-      const req = new NextRequest("https://cablecast.tv/api/cron/notifications", {
-        method: "GET",
-      });
-
-      const res = await GET(req);
-      expect(res.status).toBe(401);
-      const json = await res.json();
-      expect(json.error).toBe("Unauthorized cron execution.");
-    });
-
-    it("rejects unauthenticated POST requests with 401", async () => {
-      (process.env as Record<string, string | undefined>).NODE_ENV = "production";
-      const { POST } = await import("@/app/api/cron/notifications/route");
-
-      const req = new NextRequest("https://cablecast.tv/api/cron/notifications", {
+      const req = new NextRequest("https://cablecast.tv/api/notifications/dispatch-appointment", {
         method: "POST",
+        body: JSON.stringify({ scheduleId: "slot-xyz" }),
       });
 
       const res = await POST(req);
       expect(res.status).toBe(401);
       const json = await res.json();
-      expect(json.error).toBe("Unauthorized cron execution.");
+      expect(json.error).toBe("Missing QStash signature");
     });
 
-    it("rejects old hardcoded secret query parameter 'cablecast-cron-secret-2026'", async () => {
+    it("rejects invalid signature with 401", async () => {
       (process.env as Record<string, string | undefined>).NODE_ENV = "production";
-      const { GET } = await import("@/app/api/cron/notifications/route");
+      process.env.QSTASH_CURRENT_SIGNING_KEY = "sig_current";
+      process.env.QSTASH_NEXT_SIGNING_KEY = "sig_next";
+      const { POST } = await import("@/app/api/notifications/dispatch-appointment/route");
 
-      const req = new NextRequest(
-        "https://cablecast.tv/api/cron/notifications?key=cablecast-cron-secret-2026",
-        { method: "GET" }
-      );
-
-      const res = await GET(req);
-      expect(res.status).toBe(401);
-    });
-
-    it("allows execution when provided matching CRON_SECRET header", async () => {
-      (process.env as Record<string, string | undefined>).NODE_ENV = "production";
-      process.env.CRON_SECRET = "super-secret-token-xyz";
-
-      vi.doMock("@/lib/notifications/notificationDispatcher", () => ({
-        runAllNotificationDispatchers: vi.fn().mockResolvedValue({
-          startingSoonDispatched: 0,
-          missedBroadcastDispatched: 0,
-          tapeExpiringDispatched: 0,
-        }),
-      }));
-
-      const { GET } = await import("@/app/api/cron/notifications/route");
-
-      const req = new NextRequest("https://cablecast.tv/api/cron/notifications", {
-        method: "GET",
-        headers: {
-          "x-cron-secret": "super-secret-token-xyz",
-        },
+      const req = new NextRequest("https://cablecast.tv/api/notifications/dispatch-appointment", {
+        method: "POST",
+        headers: { "upstash-signature": "invalid_sig" },
+        body: JSON.stringify({ scheduleId: "slot-xyz" }),
       });
 
-      const res = await GET(req);
-      expect(res.status).toBe(200);
+      const res = await POST(req);
+      expect(res.status).toBe(401);
       const json = await res.json();
-      expect(json.success).toBe(true);
+      expect(json.error).toBe("Invalid signature");
+    });
+
+    it("rejects malformed json payload with 400", async () => {
+      const { POST } = await import("@/app/api/notifications/dispatch-appointment/route");
+
+      const req = new NextRequest("https://cablecast.tv/api/notifications/dispatch-appointment", {
+        method: "POST",
+        body: "not-json",
+      });
+
+      const res = await POST(req);
+      expect(res.status).toBe(400);
+      const json = await res.json();
+      expect(json.error).toBe("Invalid JSON body");
+    });
+
+    it("requires scheduleId in request body", async () => {
+      const { POST } = await import("@/app/api/notifications/dispatch-appointment/route");
+
+      const req = new NextRequest("https://cablecast.tv/api/notifications/dispatch-appointment", {
+        method: "POST",
+        body: JSON.stringify({ type: "starting_soon" }),
+      });
+
+      const res = await POST(req);
+      expect(res.status).toBe(400);
+      const json = await res.json();
+      expect(json.error).toBe("scheduleId is required");
     });
   });
 

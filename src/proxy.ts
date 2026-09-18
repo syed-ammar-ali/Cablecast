@@ -14,7 +14,7 @@ import { isSessionActive } from "@/lib/auth/validity";
  */
 
 const PUBLIC_PAGE_PREFIXES = ["/gate", "/manifest.json", "/manifest.webmanifest", "/sw.js"];
-const PUBLIC_API_PREFIXES = ["/api/auth/", "/api/cron/"];
+const PUBLIC_API_PREFIXES = ["/api/auth/", "/api/notifications/dispatch-appointment"];
 const ADMIN_PAGE_PREFIXES = ["/admin"];
 const ADMIN_API_PREFIXES = ["/api/admin/"];
 
@@ -113,8 +113,14 @@ export async function proxy(request: NextRequest) {
       return NextResponse.json({ error: "Access denied." }, { status: 403 });
     }
 
-    // 2. Anti-CSRF Verification: Block cross-site forged state-changing mutations
-    if (pathname.startsWith("/api/") && request.method !== "GET" && request.method !== "HEAD") {
+    // 2. Anti-CSRF Verification: Block cross-site forged state-changing mutations from browsers
+    // (Bypass for QStash webhook, which is authenticated via cryptographic signature)
+    if (
+      pathname.startsWith("/api/") &&
+      pathname !== "/api/notifications/dispatch-appointment" &&
+      request.method !== "GET" &&
+      request.method !== "HEAD"
+    ) {
       const secFetchSite = request.headers.get("sec-fetch-site");
       if (secFetchSite === "cross-site") {
         return NextResponse.json({ error: "Cross-site request blocked." }, { status: 403 });
