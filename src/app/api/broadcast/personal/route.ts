@@ -880,6 +880,22 @@ export async function POST(request: NextRequest) {
           },
         });
         created.push(item);
+
+        // Automatically schedule exact-time delayed alert via QStash (10 mins before air)
+        try {
+          const { scheduleDelayedBroadcastAlert } = await import("@/lib/notifications/qstash");
+          const nextAir = getNextAirDate(
+            item.dayOfWeek,
+            item.blockStartMinutes,
+            now,
+            item.timezoneOffset ?? 0,
+          );
+          const alertTime = new Date(nextAir.getTime() - 10 * 60 * 1000);
+          void scheduleDelayedBroadcastAlert({ scheduleId: item.id, alertTime });
+        } catch (e) {
+          console.error("[QStash] Failed to schedule initial alert:", e);
+        }
+
         if (input.mediaType === "tv") {
           episodeOffsetCounter++;
         }

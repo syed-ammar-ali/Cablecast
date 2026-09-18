@@ -227,4 +227,30 @@ export function formatClockTime(date: Date = new Date()): string {
   return `${hours12}:${String(minutes).padStart(2, "0")} ${period}`;
 }
 
+/**
+ * Calculates the next UTC Date when a slot (defined by dayOfWeek 0-6 and blockStartMinutes)
+ * will air, properly taking timezone offset into account.
+ */
+export function getNextAirDate(
+  dayOfWeek: number,
+  blockStartMinutes: number,
+  now: Date = new Date(),
+  tzOffset: number = 0,
+): Date {
+  const localMs = now.getTime() - tzOffset * 60 * 1000;
+  const local = new Date(localMs);
+  const currentDay = local.getUTCDay();
+  const currentMinutes = local.getUTCHours() * 60 + local.getUTCMinutes();
+
+  let daysUntil = (dayOfWeek - currentDay + 7) % 7;
+  if (daysUntil === 0 && currentMinutes > blockStartMinutes) {
+    daysUntil = 7;
+  }
+
+  const targetLocalMs = localMs + daysUntil * 24 * 60 * 60 * 1000;
+  const targetLocal = new Date(targetLocalMs);
+  const [y, m, d] = targetLocal.toISOString().slice(0, 10).split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d, 0, blockStartMinutes, 0) + tzOffset * 60 * 1000);
+}
+
 export { formatSlotLabel };

@@ -786,3 +786,203 @@ export async function runAllNotificationDispatchers(now: Date = new Date()): Pro
     cleanedSubscriptions: startingSoon.cleaned + missed.cleaned + expiring.cleaned,
   };
 }
+
+/**
+ * Dispatches a "Starting Soon" alert for a specific slot ID (triggered by QStash or direct scheduler).
+ * Guaranteed idempotent, verifies rental status, and dispatches across Push, Telegram, and Twilio.
+ */
+export async function dispatchStartingSoonForSlot(
+  slotId: string,
+  now: Date = new Date(),
+): Promise<{ success: boolean; reason?: string }> {
+  const slot = await prisma.userPersonalSchedule.findUnique({
+    where: { id: slotId },
+  });
+
+  if (!slot) {
+    return { success: true, reason: "Slot no longer exists (removed or deleted)" };
+  }
+
+  // Determine canonical user ID
+  let canonUserId = slot.sessionId;
+  try {
+    const session = await prisma.session.findFirst({
+      where: { OR: [{ id: slot.sessionId }, { accessCodeId: slot.sessionId }] },
+      select: { id: true, accessCodeId: true, role: true },
+    });
+    if (session) {
+      canonUserId = session.role === "admin" ? "admin" : (session.accessCodeId || session.id);
+    }
+  } catch {
+    // fallback to slot.sessionId
+  }
+
+  const effectiveOffset = slot.timezoneOffset ?? 0;
+  const localTimeMs = now.getTime() - effectiveOffset * 60_000;
+  const localNow = new Date(localTimeMs);
+  const localIsoDate = localNow.toISOString().slice(0, 10);
+  const referenceId = `${slot.id}_${localIsoDate}`;
+
+  // Idempotency check: verify this slot hasn't already received an alert for this air date
+  const existingLog = await prisma.notificationLog.findFirst({
+    where: {
+      userId: { in: [slot.sessionId, canonUserId] },
+      referenceId,
+      type: "STARTING_SOON",
+    },
+  });
+
+  if (existingLog) {
+    return { success: true, reason: "Alert already sent for this date" };
+  }
+
+  // Verify rental possession
+  const seasonNum = slot.mediaType === "tv" && slot.currentSeason ? slot.currentSeason : 0;
+  try {
+    const rental = await prisma.rental.findFirst({
+      where: {
+        userId: { in: [slot.sessionId, canonUserId] },
+        mediaId: slot.tmdbId,
+        seasonNumber: seasonNum,
+      },
+      orderBy: { expiresAt: "desc" },
+    });
+    if (rental && now.getTime() > rental.expiresAt.getTime()) {
+      const owned = await prisma.libraryItem.findFirst({
+        where: {
+          userId: { in: [slot.sessionId, canonUserId] },
+          mediaId: slot.tmdbId,
+          seasonNumber: seasonNum,
+        },
+      });
+      if (!owned) {
+        return { success: true, reason: "Rental expired and not owned" };
+      }
+    }
+  } catch {
+    // Non-fatal
+  }
+
+  // 1. Web Push Notification
+  const { icon, image } = getNotificationImages(slot.posterPath);
+  const title = "📺 Showtime in 10 Minutes";
+  const body =
+    slot.mediaType === "tv" && slot.currentSeason && slot.currentEpisode
+      ? `"${slot.title}" · Season ${slot.currentSeason}, Ep ${slot.currentEpisode}\nScheduled broadcast is about to start. Tune in live!`
+      : `"${slot.title}"\nScheduled broadcast is about to start on your channel. Tune in live!`;
+
+  const payload: PushNotificationPayload = {
+    title,
+    body,
+    image,
+    icon,
+    badge: "/badge-96.png",
+    tag: `starting-soon-${slot.id}`,
+    renotify: true,
+    requireInteraction: true,
+    actions: [
+      { action: "tune-in", title: "▶ Tune In" },
+      { action: "dismiss", title: "Dismiss" },
+    ],
+    data: {
+      url: "/?view=home#schedule",
+      type: "STARTING_SOON",
+      scheduleId: slot.id,
+    },
+  };
+
+  const pushRes = await sendToUserSubscriptions(slot.sessionId, payload);
+
+  // 2. Twilio (SMS / Voice call if enabled)
+  const phoneSettingsMap = await getPhoneSettingsMap([canonUserId]);
+  const phoneSettings = phoneSettingsMap.get(canonUserId);
+  let twilioFired = false;
+
+  if (phoneSettings?.phoneNumber) {
+    const showLabel =
+      slot.mediaType === "tv" && slot.currentSeason && slot.currentEpisode
+        ? `${slot.title}, Season ${slot.currentSeason}, Episode ${slot.currentEpisode}`
+        : slot.title;
+
+    if (phoneSettings.callEnabled) {
+      void makeCall(
+        phoneSettings.phoneNumber,
+        `This is Cablecast. Your show, ${showLabel}, is starting in 10 minutes. Tune in now!`,
+      ).catch((e) => console.error("[Twilio] Starting-soon call failed:", e));
+      twilioFired = true;
+    }
+    if (phoneSettings.smsEnabled) {
+      void sendSms(
+        phoneSettings.phoneNumber,
+        `📺 Cablecast: "${showLabel}" is starting in 10 minutes. Tune in live!`,
+      ).catch((e) => console.error("[Twilio] Starting-soon SMS failed:", e));
+      twilioFired = true;
+    }
+  }
+
+  // 3. Telegram Instant Alert with rich poster card and inline keyboard buttons
+  let telegramFired = false;
+  const targetChatId = phoneSettings?.telegramChatId || getDefaultTelegramChatId();
+  const isTelegramActive = phoneSettings ? phoneSettings.telegramEnabled : true;
+
+  if (isTelegramConfigured() && targetChatId && isTelegramActive) {
+    const showLabel =
+      slot.mediaType === "tv" && slot.currentSeason && slot.currentEpisode
+        ? `<b>${escapeHtml(slot.title)}</b> (Season ${slot.currentSeason}, Ep ${slot.currentEpisode})`
+        : `<b>${escapeHtml(slot.title)}</b>`;
+
+    const telegramCaption = `📺 <b>Showtime in 10 Minutes!</b>\n\n${showLabel}\nScheduled broadcast is about to start. Tune in live!`;
+
+    const posterUrl = slot.posterPath
+      ? slot.posterPath.startsWith("http")
+        ? slot.posterPath
+        : `https://image.tmdb.org/t/p/w780${slot.posterPath.startsWith("/") ? "" : "/"}${slot.posterPath}`
+      : null;
+
+    const buttons = [
+      [{ text: "▶️ Tune In Live", url: "https://cablecast.tv/?view=home#schedule" }],
+      [{ text: "🗓 Full TV Guide", url: "https://cablecast.tv/broadcast" }],
+    ];
+
+    if (posterUrl) {
+      void sendTelegramPhoto(targetChatId, posterUrl, telegramCaption, { buttons }).catch(
+        (e) => console.error("[Telegram] Starting-soon alert failed:", e),
+      );
+    } else {
+      void sendTelegramMessage(targetChatId, telegramCaption, { buttons }).catch((e) =>
+        console.error("[Telegram] Starting-soon alert failed:", e),
+      );
+    }
+    telegramFired = true;
+  }
+
+  // 4. Record NotificationLog
+  if (pushRes.sent > 0 || twilioFired || telegramFired) {
+    try {
+      await prisma.notificationLog.create({
+        data: {
+          userId: canonUserId,
+          type: "STARTING_SOON",
+          referenceId,
+          sentAt: new Date(),
+        },
+      });
+    } catch {
+      // Non-fatal duplicate
+    }
+  }
+
+  // 5. If recurring show (not rerun), schedule next week's occurrence automatically
+  if (!slot.isRerun) {
+    try {
+      const { scheduleDelayedBroadcastAlert } = await import("./qstash");
+      const nextWeekAlertTime = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+      void scheduleDelayedBroadcastAlert({ scheduleId: slot.id, alertTime: nextWeekAlertTime });
+    } catch (e) {
+      console.error("[QStash] Failed to schedule next week alert:", e);
+    }
+  }
+
+  return { success: true };
+}
+

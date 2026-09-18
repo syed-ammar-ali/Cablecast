@@ -97,6 +97,22 @@ export async function POST(request: NextRequest) {
         },
       });
 
+      // Automatically schedule exact-time delayed alert for rescheduled slot via QStash
+      try {
+        const { scheduleDelayedBroadcastAlert } = await import("@/lib/notifications/qstash");
+        const { getNextAirDate } = await import("@/lib/schedule");
+        const nextAir = getNextAirDate(
+          updated.dayOfWeek,
+          updated.blockStartMinutes,
+          new Date(),
+          updated.timezoneOffset ?? -330,
+        );
+        const alertTime = new Date(nextAir.getTime() - 10 * 60 * 1000);
+        void scheduleDelayedBroadcastAlert({ scheduleId: updated.id, alertTime });
+      } catch (e) {
+        console.error("[QStash] Failed to schedule rescheduled alert:", e);
+      }
+
       return NextResponse.json({ success: true, action: "rescheduled", item: updated });
     }
 
@@ -268,6 +284,20 @@ export async function POST(request: NextRequest) {
         where: { id: missedItem.id },
         data: { isResolved: true },
       });
+
+      // Automatically schedule exact-time delayed alert for rerun via QStash
+      try {
+        const targetSlotId = originalSchedule?.id || missedItem.scheduleId;
+        if (targetSlotId) {
+          const { scheduleDelayedBroadcastAlert } = await import("@/lib/notifications/qstash");
+          const { getNextAirDate } = await import("@/lib/schedule");
+          const nextAir = getNextAirDate(day, startMin, new Date(), -330);
+          const alertTime = new Date(nextAir.getTime() - 10 * 60 * 1000);
+          void scheduleDelayedBroadcastAlert({ scheduleId: targetSlotId, alertTime });
+        }
+      } catch (e) {
+        console.error("[QStash] Failed to schedule rerun alert:", e);
+      }
 
       return NextResponse.json({ success: true, action: "rescheduled", mode });
     }
