@@ -146,6 +146,48 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(result);
   }
 
+  // 2. Simulate 10:00 AM Broadcast Alert
+  if (action === "simulate-10am") {
+    if (!isTelegramConfigured()) {
+      return NextResponse.json(
+        { error: "Telegram bot is not configured on this server." },
+        { status: 503 },
+      );
+    }
+
+    const chatId = settings?.telegramChatId || getDefaultTelegramChatId();
+    if (!chatId) {
+      return NextResponse.json({ error: "No Telegram Chat ID found." }, { status: 400 });
+    }
+
+    const posterUrl = "https://image.tmdb.org/t/p/w780/7RyHsO4yDXtBv1zUU3mTpHeQ0d5.jpg";
+    const caption =
+      `📺 <b>CABLECAST · APPOINTMENT BROADCAST</b>\n` +
+      `━━━━━━━━━━━━━━━━━━━━\n` +
+      `🔴 <b>AIRING IN 10 MINUTES · 10:00 AM</b>\n` +
+      `📡 <b>Channel 04</b> · <i>Retro Mystery & Sci-Fi Lineup</i>\n\n` +
+      `🎬 <b>The X-Files</b> (1993)\n` +
+      `📼 <b>Season 1, Ep. 1 · "Pilot"</b>\n` +
+      `⭐ <b>8.7 / 10</b>  ·  ⏱ <b>48 mins</b>  ·  🏷 <i>Sci-Fi, Cult Classic</i>\n\n` +
+      `<blockquote>"Agent Dana Scully is assigned to debunk the FBI's anomalous unclassified cold cases alongside eccentric investigator Fox Mulder."</blockquote>\n` +
+      `━━━━━━━━━━━━━━━━━━━━\n` +
+      `📼 <b>VHS Status:</b> Hi-Fi Stereo · 4:3 CRT Master\n` +
+      `🔔 <i>Scheduled on your personal appointment matrix.</i>`;
+
+    const { sendTelegramPhoto } = await import("@/lib/notifications/telegram");
+    const result = await sendTelegramPhoto(chatId, posterUrl, caption, {
+      buttons: [
+        [{ text: "▶️ Tune In Live (Channel 04)", url: "https://cablecast.tv/?view=home#schedule" }],
+        [
+          { text: "📼 View VHS Sleeve", url: "https://cablecast.tv/library" },
+          { text: "🗓 Full TV Guide", url: "https://cablecast.tv/broadcast" },
+        ],
+      ],
+    });
+
+    return NextResponse.json(result);
+  }
+
   // 2. Twilio actions require Twilio to be configured
   if (!isTwilioConfigured()) {
     return NextResponse.json({ error: "Twilio is not configured on this server." }, { status: 503 });

@@ -57,7 +57,7 @@ export function PhoneReminderSettings() {
   const [telegramChatId, setTelegramChatId] = useState("");
   const [telegramEnabled, setTelegramEnabled] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [testing, setTesting] = useState<"call" | "sms" | "telegram" | null>(null);
+  const [testing, setTesting] = useState<"call" | "sms" | "telegram" | "simulate" | null>(null);
   const [saveMsg, setSaveMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
   const [testMsg, setTestMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
 
@@ -113,8 +113,16 @@ export function PhoneReminderSettings() {
     }
   }
 
-  async function sendTest(action: "test-call" | "test-sms" | "test-telegram") {
-    setTesting(action === "test-call" ? "call" : action === "test-sms" ? "sms" : "telegram");
+  async function sendTest(action: "test-call" | "test-sms" | "test-telegram" | "simulate-10am") {
+    setTesting(
+      action === "test-call"
+        ? "call"
+        : action === "test-sms"
+        ? "sms"
+        : action === "simulate-10am"
+        ? "simulate"
+        : "telegram",
+    );
     setTestMsg(null);
     try {
       const res = await fetch(`/api/user/phone-settings?action=${action}`, { method: "POST" });
@@ -125,7 +133,9 @@ export function PhoneReminderSettings() {
         setTestMsg({
           type: "ok",
           text:
-            action === "test-telegram"
+            action === "simulate-10am"
+              ? "⚡ 10:00 AM Broadcast card delivered to Telegram! Check your phone."
+              : action === "test-telegram"
               ? "✈️ Telegram message delivered! Check your Telegram app."
               : action === "test-call"
               ? "📞 Incoming call on its way! Pick up in a few seconds."
@@ -211,24 +221,41 @@ export function PhoneReminderSettings() {
               className="flex-1 rounded-xl border border-neutral-700 bg-neutral-900 px-3 py-2 text-xs font-mono text-white placeholder-neutral-600 outline-none transition-colors focus:border-sky-500/60 focus:ring-1 focus:ring-sky-500/30"
             />
             {hasTelegram && apiState.telegramReady && (
-              <button
-                type="button"
-                id="prs-test-telegram-btn"
-                disabled={!!testing || !telegramEnabled}
-                onClick={() => sendTest("test-telegram")}
-                className="flex items-center gap-1.5 rounded-xl border border-sky-500/40 bg-sky-950/40 px-3.5 py-2 text-xs font-semibold text-sky-300 transition-all hover:bg-sky-900/40 hover:text-white disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
-              >
-                {testing === "telegram" ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <Send className="h-3.5 w-3.5" />
-                )}
-                {testing === "telegram" ? "Sending…" : "Test Ping"}
-              </button>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  id="prs-test-telegram-btn"
+                  disabled={!!testing || !telegramEnabled}
+                  onClick={() => sendTest("test-telegram")}
+                  className="flex items-center gap-1.5 rounded-xl border border-sky-500/40 bg-sky-950/40 px-3.5 py-2 text-xs font-semibold text-sky-300 transition-all hover:bg-sky-900/40 hover:text-white disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+                >
+                  {testing === "telegram" ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Send className="h-3.5 w-3.5" />
+                  )}
+                  {testing === "telegram" ? "Sending…" : "Test Ping"}
+                </button>
+                <button
+                  type="button"
+                  id="prs-simulate-10am-btn"
+                  disabled={!!testing || !telegramEnabled}
+                  onClick={() => sendTest("simulate-10am")}
+                  className="flex items-center gap-1.5 rounded-xl border border-amber-500/50 bg-gradient-to-r from-amber-500/20 to-amber-600/20 px-3.5 py-2 text-xs font-bold text-amber-200 transition-all hover:border-amber-400 hover:from-amber-500/30 hover:to-amber-600/30 hover:text-white disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer shadow-sm"
+                  title="Simulate a real 10:00 AM broadcast alert sent directly to your Telegram phone"
+                >
+                  {testing === "simulate" ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-3.5 w-3.5 text-amber-400" />
+                  )}
+                  {testing === "simulate" ? "Simulating…" : "⚡ Simulate 10:00 AM Alert"}
+                </button>
+              </div>
             )}
           </div>
           <p className="text-[10.5px] text-neutral-400">
-            Connected to your bot <span className="font-mono text-sky-300">@CableCast_69bot</span>.
+            Connected to your bot <span className="font-mono text-sky-300">@CableCast_69bot</span>. Click <span className="text-amber-300 font-semibold">&quot;Simulate 10:00 AM Alert&quot;</span> to see how an upcoming show notification arrives on your phone with cover art &amp; live buttons!
           </p>
         </div>
       </div>
