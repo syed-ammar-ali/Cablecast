@@ -153,20 +153,6 @@ function getMetaRouterEmbed(params: StreamResolverParams): ResolvedStream {
       ? `https://anyembed.xyz/embed/tmdb-movie-${tmdbId}?autoplay=1`
       : `https://anyembed.xyz/embed/tmdb-tv-${tmdbId}-${season}-${episode}?autoplay=1`;
 
-  // Secondary Meta-Router: ZXCStream Turbopack (~380ms)
-  const zxcUrl =
-    type === "movie"
-      ? `https://player.zxcstream.xyz/embed/movie/${tmdbId}?autoplay=1`
-      : `https://player.zxcstream.xyz/embed/tv/${tmdbId}/${season}/${episode}?autoplay=1`;
-
-  // Tertiary Meta-Router: VidLink Pro
-  const vidLinkUrl =
-    type === "movie"
-      ? `https://vidlink.pro/movie/${tmdbId}?primaryColor=6366f1&autoplay=true`
-      : `https://vidlink.pro/tv/${tmdbId}/${season}/${episode}?primaryColor=6366f1&autoplay=true`;
-
-  // NOTE: anyEmbedUrl is always defined; zxcUrl/vidLinkUrl are reserved for
-  // future sequential fallback validation. Currently only primary is returned.
   return {
     url: anyEmbedUrl,
     type: "embed",

@@ -17,14 +17,10 @@ import {
 import {
   buildPlayerSource,
   inferRegionFromCountry,
-  isDynamicProvider,
   listProviders,
-  PROVIDER_COUNT,
 } from "@/lib/providers";
-import { triggerHaptic } from "@/lib/haptics";
 import { REGION_OPTIONS, type StreamRegion } from "@/config/providers";
 import { CHANNELS } from "@/config/channels";
-import { BLOCK_MINUTES } from "@/lib/runtime";
 import {
   getAppointmentEndDate,
   getAppointmentStartDate,

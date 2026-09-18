@@ -242,7 +242,6 @@ export function VhsModal({
   const [metadata, setMetadata] = useState<VhsMetadata | null>(null);
   const [hasInitialMetadataLoaded, setHasInitialMetadataLoaded] = useState(false);
   const [isLoadingMetadata, setIsLoadingMetadata] = useState(true);
-  const [loadedImages, setLoadedImages] = useState<Record<string, boolean>>({});
   const [seasonCache, setSeasonCache] = useState<Record<number, VhsMetadata>>({});
   const seasonCacheRef = useRef<Record<number, VhsMetadata>>({});
   useEffect(() => {
@@ -308,13 +307,6 @@ export function VhsModal({
         if (posterUrl) {
           const img = new Image();
           img.src = posterUrl;
-          if (img.complete) {
-            setLoadedImages((prev) => ({ ...prev, [posterUrl]: true }));
-          } else {
-            img.onload = () => {
-              setLoadedImages((prev) => ({ ...prev, [posterUrl]: true }));
-            };
-          }
         }
       });
     }
@@ -326,13 +318,6 @@ export function VhsModal({
     if (posterUrl) {
       const img = new Image();
       img.src = posterUrl;
-      if (img.complete) {
-        setLoadedImages((prev) => ({ ...prev, [posterUrl]: true }));
-      } else {
-        img.onload = () => {
-          setLoadedImages((prev) => ({ ...prev, [posterUrl]: true }));
-        };
-      }
     }
   }, [initialPosterUrl]);
 
@@ -961,9 +946,6 @@ export function VhsModal({
                     <img
                       src={singlePosterSrc}
                       alt={displayTitle}
-                      onLoad={() =>
-                        setLoadedImages((prev) => ({ ...prev, [singlePosterSrc]: true }))
-                      }
                       className="w-full h-full object-cover object-center"
                       loading="eager"
                     />
@@ -1258,12 +1240,6 @@ export function VhsModal({
                             <img
                               src={seasonPoster}
                               alt={displayTitle}
-                              onLoad={() =>
-                                setLoadedImages((prev) => ({
-                                  ...prev,
-                                  [seasonPoster]: true,
-                                }))
-                              }
                               className="w-full h-full object-cover object-center"
                               loading="eager"
                             />
@@ -1552,12 +1528,6 @@ export function VhsModal({
                       <img
                         src={seasonPoster}
                         alt={`Season ${seasonNum}`}
-                        onLoad={() =>
-                          setLoadedImages((prev) => ({
-                            ...prev,
-                            [seasonPoster]: true,
-                          }))
-                        }
                         className="w-full h-full object-cover object-center opacity-40 group-hover:opacity-75 transition-opacity duration-300 pointer-events-none"
                         loading="eager"
                       />

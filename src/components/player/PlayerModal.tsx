@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ChevronLeft, Loader2, X, ShoppingBag, Zap } from "lucide-react";
+import { ChevronLeft, Loader2, X, ShoppingBag } from "lucide-react";
 import { VideoPlayer } from "@/components/player/VideoPlayer";
 import type { MediaSearchResult, ShowDetails } from "@/types/media";
 import type { ScheduleEntry } from "@/types/schedule";
