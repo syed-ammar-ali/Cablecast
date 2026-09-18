@@ -107,10 +107,7 @@ export function calculateLiveOffset(
   return elapsedSeconds;
 }
 
-/** Maps a TMDB exact runtime (minutes) to the number of 30-min blocks it reserves. */
-export function blocksForRuntime(minutes: number): number {
-  return normalizeRuntime(minutes).blockCount;
-}
+
 
 interface AppointmentTiming {
   dayOfWeek: number;

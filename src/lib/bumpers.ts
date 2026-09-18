@@ -25,7 +25,7 @@ export interface Bumper {
   url: string;
 }
 
-export const BUMPERS: Bumper[] = [
+const BUMPERS: Bumper[] = [
   {
     id: "retro-ad-gaming",
     label: "RETRO COMMERCIAL · 90s CONSOLE GAMING",

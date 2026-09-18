@@ -72,18 +72,3 @@ export function getBroadcastLiveOffsetSeconds(
   return Math.max(0, (nowMinutes - startMinutes) * 60 + now.getSeconds());
 }
 
-// ── Legacy shape kept for useBroadcastResolver (offset-from-airstamp fallback) ──
-
-/** @deprecated Use getBroadcastLiveOffsetSeconds instead. */
-export function getBroadcastStartDate(item: Pick<BroadcastScheduleItem, "airstamp">): Date {
-  return new Date(item.airstamp);
-}
-
-/** @deprecated Use getBroadcastLiveOffsetSeconds instead. */
-export function getBroadcastEndDate(
-  item: Pick<BroadcastScheduleItem, "airstamp" | "runtime">,
-): Date {
-  const start = new Date(item.airstamp);
-  const minutes = item.runtime && item.runtime > 0 ? item.runtime : DEFAULT_RUNTIME_MINUTES;
-  return new Date(start.getTime() + minutes * 60_000);
-}
