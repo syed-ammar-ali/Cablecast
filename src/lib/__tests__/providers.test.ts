@@ -11,8 +11,8 @@ describe("Stream Providers Engine", () => {
   it("has 15 verified, ordered providers in the fallback chain sorted with lowest latency first", () => {
     expect(PROVIDER_COUNT).toBe(15);
     expect(PROVIDERS.length).toBe(15);
-    expect(PROVIDERS[0].id).toBe("anyembed-matrix");
-    expect(PROVIDERS[1].id).toBe("zxcstream-direct");
+    expect(PROVIDERS[0].id).toBe("vidlove-express");
+    expect(PROVIDERS[1].id).toBe("anyembed-matrix");
     expect(PROVIDERS.some((p) => p.id === "vidlink-primary")).toBe(true);
     expect(PROVIDERS.some((p) => p.id === "videasy-hd")).toBe(true);
   });
@@ -82,11 +82,12 @@ describe("Stream Providers Engine", () => {
   it("lists all providers for the Channel Swap UI and filters by region with specialized prioritization", () => {
     const list = listProviders();
     expect(list.length).toBe(15);
-    expect(list[0].id).toBe("anyembed-matrix");
+    expect(list[0].id).toBe("vidlove-express");
 
     // Regional filtering & prioritization
     const usList = listProviders("US");
     expect(usList.length).toBeGreaterThan(0);
+    expect(usList[0].id).toBe("vidlove-express");
     expect(usList.some((p) => p.id === "zxcstream-direct")).toBe(true);
 
     // Japan / Korea: Asian drama & anime specialists are prioritized first

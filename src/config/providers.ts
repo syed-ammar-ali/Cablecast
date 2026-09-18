@@ -75,6 +75,19 @@ function getStartParam(offset?: number, paramName = "start"): string {
  */
 export const PROVIDERS: Provider[] = [
   {
+    id: "vidlove-express",
+    name: "VidLove Express",
+    regions: ["ALL", "US", "GB_CA", "AU_DE_FR"],
+    benchmarkLatencyMs: 260,
+    buildUrl: (kind, { tmdbId, season, episode, startOffsetSeconds }) => {
+      const offsetParam = getStartParam(startOffsetSeconds, "start");
+      if (kind === "movie") {
+        return `https://player.vidlove.cc/embed/movie/${tmdbId}?autoplay=1${offsetParam}`;
+      }
+      return `https://player.vidlove.cc/embed/tv/${tmdbId}/${season ?? 1}/${episode ?? 1}?autoplay=1${offsetParam}`;
+    },
+  },
+  {
     id: "anyembed-matrix",
     name: "AnyEmbed Matrix (Direct HLS)",
     regions: ["ALL", "IN", "US", "JP_KR", "GB_CA", "AU_DE_FR"],
@@ -98,19 +111,6 @@ export const PROVIDERS: Provider[] = [
         return `https://player.zxcstream.xyz/embed/movie/${tmdbId}?autoplay=1${offsetParam}`;
       }
       return `https://player.zxcstream.xyz/embed/tv/${tmdbId}/${season ?? 1}/${episode ?? 1}?autoplay=1${offsetParam}`;
-    },
-  },
-  {
-    id: "vidlove-express",
-    name: "VidLove Express",
-    regions: ["ALL", "US", "GB_CA", "AU_DE_FR"],
-    benchmarkLatencyMs: 260,
-    buildUrl: (kind, { tmdbId, season, episode, startOffsetSeconds }) => {
-      const offsetParam = getStartParam(startOffsetSeconds, "start");
-      if (kind === "movie") {
-        return `https://player.vidlove.cc/embed/movie/${tmdbId}?autoplay=1${offsetParam}`;
-      }
-      return `https://player.vidlove.cc/embed/tv/${tmdbId}/${season ?? 1}/${episode ?? 1}?autoplay=1${offsetParam}`;
     },
   },
   {
