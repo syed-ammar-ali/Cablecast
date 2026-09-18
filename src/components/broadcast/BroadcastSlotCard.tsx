@@ -14,6 +14,7 @@ interface BroadcastSlotCardProps {
     startOffsetSeconds?: number;
   }) => void;
   onRemove: (id: string) => void;
+  onReschedule?: (item: PersonalScheduleItem) => void;
   onCloseModal?: () => void;
 }
 
@@ -35,6 +36,7 @@ export function BroadcastSlotCard({
   item,
   onPlay,
   onRemove,
+  onReschedule,
   onCloseModal,
 }: BroadcastSlotCardProps) {
   const posterUrl = getSafePosterUrl(item.posterPath, item.backdropUrl);
@@ -158,6 +160,19 @@ export function BroadcastSlotCard({
             >
               <Play className="h-3 w-3 fill-white" />
               <span>Live</span>
+            </button>
+          ) : onReschedule ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onReschedule(item);
+              }}
+              className="flex items-center gap-1.5 rounded-md border border-neutral-700 bg-neutral-900 px-2.5 py-1 text-xs font-semibold text-neutral-200 transition-colors hover:border-yellow-500/60 hover:text-yellow-400 cursor-pointer"
+              title="Reschedule broadcast slot"
+            >
+              <RotateCcw className="h-3 w-3 text-yellow-400" />
+              <span>Reschedule</span>
             </button>
           ) : (
             <span className="flex items-center gap-1 rounded-md border border-neutral-800 bg-neutral-900 px-2.5 py-1 text-[10px] sm:text-[11px] font-mono text-neutral-400">

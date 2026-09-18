@@ -258,6 +258,40 @@ export function usePersonalBroadcast() {
     [syncFromServer],
   );
 
+  const rescheduleActiveSlot = useCallback(
+    async (
+      scheduleId: string,
+      targetDayOfWeek: number,
+      targetBlockStartMinutes: number,
+    ): Promise<{ success: boolean; error?: string }> => {
+      try {
+        const res = await fetch("/api/broadcast/reschedule", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            scheduleId,
+            action: "reschedule",
+            targetDayOfWeek,
+            targetBlockStartMinutes,
+            timezoneOffset: new Date().getTimezoneOffset(),
+          }),
+        });
+
+        const data = await res.json();
+        if (!res.ok) {
+          return { success: false, error: data.error || "Slot conflict or error" };
+        }
+
+        notifyBroadcastMutation();
+        void syncFromServer();
+        return { success: true };
+      } catch (e: unknown) {
+        return { success: false, error: e instanceof Error ? e.message : "Network error" };
+      }
+    },
+    [syncFromServer],
+  );
+
   const rescheduleMissed = useCallback(
     async (
       missedId: string,
@@ -387,6 +421,7 @@ export function usePersonalBroadcast() {
     removeSchedule,
     removeShowSchedule,
     removeSubscribedChannel,
+    rescheduleActiveSlot,
     rescheduleMissed,
     dismissMissed,
     dismissSeasonAlert,

@@ -14,15 +14,90 @@ export async function POST(request: NextRequest) {
     const userId = getPersistentUserId(session);
     const userKeys = Array.from(new Set([userId, session.id, session.accessCodeId])).filter(Boolean) as string[];
     const body = (await request.json()) as {
-      missedId: string;
+      missedId?: string;
+      scheduleId?: string;
       action: "reschedule" | "dismiss" | "skip";
       mode?: "move" | "one_off";
       targetDayOfWeek?: number;
       targetBlockStartMinutes?: number;
+      timezoneOffset?: number;
     };
 
-    if (!body.missedId) {
-      return NextResponse.json({ error: "missedId is required." }, { status: 400 });
+    if (!body.missedId && !body.scheduleId) {
+      return NextResponse.json({ error: "Either missedId or scheduleId is required." }, { status: 400 });
+    }
+
+    // ── Reschedule an active Personal Broadcast Slot ─────────────────────────
+    if (body.scheduleId && !body.missedId) {
+      if (body.action !== "reschedule") {
+        return NextResponse.json({ error: "Invalid action for active schedule." }, { status: 400 });
+      }
+
+      if (
+        typeof body.targetDayOfWeek !== "number" ||
+        typeof body.targetBlockStartMinutes !== "number"
+      ) {
+        return NextResponse.json(
+          { error: "targetDayOfWeek and targetBlockStartMinutes are required to reschedule." },
+          { status: 400 },
+        );
+      }
+
+      const activeSchedule = await prisma.userPersonalSchedule.findFirst({
+        where: { id: body.scheduleId, sessionId: { in: userKeys } },
+      });
+
+      if (!activeSchedule) {
+        return NextResponse.json({ error: "Scheduled broadcast not found." }, { status: 404 });
+      }
+
+      const day = body.targetDayOfWeek;
+      const startMin = body.targetBlockStartMinutes;
+      const blockCount =
+        activeSchedule.blockCount && activeSchedule.blockCount > 0 ? activeSchedule.blockCount : 1;
+      const requestedEnd = startMin + blockCount * BLOCK_MINUTES;
+
+      // Conflict verification: look for overlaps on target day excluding this slot itself
+      const existingOnDay = await prisma.userPersonalSchedule.findMany({
+        where: {
+          sessionId: { in: userKeys },
+          dayOfWeek: day,
+          id: { not: activeSchedule.id },
+        },
+      });
+
+      for (const item of existingOnDay) {
+        const itemEnd = item.blockStartMinutes + item.blockCount * BLOCK_MINUTES;
+        const overlaps = startMin < itemEnd && requestedEnd > item.blockStartMinutes;
+
+        if (overlaps) {
+          const dayName = DAYS_OF_WEEK.find((d) => d.day === day)?.name ?? `Day ${day}`;
+          const itemTime = formatBlockTimeRange(item.blockStartMinutes, item.blockCount);
+          return NextResponse.json(
+            {
+              error: `Slot conflict on ${dayName} (${itemTime}): Already occupied by "${item.title}". Choose an open slot.`,
+            },
+            { status: 409 },
+          );
+        }
+      }
+
+      const tzOffset =
+        typeof body.timezoneOffset === "number"
+          ? body.timezoneOffset
+          : activeSchedule.timezoneOffset ?? -330;
+
+      const updated = await prisma.userPersonalSchedule.update({
+        where: { id: activeSchedule.id },
+        data: {
+          dayOfWeek: day,
+          blockStartMinutes: startMin,
+          timezoneOffset: tzOffset,
+          wasWatched: false,
+        },
+      });
+
+      return NextResponse.json({ success: true, action: "rescheduled", item: updated });
     }
 
     const missedItem = await prisma.userMissedBroadcast.findFirst({

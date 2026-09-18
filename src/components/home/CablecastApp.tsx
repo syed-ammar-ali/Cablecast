@@ -558,6 +558,7 @@ function CablecastAppContent({ initialView = "home" }: CablecastAppProps) {
         onRemoveSchedule={personalBroadcast.removeSchedule}
         onRemoveShowSchedule={personalBroadcast.removeShowSchedule}
         onRemoveSubscribedChannel={personalBroadcast.removeSubscribedChannel}
+        onRescheduleActiveSlot={personalBroadcast.rescheduleActiveSlot}
         onRescheduleMissed={personalBroadcast.rescheduleMissed}
         onDismissMissed={personalBroadcast.dismissMissed}
         onPlay={({ media, season, episode, startOffsetSeconds }) => {

@@ -68,6 +68,11 @@ interface PersonalBroadcastModalProps {
     targetBlockStartMinutes: number,
     mode?: "move" | "one_off",
   ) => Promise<{ success: boolean; error?: string }>;
+  onRescheduleActiveSlot?: (
+    scheduleId: string,
+    targetDayOfWeek: number,
+    targetBlockStartMinutes: number,
+  ) => Promise<{ success: boolean; error?: string }>;
   onDismissMissed: (missedId: string) => void;
   isAdmin?: boolean;
   onPlay: (target: {
@@ -144,6 +149,7 @@ export function PersonalBroadcastModal({
   onRemoveSchedule,
   onRemoveShowSchedule,
   onRemoveSubscribedChannel,
+  onRescheduleActiveSlot,
   onRescheduleMissed,
   onDismissMissed,
   isAdmin = false,
@@ -154,6 +160,7 @@ export function PersonalBroadcastModal({
   );
   const [selectedDay, setSelectedDay] = useState<number>(new Date().getDay());
   const [reschedulingItem, setReschedulingItem] = useState<MissedBroadcastItem | null>(null);
+  const [reschedulingActiveSlot, setReschedulingActiveSlot] = useState<PersonalScheduleItem | null>(null);
 
   const {
     isSupported: isPushSupported,
@@ -731,6 +738,7 @@ export function PersonalBroadcastModal({
                       item={item}
                       onPlay={onPlay}
                       onRemove={onRemoveSchedule}
+                      onReschedule={(slot) => setReschedulingActiveSlot(slot)}
                       onCloseModal={onClose}
                     />
                   ))}
@@ -823,6 +831,16 @@ export function PersonalBroadcastModal({
 
                           {/* Action Button matching Admin */}
                           <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                            <button
+                              type="button"
+                              onClick={() => setReschedulingActiveSlot(first)}
+                              className="flex items-center gap-1.5 rounded-md border border-neutral-700 bg-neutral-900 px-3 py-1.5 text-xs font-semibold text-neutral-200 transition-colors hover:border-yellow-500/60 hover:text-yellow-400 cursor-pointer"
+                              title="Reschedule broadcast slot"
+                            >
+                              <RotateCcw className="h-3.5 w-3.5 text-yellow-400" />
+                              <span>Reschedule</span>
+                            </button>
+
                             <button
                               type="button"
                               onClick={() => onRemoveShowSchedule(tmdbId)}
@@ -1413,6 +1431,16 @@ export function PersonalBroadcastModal({
           />
         )}
 
+        {/* Reschedule Active Broadcast Slot Modal */}
+        {reschedulingActiveSlot && onRescheduleActiveSlot && (
+          <RescheduleActiveSlotModal
+            item={reschedulingActiveSlot}
+            schedule={schedule}
+            onClose={() => setReschedulingActiveSlot(null)}
+            onReschedule={onRescheduleActiveSlot}
+          />
+        )}
+
         {/* Channel Share Modal */}
         <ChannelShareModal
           isOpen={isShareModalOpen}
@@ -1735,6 +1763,299 @@ function RescheduleRerunModal({
               : mode === "move"
                 ? `Confirm Move to ${dayName} @ ${formatBlockTime(targetBlockStartMinutes)}`
                 : `Confirm One-Off Encore (${dayName} @ ${formatBlockTime(targetBlockStartMinutes)})`}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function RescheduleActiveSlotModal({
+  item,
+  schedule,
+  onClose,
+  onReschedule,
+}: {
+  item: PersonalScheduleItem;
+  schedule: PersonalScheduleItem[];
+  onClose: () => void;
+  onReschedule: (
+    scheduleId: string,
+    targetDayOfWeek: number,
+    targetBlockStartMinutes: number,
+  ) => Promise<{ success: boolean; error?: string }>;
+}) {
+  const blockCount = item.blockCount && item.blockCount > 0 ? item.blockCount : 1;
+  const runtimeMinutes = item.runtimeMinutes ?? blockCount * 30;
+
+  // Determine initial day, meridiem, and slot index from item
+  const initialMeridiem: "AM" | "PM" =
+    Math.floor(item.blockStartMinutes / 60) >= 12 ? "PM" : "AM";
+  const initialHour24 = Math.floor(item.blockStartMinutes / 60) % 24;
+  const initialMin = item.blockStartMinutes % 60;
+  const initialHour12 = initialHour24 % 12 === 0 ? 12 : initialHour24 % 12;
+  const matchedIndex = HALF_DAY_SLOTS.findIndex(
+    (s) => s.hour12 === initialHour12 && s.minute === initialMin,
+  );
+
+  const [day, setDay] = useState<number>(item.dayOfWeek);
+  const [meridiem, setMeridiem] = useState<"AM" | "PM">(initialMeridiem);
+  const [selectedSlotIndex, setSelectedSlotIndex] = useState<number>(
+    matchedIndex !== -1 ? matchedIndex : 16,
+  );
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const currentSlot = HALF_DAY_SLOTS[selectedSlotIndex] ?? HALF_DAY_SLOTS[16];
+  const targetBlockStartMinutes = toMinutesFromMidnight(
+    currentSlot.hour12,
+    currentSlot.minute,
+    meridiem,
+  );
+  const timeRangeLabel = formatBlockTimeRange(targetBlockStartMinutes, blockCount);
+  const dayName = DAYS_OF_WEEK.find((d) => d.day === day)?.name ?? `Day ${day}`;
+
+  const isSameSlot =
+    day === item.dayOfWeek && targetBlockStartMinutes === item.blockStartMinutes;
+
+  // Conflict validation: check target day, excluding this slot itself
+  const conflict = useMemo(() => {
+    const dayItems = schedule.filter((s) => s.dayOfWeek === day && s.id !== item.id);
+    const requestedEnd = targetBlockStartMinutes + blockCount * 30;
+
+    for (const s of dayItems) {
+      const sEnd = s.blockStartMinutes + s.blockCount * 30;
+      const overlaps = targetBlockStartMinutes < sEnd && requestedEnd > s.blockStartMinutes;
+      if (overlaps) {
+        return {
+          title: s.title,
+          timeStr: formatBlockTimeRange(s.blockStartMinutes, s.blockCount),
+        };
+      }
+    }
+    return null;
+  }, [schedule, day, targetBlockStartMinutes, blockCount, item.id]);
+
+  const currentDayName =
+    DAYS_OF_WEEK.find((d) => d.day === item.dayOfWeek)?.name ?? `Day ${item.dayOfWeek}`;
+  const currentTimeRange = formatBlockTimeRange(item.blockStartMinutes, blockCount);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (isSameSlot) {
+      onClose();
+      return;
+    }
+    if (conflict) {
+      setError(
+        `Slot conflict: Overlaps with "${conflict.title}" (${conflict.timeStr}). Please pick an open time slot.`,
+      );
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError(null);
+
+    const res = await onReschedule(item.id, day, targetBlockStartMinutes);
+    setIsSubmitting(false);
+
+    if (res.success) {
+      onClose();
+    } else {
+      setError(res.error || "Failed to reschedule broadcast.");
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/85 p-3 sm:p-4 backdrop-blur-md animate-in fade-in">
+      <div className="relative flex w-full max-w-lg flex-col rounded-2xl border border-neutral-800 bg-neutral-950 p-5 sm:p-6 shadow-2xl animate-in zoom-in-95 max-h-[92vh] overflow-y-auto no-scrollbar">
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close"
+          className="absolute right-4 top-4 rounded-lg border border-neutral-800 p-1.5 text-neutral-400 hover:border-neutral-700 hover:text-white cursor-pointer"
+        >
+          <X className="h-4 w-4" />
+        </button>
+
+        {/* Header */}
+        <div className="flex items-center gap-3 border-b border-neutral-900 pb-4">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-neutral-800 bg-neutral-900 text-yellow-400 shadow">
+            <RotateCcw className="h-5 w-5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="text-sm font-bold uppercase tracking-wider text-white truncate">
+                Reschedule Broadcast
+              </h3>
+              <span className="inline-flex items-center gap-1 rounded bg-neutral-900 border border-neutral-800 px-2 py-0.5 font-mono text-[10px] font-semibold text-yellow-400">
+                <Layers className="h-3 w-3" />
+                {blockCount} {blockCount === 1 ? "Block" : "Blocks"} ({runtimeMinutes}m)
+              </span>
+            </div>
+            <p className="text-xs text-neutral-400 truncate mt-0.5">
+              {item.title} {item.mediaType === "tv" ? `· Season ${item.currentSeason}, Episode ${item.currentEpisode}` : "· Feature Film"}
+            </p>
+          </div>
+        </div>
+
+        {/* Current Schedule Summary */}
+        <div className="mt-4 rounded-xl border border-neutral-800/80 bg-neutral-900/40 p-3 flex items-center justify-between gap-3 text-xs">
+          <span className="text-neutral-400">Currently Scheduled:</span>
+          <span className="font-mono font-bold text-neutral-200">
+            {currentDayName}s @ {currentTimeRange}
+          </span>
+        </div>
+
+        <form onSubmit={handleSubmit} className="mt-4 space-y-4">
+          {/* Step 1: Select New Day */}
+          <div>
+            <label className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-neutral-400">
+              <Calendar className="h-3.5 w-3.5 text-neutral-500" />
+              1. Select New Broadcast Day
+            </label>
+            <div className="grid grid-cols-7 gap-1">
+              {DAYS_OF_WEEK.map((d) => {
+                const isSelected = day === d.day;
+                const isToday = new Date().getDay() === d.day;
+                const isOriginalDay = item.dayOfWeek === d.day;
+                return (
+                  <button
+                    key={d.day}
+                    type="button"
+                    onClick={() => {
+                      setDay(d.day);
+                      setError(null);
+                    }}
+                    className={`flex flex-col items-center justify-center rounded-lg py-2 text-xs font-bold transition-all cursor-pointer ${
+                      isSelected
+                        ? "border border-yellow-500/70 bg-yellow-500/10 text-yellow-400 shadow-md ring-1 ring-yellow-500/40"
+                        : "border border-neutral-800 bg-neutral-900/60 text-neutral-400 hover:border-neutral-700 hover:text-white"
+                    }`}
+                  >
+                    <span>{d.short}</span>
+                    {isToday && (
+                      <span className="text-[8px] font-mono text-yellow-400 uppercase tracking-tighter">
+                        Today
+                      </span>
+                    )}
+                    {isOriginalDay && !isToday && (
+                      <span className="text-[7px] font-mono text-neutral-500 uppercase tracking-tighter">
+                        Current
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Step 2: Select New Time */}
+          <div className="border-t border-neutral-900 pt-4 space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-neutral-400">
+                <Clock className="h-3.5 w-3.5 text-neutral-500" />
+                2. Select New Time ({formatBlockTime(targetBlockStartMinutes)})
+              </label>
+
+              {/* AM / PM Segmented Switch */}
+              <div className="flex items-center rounded-xl bg-neutral-950 p-1 border border-neutral-800">
+                <button
+                  type="button"
+                  onClick={() => setMeridiem("AM")}
+                  className={`flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                    meridiem === "AM"
+                      ? "bg-neutral-800 text-white shadow-md"
+                      : "text-neutral-400 hover:text-neutral-200"
+                  }`}
+                >
+                  <Sun className="h-3 w-3" />
+                  <span>AM</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setMeridiem("PM")}
+                  className={`flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                    meridiem === "PM"
+                      ? "bg-neutral-800 text-white shadow-md"
+                      : "text-neutral-400 hover:text-neutral-200"
+                  }`}
+                >
+                  <Moon className="h-3 w-3" />
+                  <span>PM</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Time Slot Matrix */}
+            <div className="grid grid-cols-4 sm:grid-cols-6 gap-1 max-h-[120px] overflow-y-auto no-scrollbar rounded-xl border border-neutral-800 bg-neutral-950 p-2">
+              {HALF_DAY_SLOTS.map((slot, index) => {
+                const isSelected = selectedSlotIndex === index;
+                return (
+                  <button
+                    key={`${slot.label}-${meridiem}`}
+                    type="button"
+                    onClick={() => {
+                      setSelectedSlotIndex(index);
+                      setError(null);
+                    }}
+                    className={`rounded-lg px-1.5 py-1 font-mono text-xs font-semibold transition-all cursor-pointer ${
+                      isSelected
+                        ? "border border-yellow-500/70 bg-yellow-500/15 text-yellow-300 font-bold shadow-md ring-1 ring-yellow-500/40"
+                        : "border border-neutral-800/80 bg-neutral-900/60 text-neutral-400 hover:border-neutral-700 hover:text-white"
+                    }`}
+                  >
+                    {slot.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* New Air Window Preview Card */}
+          <div className="rounded-xl border border-neutral-800/90 bg-neutral-900/40 p-3 flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <span className="text-[10px] font-mono uppercase tracking-wider text-neutral-500 block">
+                New Air Window
+              </span>
+              <p className="text-xs font-bold text-white font-mono truncate">
+                {dayName} · {timeRangeLabel}
+              </p>
+            </div>
+            <div className="text-right shrink-0">
+              <span className="inline-flex items-center gap-1 rounded-md bg-neutral-800/80 px-2 py-0.5 font-mono text-[10px] font-bold text-neutral-300 border border-neutral-700/60">
+                {blockCount} {blockCount === 1 ? "Block" : "Blocks"} ({blockCount * 30}m)
+              </span>
+            </div>
+          </div>
+
+          {/* Conflict Alert */}
+          {conflict && (
+            <div className="flex items-start gap-2 rounded-xl border border-amber-800/60 bg-amber-950/30 p-3 text-xs text-amber-300">
+              <AlertTriangle className="h-4 w-4 shrink-0 text-amber-400 mt-0.5" />
+              <div>
+                <strong>Slot Conflict:</strong> Overlaps with &quot;{conflict.title}&quot; ({conflict.timeStr}). Please select an unoccupied time slot.
+              </div>
+            </div>
+          )}
+
+          {error && (
+            <p className="rounded-xl border border-red-900/50 bg-red-950/20 p-3 text-xs text-red-400">
+              {error}
+            </p>
+          )}
+
+          <button
+            type="submit"
+            disabled={isSubmitting || Boolean(conflict) || isSameSlot}
+            className="flex w-full items-center justify-center gap-2 rounded-xl border border-neutral-700 bg-neutral-900 py-3 text-xs font-semibold uppercase tracking-wider text-neutral-200 transition-colors hover:border-neutral-500 hover:bg-neutral-800 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+          >
+            {isSubmitting
+              ? "Updating Schedule..."
+              : isSameSlot
+                ? "Already at this time (Select a different slot)"
+                : `Confirm Move to ${dayName} @ ${formatBlockTime(targetBlockStartMinutes)}`}
           </button>
         </form>
       </div>
