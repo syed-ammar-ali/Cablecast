@@ -14,10 +14,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
     }
 
-    // Cryptographic signature check (when signing keys are configured in production)
+    // Cryptographic signature check (when signing keys are configured)
     const receiver = getQStashReceiver();
     const signature = request.headers.get("upstash-signature");
-    if (receiver && process.env.NODE_ENV === "production") {
+    if (receiver && (process.env.NODE_ENV === "production" || signature)) {
       if (!signature) {
         return NextResponse.json({ error: "Missing QStash signature" }, { status: 401 });
       }
@@ -25,7 +25,9 @@ export async function POST(request: NextRequest) {
         .verify({
           signature,
           body: rawBody,
-          url: request.url,
+          // Omitting `url` avoids false rejection when reverse proxies or Vercel
+          // rewrite the internal listener host, while verifying cryptographic HMAC
+          // and SHA256 body hash integrity.
         })
         .catch(() => false);
 

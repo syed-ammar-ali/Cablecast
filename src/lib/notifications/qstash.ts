@@ -1,8 +1,12 @@
 import { Client, Receiver } from "@upstash/qstash";
 
-function getAppBaseUrl(): string {
+export function getAppBaseUrl(): string {
   if (process.env.NEXT_PUBLIC_APP_URL) {
-    return process.env.NEXT_PUBLIC_APP_URL.replace(/\/$/, "");
+    let url = process.env.NEXT_PUBLIC_APP_URL.replace(/\/$/, "");
+    if (!url.startsWith("http://") && !url.startsWith("https://")) {
+      url = `https://${url}`;
+    }
+    return url;
   }
   if (process.env.VERCEL_PROJECT_PRODUCTION_URL) {
     return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`;
@@ -10,11 +14,19 @@ function getAppBaseUrl(): string {
   if (process.env.VERCEL_URL) {
     return `https://${process.env.VERCEL_URL}`;
   }
-  return "https://cablecast.tv";
+  if (process.env.NODE_ENV === "production") {
+    return "https://cablecast.tv";
+  }
+  return "http://localhost:3000";
 }
 
 let qstashClient: Client | null = null;
 let qstashReceiver: Receiver | null = null;
+
+export function resetQStashClients(): void {
+  qstashClient = null;
+  qstashReceiver = null;
+}
 
 export function isQStashConfigured(): boolean {
   return Boolean(process.env.QSTASH_TOKEN);
@@ -59,8 +71,10 @@ export async function scheduleDelayedBroadcastAlert(
 ): Promise<{ success: boolean; messageId?: string; mode: "qstash" | "dev_timer" | "noop" }> {
   const { scheduleId, alertTime } = params;
   const now = new Date();
-  const delaySeconds = Math.max(0, Math.floor((alertTime.getTime() - now.getTime()) / 1000));
-  const notBeforeEpoch = Math.floor(alertTime.getTime() / 1000);
+  const notBeforeEpoch = Math.max(
+    Math.floor(Date.now() / 1000),
+    Math.floor(alertTime.getTime() / 1000),
+  );
 
   const client = getQStashClient();
   const baseUrl = getAppBaseUrl();

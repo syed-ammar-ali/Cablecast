@@ -818,6 +818,25 @@ export async function dispatchStartingSoonForSlot(
   }
 
   const effectiveOffset = slot.timezoneOffset ?? 0;
+
+  // Verify the slot is actually scheduled to start soon (within -10m to +25m of airtime).
+  // If the user rescheduled or moved the slot, the old QStash delayed alert will arrive
+  // at the wrong time/day. We detect this and discard the obsolete alert cleanly.
+  const { getNextAirDate } = await import("@/lib/schedule");
+  const nextAir = getNextAirDate(
+    slot.dayOfWeek,
+    slot.blockStartMinutes,
+    new Date(now.getTime() - 20 * 60 * 1000),
+    effectiveOffset,
+  );
+  const diffMs = nextAir.getTime() - now.getTime();
+  if (diffMs > 25 * 60 * 1000 || diffMs < -10 * 60 * 1000) {
+    return {
+      success: true,
+      reason: `Obsolete alert discarded (slot moved or rescheduled; next air in ${Math.round(diffMs / 60000)}m)`,
+    };
+  }
+
   const localTimeMs = now.getTime() - effectiveOffset * 60_000;
   const localNow = new Date(localTimeMs);
   const localIsoDate = localNow.toISOString().slice(0, 10);
@@ -976,7 +995,15 @@ export async function dispatchStartingSoonForSlot(
   if (!slot.isRerun) {
     try {
       const { scheduleDelayedBroadcastAlert } = await import("./qstash");
-      const nextWeekAlertTime = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+      // Advance 1 hour past now so getNextAirDate locks to next week's occurrence
+      const reference = new Date(now.getTime() + 60 * 60 * 1000);
+      const nextWeekAir = getNextAirDate(
+        slot.dayOfWeek,
+        slot.blockStartMinutes,
+        reference,
+        effectiveOffset,
+      );
+      const nextWeekAlertTime = new Date(nextWeekAir.getTime() - 10 * 60 * 1000);
       void scheduleDelayedBroadcastAlert({ scheduleId: slot.id, alertTime: nextWeekAlertTime });
     } catch (e) {
       console.error("[QStash] Failed to schedule next week alert:", e);

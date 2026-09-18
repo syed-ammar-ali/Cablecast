@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
       const tzOffset =
         typeof body.timezoneOffset === "number"
           ? body.timezoneOffset
-          : activeSchedule.timezoneOffset ?? -330;
+          : activeSchedule.timezoneOffset ?? 0;
 
       const updated = await prisma.userPersonalSchedule.update({
         where: { id: activeSchedule.id },
@@ -105,7 +105,7 @@ export async function POST(request: NextRequest) {
           updated.dayOfWeek,
           updated.blockStartMinutes,
           new Date(),
-          updated.timezoneOffset ?? -330,
+          updated.timezoneOffset ?? 0,
         );
         const alertTime = new Date(nextAir.getTime() - 10 * 60 * 1000);
         void scheduleDelayedBroadcastAlert({ scheduleId: updated.id, alertTime });
@@ -291,7 +291,8 @@ export async function POST(request: NextRequest) {
         if (targetSlotId) {
           const { scheduleDelayedBroadcastAlert } = await import("@/lib/notifications/qstash");
           const { getNextAirDate } = await import("@/lib/schedule");
-          const nextAir = getNextAirDate(day, startMin, new Date(), -330);
+          const rerunTz = originalSchedule?.timezoneOffset ?? (typeof body.timezoneOffset === "number" ? body.timezoneOffset : 0);
+          const nextAir = getNextAirDate(day, startMin, new Date(), rerunTz);
           const alertTime = new Date(nextAir.getTime() - 10 * 60 * 1000);
           void scheduleDelayedBroadcastAlert({ scheduleId: targetSlotId, alertTime });
         }
