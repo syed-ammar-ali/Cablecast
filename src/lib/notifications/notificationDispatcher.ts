@@ -2,6 +2,19 @@ import { prisma } from "@/lib/prisma";
 import { sendPushNotification } from "./webpush";
 import type { PushNotificationPayload } from "./webpush";
 import { sendSms, makeCall, isTwilioConfigured } from "./twilio";
+import {
+  sendTelegramMessage,
+  sendTelegramPhoto,
+  isTelegramConfigured,
+  getDefaultTelegramChatId,
+} from "./telegram";
+
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
 
 export interface DispatchSummary {
   startingSoon: number;
@@ -120,24 +133,54 @@ async function getCanonicalUserMap(sessionIds: string[]): Promise<Map<string, st
 
 
 /**
- * Bulk-fetches phone settings for a list of canonical user IDs.
- * Returns a Map keyed by userId → { phoneNumber, callEnabled, smsEnabled, verifiedAt }
+ * Bulk-fetches phone & telegram settings for a list of canonical user IDs.
+ * Returns a Map keyed by userId → settings row
  */
 async function getPhoneSettingsMap(
   userIds: string[],
-): Promise<Map<string, { phoneNumber: string; callEnabled: boolean; smsEnabled: boolean; verifiedAt: Date | null }>> {
-  const map = new Map<string, { phoneNumber: string; callEnabled: boolean; smsEnabled: boolean; verifiedAt: Date | null }>();
-  if (!isTwilioConfigured() || userIds.length === 0) return map;
+): Promise<
+  Map<
+    string,
+    {
+      phoneNumber: string;
+      callEnabled: boolean;
+      smsEnabled: boolean;
+      telegramChatId: string | null;
+      telegramEnabled: boolean;
+      verifiedAt: Date | null;
+    }
+  >
+> {
+  const map = new Map<
+    string,
+    {
+      phoneNumber: string;
+      callEnabled: boolean;
+      smsEnabled: boolean;
+      telegramChatId: string | null;
+      telegramEnabled: boolean;
+      verifiedAt: Date | null;
+    }
+  >();
+  if ((!isTwilioConfigured() && !isTelegramConfigured()) || userIds.length === 0) return map;
   try {
     const rows = await prisma.userPhoneSettings.findMany({
       where: { userId: { in: userIds } },
-      select: { userId: true, phoneNumber: true, callEnabled: true, smsEnabled: true, verifiedAt: true },
+      select: {
+        userId: true,
+        phoneNumber: true,
+        callEnabled: true,
+        smsEnabled: true,
+        telegramChatId: true,
+        telegramEnabled: true,
+        verifiedAt: true,
+      },
     });
     for (const row of rows) {
-      if (row.phoneNumber) map.set(row.userId, row);
+      map.set(row.userId, row);
     }
   } catch {
-    // Non-fatal — Twilio delivery is best-effort
+    // Non-fatal — delivery is best-effort
   }
   return map;
 }
@@ -394,11 +437,41 @@ export async function dispatchStartingSoonAlerts(now: Date = new Date()): Promis
       }
     }
 
-    // 5. Record idempotency log — log if push sent OR Twilio alert was triggered
+    // 5. Telegram instant alert with high-res poster (100% free forever)
+    let telegramFired = false;
+    const targetChatId = phoneSettings?.telegramChatId || getDefaultTelegramChatId();
+    const isTelegramActive = phoneSettings ? phoneSettings.telegramEnabled : true;
+    if (isTelegramConfigured() && targetChatId && isTelegramActive) {
+      const showLabel =
+        slot.mediaType === "tv" && slot.currentSeason && slot.currentEpisode
+          ? `<b>${escapeHtml(slot.title)}</b> (Season ${slot.currentSeason}, Ep ${slot.currentEpisode})`
+          : `<b>${escapeHtml(slot.title)}</b>`;
+
+      const telegramCaption = `📺 <b>Showtime in 10 Minutes!</b>\n\n${showLabel}\nScheduled broadcast is about to start. Tune in live!`;
+
+      const posterUrl = slot.posterPath
+        ? slot.posterPath.startsWith("http")
+          ? slot.posterPath
+          : `https://image.tmdb.org/t/p/w780${slot.posterPath.startsWith("/") ? "" : "/"}${slot.posterPath}`
+        : null;
+
+      if (posterUrl) {
+        sendTelegramPhoto(targetChatId, posterUrl, telegramCaption).catch((e) =>
+          console.error("[Telegram] Starting-soon alert failed:", e),
+        );
+      } else {
+        sendTelegramMessage(targetChatId, telegramCaption).catch((e) =>
+          console.error("[Telegram] Starting-soon alert failed:", e),
+        );
+      }
+      telegramFired = true;
+    }
+
+    // 6. Record idempotency log — log if push sent OR Twilio alert OR Telegram alert was triggered
     const twilioFired = Boolean(
       phoneSettings?.phoneNumber && (phoneSettings.callEnabled || phoneSettings.smsEnabled),
     );
-    if (res.sent > 0 || twilioFired) {
+    if (res.sent > 0 || twilioFired || telegramFired) {
       try {
         await prisma.notificationLog.create({
           data: {
@@ -502,8 +575,31 @@ export async function dispatchMissedBroadcastAlerts(): Promise<{ count: number; 
       }
     }
 
-    // 4. Record log if push sent OR SMS triggered
-    if (res.sent > 0 || missedTwilioFired) {
+    // 4. Telegram alert for missed broadcast
+    let missedTelegramFired = false;
+    if (isTelegramConfigured()) {
+      try {
+        const phoneSetting = await prisma.userPhoneSettings.findUnique({
+          where: { userId: canonUserId },
+          select: { telegramChatId: true, telegramEnabled: true },
+        });
+        const targetChatId = phoneSetting?.telegramChatId || getDefaultTelegramChatId();
+        const isTelegramActive = phoneSetting ? phoneSetting.telegramEnabled : true;
+        if (targetChatId && isTelegramActive) {
+          const epDetails = item.season && item.episode ? ` (Season ${item.season}, Ep ${item.episode})` : "";
+          const msg = `📼 <b>Missed Broadcast</b>\n\nYou missed <b>${escapeHtml(item.title)}</b>${epDetails}.\nOpen your guide anytime to reschedule a rerun!`;
+          sendTelegramMessage(targetChatId, msg).catch((e) =>
+            console.error("[Telegram] Missed-broadcast alert failed:", e),
+          );
+          missedTelegramFired = true;
+        }
+      } catch {
+        // Non-fatal
+      }
+    }
+
+    // 5. Record log if push sent OR SMS OR Telegram triggered
+    if (res.sent > 0 || missedTwilioFired || missedTelegramFired) {
       try {
         await prisma.notificationLog.create({
           data: {
@@ -629,8 +725,30 @@ export async function dispatchTapeExpiringAlerts(now: Date = new Date()): Promis
       }
     }
 
-    // 5. Record log if push was sent OR SMS triggered
-    if (res.sent > 0 || expiringTwilioFired) {
+    // 5. Telegram alert for expiring rental
+    let expiringTelegramFired = false;
+    if (isTelegramConfigured()) {
+      try {
+        const phoneSetting = await prisma.userPhoneSettings.findUnique({
+          where: { userId: canonUserId },
+          select: { telegramChatId: true, telegramEnabled: true },
+        });
+        const targetChatId = phoneSetting?.telegramChatId || getDefaultTelegramChatId();
+        const isTelegramActive = phoneSetting ? phoneSetting.telegramEnabled : true;
+        if (targetChatId && isTelegramActive) {
+          const msg = `⏳ <b>VHS Rental Expiring Soon</b>\n\nYour rental for <b>${escapeHtml(title)}</b> expires in 2 hours. Watch now or renew in your library!`;
+          sendTelegramMessage(targetChatId, msg).catch((e) =>
+            console.error("[Telegram] Tape-expiring alert failed:", e),
+          );
+          expiringTelegramFired = true;
+        }
+      } catch {
+        // Non-fatal
+      }
+    }
+
+    // 6. Record log if push was sent OR SMS OR Telegram triggered
+    if (res.sent > 0 || expiringTwilioFired || expiringTelegramFired) {
       try {
         await prisma.notificationLog.create({
           data: {

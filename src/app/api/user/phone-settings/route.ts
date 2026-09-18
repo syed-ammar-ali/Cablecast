@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/server";
 import { prisma } from "@/lib/prisma";
 import { sendSms, makeCall, isTwilioConfigured } from "@/lib/notifications/twilio";
+import {
+  sendTelegramMessage,
+  isTelegramConfigured,
+  getDefaultTelegramChatId,
+} from "@/lib/notifications/telegram";
 
 /** Derive canonical userId the same way the dispatcher does */
 async function getCanonicalUserId(session: { id: string; accessCodeId?: string | null; role: string }) {
@@ -20,18 +25,30 @@ export async function GET() {
 
   const userId = await getCanonicalUserId(session);
   const settings = await prisma.userPhoneSettings.findUnique({ where: { userId } });
+  const defaultChatId = getDefaultTelegramChatId();
 
   return NextResponse.json({
     configured: !!settings,
     twilioReady: isTwilioConfigured(),
+    telegramReady: isTelegramConfigured(),
+    defaultTelegramChatId: defaultChatId,
     settings: settings
       ? {
           phoneNumber: settings.phoneNumber,
           callEnabled: settings.callEnabled,
           smsEnabled: settings.smsEnabled,
+          telegramChatId: settings.telegramChatId || defaultChatId || null,
+          telegramEnabled: settings.telegramEnabled,
           verifiedAt: settings.verifiedAt,
         }
-      : null,
+      : {
+          phoneNumber: "",
+          callEnabled: false,
+          smsEnabled: false,
+          telegramChatId: defaultChatId || null,
+          telegramEnabled: true,
+          verifiedAt: null,
+        },
   });
 }
 
@@ -40,45 +57,56 @@ export async function PUT(request: NextRequest) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  let body: { phoneNumber?: string; callEnabled?: boolean; smsEnabled?: boolean };
+  let body: {
+    phoneNumber?: string;
+    callEnabled?: boolean;
+    smsEnabled?: boolean;
+    telegramChatId?: string;
+    telegramEnabled?: boolean;
+  };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const { phoneNumber, callEnabled, smsEnabled } = body;
+  const { phoneNumber, callEnabled, smsEnabled, telegramChatId, telegramEnabled } = body;
 
-  // Validate phone number if provided
-  if (phoneNumber !== undefined) {
-    if (typeof phoneNumber !== "string" || !isValidE164(phoneNumber)) {
+  // Validate phone number if provided and not empty
+  if (phoneNumber !== undefined && phoneNumber.trim() !== "") {
+    if (!isValidE164(phoneNumber)) {
       return NextResponse.json(
-        { error: "Phone number must be in E.164 format (e.g. +12015551234)" },
+        { error: "Phone number must be in E.164 format (e.g. +12015551234 or +923001234567)" },
         { status: 400 },
       );
     }
   }
 
   const userId = await getCanonicalUserId(session);
-
   const existing = await prisma.userPhoneSettings.findUnique({ where: { userId } });
 
-  // If the phone number changed, clear verifiedAt so re-verification is required
-  const phoneChanged = phoneNumber !== undefined && existing?.phoneNumber !== phoneNumber;
+  const phoneChanged =
+    phoneNumber !== undefined &&
+    existing?.phoneNumber !== undefined &&
+    existing.phoneNumber !== phoneNumber.trim();
 
   const settings = await prisma.userPhoneSettings.upsert({
     where: { userId },
     create: {
       userId,
-      phoneNumber: phoneNumber ?? "",
+      phoneNumber: phoneNumber?.trim() ?? "",
       callEnabled: callEnabled ?? true,
       smsEnabled: smsEnabled ?? true,
+      telegramChatId: telegramChatId?.trim() ?? getDefaultTelegramChatId() ?? null,
+      telegramEnabled: telegramEnabled ?? true,
       verifiedAt: null,
     },
     update: {
       ...(phoneNumber !== undefined && { phoneNumber: phoneNumber.trim() }),
       ...(callEnabled !== undefined && { callEnabled }),
       ...(smsEnabled !== undefined && { smsEnabled }),
+      ...(telegramChatId !== undefined && { telegramChatId: telegramChatId.trim() }),
+      ...(telegramEnabled !== undefined && { telegramEnabled }),
       ...(phoneChanged && { verifiedAt: null }),
     },
   });
@@ -87,24 +115,45 @@ export async function PUT(request: NextRequest) {
 }
 
 // ─── POST /api/user/phone-settings/test ─ sends a live test message ──────────
-// We handle the /test sub-path here via query param ?action=test
 export async function POST(request: NextRequest) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  if (!isTwilioConfigured()) {
-    return NextResponse.json({ error: "Twilio is not configured on this server." }, { status: 503 });
-  }
+  const url = new URL(request.url);
+  const action = url.searchParams.get("action");
 
   const userId = await getCanonicalUserId(session);
   const settings = await prisma.userPhoneSettings.findUnique({ where: { userId } });
 
+  // 1. Test Telegram
+  if (action === "test-telegram") {
+    if (!isTelegramConfigured()) {
+      return NextResponse.json(
+        { error: "Telegram bot is not configured on this server." },
+        { status: 503 },
+      );
+    }
+
+    const chatId = settings?.telegramChatId || getDefaultTelegramChatId();
+    if (!chatId) {
+      return NextResponse.json({ error: "No Telegram Chat ID found." }, { status: 400 });
+    }
+
+    const result = await sendTelegramMessage(
+      chatId,
+      "📺 <b>Cablecast Reminder Test</b>\n\nYour Telegram reminders are connected and working! You will receive alerts here 10 minutes before your scheduled broadcasts air.",
+    );
+    return NextResponse.json(result);
+  }
+
+  // 2. Twilio actions require Twilio to be configured
+  if (!isTwilioConfigured()) {
+    return NextResponse.json({ error: "Twilio is not configured on this server." }, { status: 503 });
+  }
+
   if (!settings?.phoneNumber) {
     return NextResponse.json({ error: "No phone number saved." }, { status: 400 });
   }
-
-  const url = new URL(request.url);
-  const action = url.searchParams.get("action");
 
   if (action === "test-call") {
     const result = await makeCall(
@@ -122,35 +171,5 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(result);
   }
 
-  // Default: verify the number by sending an OTP
-  const otp = Math.floor(100000 + Math.random() * 900000).toString();
-  // Store hashed OTP temporarily (we re-use the verifiedAt as null to flag pending)
-  // Simple approach: store OTP in a temp key — we use the updatedAt timestamp to expire it
-  const otpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 min
-
-  // We'll encode OTP in a way we can check later without a separate table:
-  // Store as verifiedAt = null and add a transient server-side cache would normally be ideal,
-  // but for simplicity we store the hash in the DB as a special sentinel value.
-  // Here we keep it simple: just send the OTP and mark verifiedAt only on confirm.
-  await prisma.userPhoneSettings.update({
-    where: { userId },
-    data: { verifiedAt: null },
-  });
-
-  // Store OTP hash with expiry — embed in updatedAt epoch won't work, so we'll use a
-  // simple in-memory approach isn't durable on serverless. Instead, store OTP as a
-  // hash in a scratch column or just confirm without strict OTP for now.
-  // SIMPLIFICATION: For this app (single user / admin), we skip strict OTP and just send
-  // a verification SMS then mark verified immediately. Full OTP loop can be added later.
-  const smsResult = await sendSms(
-    settings.phoneNumber,
-    `📺 Cablecast verification code: ${otp}\n\nEnter this code to confirm your phone number. Expires in 10 minutes.`,
-  );
-
-  if (!smsResult.success) {
-    return NextResponse.json({ error: `Failed to send SMS: ${smsResult.error}` }, { status: 500 });
-  }
-
-  // Return the expiry so the client can show a countdown
-  return NextResponse.json({ success: true, otp, otpExpiry });
+  return NextResponse.json({ error: "Invalid action" }, { status: 400 });
 }
