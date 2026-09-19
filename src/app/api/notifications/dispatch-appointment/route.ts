@@ -41,7 +41,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "scheduleId is required" }, { status: 400 });
     }
 
-    const res = await dispatchStartingSoonForSlot(scheduleId, new Date());
+    const host = request.headers.get("x-forwarded-host") || request.headers.get("host");
+    const proto = request.headers.get("x-forwarded-proto") || "https";
+    const requestOrigin = host ? `${proto}://${host}` : request.nextUrl.origin;
+
+    const res = await dispatchStartingSoonForSlot(scheduleId, new Date(), requestOrigin);
     return NextResponse.json(res);
   } catch (error) {
     console.error("[dispatch-appointment] Error handling delayed alert:", error);

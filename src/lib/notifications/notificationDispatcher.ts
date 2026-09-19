@@ -578,6 +578,7 @@ export async function runAllNotificationDispatchers(now: Date = new Date()): Pro
 export async function dispatchStartingSoonForSlot(
   slotId: string,
   now: Date = new Date(),
+  requestOrigin?: string | null,
 ): Promise<{ success: boolean; reason?: string }> {
   const slot = await prisma.userPersonalSchedule.findUnique({
     where: { id: slotId },
@@ -725,7 +726,7 @@ export async function dispatchStartingSoonForSlot(
         effectiveOffset,
       );
       const nextWeekAlertTime = new Date(nextWeekAir.getTime() - 10 * 60 * 1000);
-      void scheduleDelayedBroadcastAlert({ scheduleId: slot.id, alertTime: nextWeekAlertTime });
+      void scheduleDelayedBroadcastAlert({ scheduleId: slot.id, alertTime: nextWeekAlertTime, requestOrigin });
     } catch (e) {
       console.error("[QStash] Failed to schedule next week alert:", e);
     }

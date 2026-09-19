@@ -108,7 +108,10 @@ export async function POST(request: NextRequest) {
           updated.timezoneOffset ?? 0,
         );
         const alertTime = new Date(nextAir.getTime() - 10 * 60 * 1000);
-        void scheduleDelayedBroadcastAlert({ scheduleId: updated.id, alertTime });
+        const host = request.headers.get("x-forwarded-host") || request.headers.get("host");
+        const proto = request.headers.get("x-forwarded-proto") || "https";
+        const requestOrigin = host ? `${proto}://${host}` : request.nextUrl.origin;
+        void scheduleDelayedBroadcastAlert({ scheduleId: updated.id, alertTime, requestOrigin });
       } catch (e) {
         console.error("[QStash] Failed to schedule rescheduled alert:", e);
       }
@@ -294,7 +297,10 @@ export async function POST(request: NextRequest) {
           const rerunTz = originalSchedule?.timezoneOffset ?? (typeof body.timezoneOffset === "number" ? body.timezoneOffset : 0);
           const nextAir = getNextAirDate(day, startMin, new Date(), rerunTz);
           const alertTime = new Date(nextAir.getTime() - 10 * 60 * 1000);
-          void scheduleDelayedBroadcastAlert({ scheduleId: targetSlotId, alertTime });
+          const host = request.headers.get("x-forwarded-host") || request.headers.get("host");
+          const proto = request.headers.get("x-forwarded-proto") || "https";
+          const requestOrigin = host ? `${proto}://${host}` : request.nextUrl.origin;
+          void scheduleDelayedBroadcastAlert({ scheduleId: targetSlotId, alertTime, requestOrigin });
         }
       } catch (e) {
         console.error("[QStash] Failed to schedule rerun alert:", e);

@@ -80,13 +80,15 @@ describe("Upstash QStash Notification Integration", () => {
       expect(getAppBaseUrl()).toBe("http://localhost:3000");
     });
 
-    it("falls back to https://cablecast.tv in production", () => {
+    it("uses requestOrigin when provided", () => {
+      expect(getAppBaseUrl("https://my-domain.vercel.app")).toBe("https://my-domain.vercel.app");
+    });
+
+    it("falls back to localhost:3000 if no URL environment variables or origin provided", () => {
       delete process.env.NEXT_PUBLIC_APP_URL;
       delete process.env.VERCEL_PROJECT_PRODUCTION_URL;
       delete process.env.VERCEL_URL;
-      vi.stubEnv("NODE_ENV", "production");
-
-      expect(getAppBaseUrl()).toBe("https://cablecast.tv");
+      expect(getAppBaseUrl()).toBe("http://localhost:3000");
     });
 
     it("normalizes NEXT_PUBLIC_APP_URL by removing trailing slashes and ensuring protocol", () => {

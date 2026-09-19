@@ -1,6 +1,9 @@
 import { Client, Receiver } from "@upstash/qstash";
 
-export function getAppBaseUrl(): string {
+export function getAppBaseUrl(requestOrigin?: string | null): string {
+  if (requestOrigin && !requestOrigin.includes("localhost") && !requestOrigin.includes("127.0.0.1")) {
+    return requestOrigin.replace(/\/$/, "");
+  }
   if (process.env.NEXT_PUBLIC_APP_URL) {
     let url = process.env.NEXT_PUBLIC_APP_URL.replace(/\/$/, "");
     if (!url.startsWith("http://") && !url.startsWith("https://")) {
@@ -9,13 +12,15 @@ export function getAppBaseUrl(): string {
     return url;
   }
   if (process.env.VERCEL_PROJECT_PRODUCTION_URL) {
-    return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`;
+    const host = process.env.VERCEL_PROJECT_PRODUCTION_URL.replace(/\/$/, "");
+    return host.startsWith("http") ? host : `https://${host}`;
   }
   if (process.env.VERCEL_URL) {
-    return `https://${process.env.VERCEL_URL}`;
+    const host = process.env.VERCEL_URL.replace(/\/$/, "");
+    return host.startsWith("http") ? host : `https://${host}`;
   }
-  if (process.env.NODE_ENV === "production") {
-    return "https://cablecast.tv";
+  if (requestOrigin) {
+    return requestOrigin.replace(/\/$/, "");
   }
   return "http://localhost:3000";
 }
@@ -59,6 +64,7 @@ export function getQStashReceiver(): Receiver | null {
 export interface ScheduleAlertParams {
   scheduleId: string;
   alertTime: Date;
+  requestOrigin?: string | null;
 }
 
 /**
@@ -69,7 +75,7 @@ export interface ScheduleAlertParams {
 export async function scheduleDelayedBroadcastAlert(
   params: ScheduleAlertParams,
 ): Promise<{ success: boolean; messageId?: string; mode: "qstash" | "dev_timer" | "noop" }> {
-  const { scheduleId, alertTime } = params;
+  const { scheduleId, alertTime, requestOrigin } = params;
   const now = new Date();
   const notBeforeEpoch = Math.max(
     Math.floor(Date.now() / 1000),
@@ -77,7 +83,7 @@ export async function scheduleDelayedBroadcastAlert(
   );
 
   const client = getQStashClient();
-  const baseUrl = getAppBaseUrl();
+  const baseUrl = getAppBaseUrl(requestOrigin);
   const destinationUrl = `${baseUrl}/api/notifications/dispatch-appointment`;
 
   // 1. Cloud QStash execution (Production or Public URL)
@@ -94,9 +100,10 @@ export async function scheduleDelayedBroadcastAlert(
         retries: 3,
       });
 
+      console.log(`[QStash] Successfully scheduled delayed alert for slot ${scheduleId} to ${destinationUrl} at ${alertTime.toISOString()} (msg: ${res.messageId})`);
       return { success: true, messageId: res.messageId, mode: "qstash" };
     } catch (error) {
-      console.error("[QStash] Failed to publish delayed alert:", error);
+      console.error(`[QStash] Failed to publish delayed alert to ${destinationUrl}:`, error);
     }
   }
 

@@ -1,0 +1,70 @@
+import { NextRequest, NextResponse } from "next/server";
+import { runAllNotificationDispatchers } from "@/lib/notifications/notificationDispatcher";
+import { getSession } from "@/lib/auth/server";
+
+export const dynamic = "force-dynamic";
+
+/**
+ * Scheduled cron / webhook endpoint to process notification triggers:
+ * 1. Starting Soon (10 mins before broadcast)
+ * 2. Missed Broadcast (completed unwatched)
+ * 3. Tape Expiring Soon (2 hours before expiration)
+ *
+ * Runs idempotently: if QStash already alerted the user, this sweeper
+ * skips without duplicating alerts. If QStash failed or dropped, this
+ * catches the slot and delivers the Web Push notification.
+ */
+export async function GET(request: NextRequest) {
+  return handleCron(request);
+}
+
+export async function POST(request: NextRequest) {
+  return handleCron(request);
+}
+
+async function handleCron(request: NextRequest) {
+  try {
+    const authHeader = request.headers.get("authorization");
+    const secretHeader = request.headers.get("x-cron-secret");
+    const vercelCron = request.headers.get("x-vercel-cron");
+    const expectedSecret = process.env.CRON_SECRET ?? null;
+
+    const url = new URL(request.url);
+    const queryKey = url.searchParams.get("key") || url.searchParams.get("secret");
+
+    const userAgent = request.headers.get("user-agent") || "";
+    const isCronJobOrg = userAgent.toLowerCase().includes("cron-job.org");
+
+    const session = await getSession();
+
+    // Flexible authorization: allow cron-job.org pings, Bearer tokens, custom headers, URL query keys (?key=...),
+    // authenticated admin sessions, Vercel cron headers, or development mode.
+    const isExplicitlyAuthorized =
+      isCronJobOrg ||
+      session?.role === "admin" ||
+      Boolean(vercelCron) ||
+      (expectedSecret !== null && authHeader === `Bearer ${expectedSecret}`) ||
+      (expectedSecret !== null && secretHeader === expectedSecret) ||
+      (expectedSecret !== null && queryKey === expectedSecret) ||
+      expectedSecret === null ||
+      process.env.NODE_ENV === "development";
+
+    if (!isExplicitlyAuthorized) {
+      return NextResponse.json({ error: "Unauthorized cron execution." }, { status: 401 });
+    }
+
+    const summary = await runAllNotificationDispatchers(new Date());
+
+    return NextResponse.json({
+      success: true,
+      timestamp: new Date().toISOString(),
+      dispatched: summary,
+    });
+  } catch (error) {
+    console.error("[api/cron/notifications] Error executing notification cron:", error);
+    return NextResponse.json(
+      { error: "Failed to process notification dispatch.", details: String(error) },
+      { status: 500 },
+    );
+  }
+}

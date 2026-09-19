@@ -891,7 +891,10 @@ export async function POST(request: NextRequest) {
             item.timezoneOffset ?? 0,
           );
           const alertTime = new Date(nextAir.getTime() - 10 * 60 * 1000);
-          void scheduleDelayedBroadcastAlert({ scheduleId: item.id, alertTime });
+          const host = request.headers.get("x-forwarded-host") || request.headers.get("host");
+          const proto = request.headers.get("x-forwarded-proto") || "https";
+          const requestOrigin = host ? `${proto}://${host}` : request.nextUrl.origin;
+          void scheduleDelayedBroadcastAlert({ scheduleId: item.id, alertTime, requestOrigin });
         } catch (e) {
           console.error("[QStash] Failed to schedule initial alert:", e);
         }
