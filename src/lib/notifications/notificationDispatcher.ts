@@ -20,28 +20,31 @@ async function sendToUserSubscriptions(
 ): Promise<{ sent: number; failed: number; cleaned: number }> {
   let subscriptions: any[] = [];
   try {
-    const userKeys = [userId];
-    let session: any = null;
+    const userKeys = new Set<string>([userId]);
+    let sessions: any[] = [];
     try {
-      session = await prisma.session?.findFirst({
-        where: {
-          OR: [{ id: userId }, { accessCodeId: userId }],
-        },
-        select: { id: true, accessCodeId: true, role: true },
-      });
+      sessions =
+        (await prisma.session?.findMany({
+          where: {
+            OR: [
+              { id: userId },
+              { accessCodeId: userId },
+              ...(userId === "admin" ? [{ role: "admin" }] : []),
+            ],
+          },
+          select: { id: true, accessCodeId: true, role: true },
+        })) || [];
     } catch {
-      session = null;
+      sessions = [];
     }
-    if (session) {
-      if (session.id && !userKeys.includes(session.id)) userKeys.push(session.id);
-      if (session.accessCodeId && !userKeys.includes(session.accessCodeId)) userKeys.push(session.accessCodeId);
-      // Admin subscriptions are stored as userId="admin" by getPersistentUserId().
-      // Schedule slots store the actual session.id, so we must add "admin" here.
-      if (session.role === "admin" && !userKeys.includes("admin")) userKeys.push("admin");
+    for (const session of sessions) {
+      if (session.id) userKeys.add(session.id);
+      if (session.accessCodeId) userKeys.add(session.accessCodeId);
+      if (session.role === "admin") userKeys.add("admin");
     }
 
     subscriptions = (await prisma.pushSubscription.findMany({
-      where: { userId: { in: userKeys } },
+      where: { userId: { in: Array.from(userKeys) } },
     })) || [];
   } catch {
     subscriptions = [];
