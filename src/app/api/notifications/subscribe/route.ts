@@ -116,10 +116,12 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Trigger dispatcher check in the background for any shows currently starting soon
-    void runAllNotificationDispatchers().catch((e) => {
+    // Trigger dispatcher check for any shows currently starting soon
+    try {
+      await runAllNotificationDispatchers();
+    } catch (e) {
       console.warn("[api/notifications/subscribe] Background dispatcher check error:", e);
-    });
+    }
 
     return NextResponse.json({
       success: true,

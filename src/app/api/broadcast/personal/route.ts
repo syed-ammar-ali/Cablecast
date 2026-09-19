@@ -894,7 +894,7 @@ export async function POST(request: NextRequest) {
           const host = request.headers.get("x-forwarded-host") || request.headers.get("host");
           const proto = request.headers.get("x-forwarded-proto") || "https";
           const requestOrigin = host ? `${proto}://${host}` : request.nextUrl.origin;
-          void scheduleDelayedBroadcastAlert({ scheduleId: item.id, alertTime, requestOrigin });
+          await scheduleDelayedBroadcastAlert({ scheduleId: item.id, alertTime, requestOrigin });
         } catch (e) {
           console.error("[QStash] Failed to schedule initial alert:", e);
         }

@@ -729,7 +729,7 @@ export async function dispatchStartingSoonForSlot(
         effectiveOffset,
       );
       const nextWeekAlertTime = new Date(nextWeekAir.getTime() - 10 * 60 * 1000);
-      void scheduleDelayedBroadcastAlert({ scheduleId: slot.id, alertTime: nextWeekAlertTime, requestOrigin });
+      await scheduleDelayedBroadcastAlert({ scheduleId: slot.id, alertTime: nextWeekAlertTime, requestOrigin });
     } catch (e) {
       console.error("[QStash] Failed to schedule next week alert:", e);
     }
