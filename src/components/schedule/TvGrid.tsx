@@ -442,7 +442,7 @@ function PersonalChannelRow({
   const isCyan = accentColor === "cyan";
 
   return (
-    <div className="flex border-b border-neutral-900 bg-neutral-950/40 [content-visibility:auto] [contain-intrinsic-size:auto_60px]">
+    <div className="flex border-b border-neutral-900 bg-neutral-950/40">
       <div
         className="sticky left-0 z-30 flex shrink-0 items-center justify-between border-r border-neutral-800 bg-black px-2 md:px-3 text-base font-semibold text-neutral-100 shadow-[2px_0_6px_-2px_rgba(0,0,0,0.8)] w-24 md:w-52"
         style={{ height: ROW_HEIGHT_PX }}
@@ -684,7 +684,7 @@ function NetworkRow({
   }, [items]);
 
   return (
-    <div className="flex border-b border-neutral-900 [content-visibility:auto] [contain-intrinsic-size:auto_60px]">
+    <div className="flex border-b border-neutral-900">
       <div
         className="sticky left-0 z-30 flex shrink-0 items-center gap-2 border-r border-neutral-800 bg-black px-2 md:px-3 text-base font-semibold text-neutral-100 shadow-[2px_0_6px_-2px_rgba(0,0,0,0.8)] w-24 md:w-52"
         style={{ height: ROW_HEIGHT_PX }}
