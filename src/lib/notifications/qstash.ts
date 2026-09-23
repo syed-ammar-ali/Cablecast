@@ -42,7 +42,9 @@ export function getQStashClient(): Client | null {
   if (!qstashClient) {
     qstashClient = new Client({
       token: process.env.QSTASH_TOKEN,
-      baseUrl: process.env.QSTASH_URL || "https://qstash.upstash.io",
+      // Do NOT pass baseUrl — the SDK default (https://qstash.upstash.io) is the correct
+      // public API. Regional subdomains like qstash-eu-central-1.upstash.io are internal
+      // Upstash routing and will cause publishJSON to silently fail.
     });
   }
   return qstashClient;
@@ -87,6 +89,8 @@ export async function scheduleDelayedBroadcastAlert(
   const destinationUrl = `${baseUrl}/api/notifications/dispatch-appointment`;
 
   // 1. Cloud QStash execution (Production or Public URL)
+  console.log(`[QStash] scheduleDelayedBroadcastAlert: baseUrl="${baseUrl}", destination="${destinationUrl}", alertTime=${alertTime.toISOString()}, hasClient=${Boolean(client)}, notBefore=${notBeforeEpoch}`);
+
   if (client && !baseUrl.includes("localhost") && !baseUrl.includes("127.0.0.1")) {
     try {
       const res = await client.publishJSON({
@@ -105,6 +109,10 @@ export async function scheduleDelayedBroadcastAlert(
     } catch (error) {
       console.error(`[QStash] Failed to publish delayed alert to ${destinationUrl}:`, error);
     }
+  } else if (!client) {
+    console.warn("[QStash] Skipping: QSTASH_TOKEN is not set.");
+  } else {
+    console.log(`[QStash] Skipping cloud delivery: baseUrl is localhost. Using dev_timer fallback.`);
   }
 
   // 2. Development mode timer fallback (for testing on localhost without an ngrok tunnel)

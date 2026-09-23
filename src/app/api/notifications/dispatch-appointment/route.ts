@@ -17,21 +17,33 @@ export async function POST(request: NextRequest) {
     // Cryptographic signature check (when signing keys are configured)
     const receiver = getQStashReceiver();
     const signature = request.headers.get("upstash-signature");
+
+    console.log(`[dispatch-appointment] Incoming request. Has signature: ${Boolean(signature)}, Has receiver: ${Boolean(receiver)}, ENV: ${process.env.NODE_ENV}`);
+
     if (receiver && (process.env.NODE_ENV === "production" || signature)) {
       if (!signature) {
+        console.error("[dispatch-appointment] Rejected: missing QStash signature header");
         return NextResponse.json({ error: "Missing QStash signature" }, { status: 401 });
       }
-      const isValid = await receiver
-        .verify({
+      let isValid = false;
+      try {
+        isValid = await receiver.verify({
           signature,
           body: rawBody,
+          // clockTolerance: allow up to 5 extra minutes for retried/delayed messages.
+          // Without this, QStash retries arriving after the default 5-min window are rejected.
+          clockTolerance: 300,
           // Omitting `url` avoids false rejection when reverse proxies or Vercel
-          // rewrite the internal listener host, while verifying cryptographic HMAC
+          // rewrite the internal listener host, while still verifying cryptographic HMAC
           // and SHA256 body hash integrity.
-        })
-        .catch(() => false);
+        });
+      } catch (verifyErr) {
+        console.error("[dispatch-appointment] Signature verify threw error:", verifyErr);
+        isValid = false;
+      }
 
       if (!isValid) {
+        console.error("[dispatch-appointment] Rejected: invalid QStash signature. Check that QSTASH_CURRENT_SIGNING_KEY and QSTASH_NEXT_SIGNING_KEY in Vercel env match the keys at console.upstash.com.");
         return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
       }
     }
