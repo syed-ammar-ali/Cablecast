@@ -23,6 +23,8 @@ const DatePicker = dynamic(
   () => import("./DatePicker").then((mod) => mod.DatePicker),
   { ssr: false },
 );
+import { playMechanicalClick } from "@/lib/soundEffects";
+import { Tooltip } from "@/components/ui/Tooltip";
 
 interface AppHeaderProps {
   searchQuery: string;
@@ -237,19 +239,23 @@ export function AppHeader({
 
         <div className="flex w-full max-w-md items-center gap-2 justify-self-center sm:w-[32rem]">
           {onOpenBroadcastStudio && (
-            <button
-              type="button"
-              onClick={onOpenBroadcastStudio}
-              title="Broadcast Studio (My Lineup & Reruns)"
-              className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-neutral-700 bg-transparent text-neutral-300 transition-colors hover:border-purple-400/60 hover:text-purple-400 cursor-pointer active:scale-95"
-            >
-              <Radio className="h-4 w-4" />
-              {missedBroadcastCount != null && missedBroadcastCount > 0 && (
-                <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-600 px-1 font-mono text-[9px] font-bold text-white shadow animate-pulse">
-                  {missedBroadcastCount}
-                </span>
-              )}
-            </button>
+            <Tooltip content="Broadcast Studio" position="bottom">
+              <button
+                type="button"
+                onClick={() => {
+                  playMechanicalClick();
+                  onOpenBroadcastStudio();
+                }}
+                className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-neutral-700 bg-transparent text-neutral-300 transition-colors hover:border-purple-400/60 hover:text-purple-400 cursor-pointer active:scale-95"
+              >
+                <Radio className="h-4 w-4" />
+                {missedBroadcastCount != null && missedBroadcastCount > 0 && (
+                  <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-600 px-1 font-mono text-[9px] font-bold text-white shadow animate-pulse">
+                    {missedBroadcastCount}
+                  </span>
+                )}
+              </button>
+            </Tooltip>
           )}
 
           <form
@@ -260,17 +266,19 @@ export function AppHeader({
             className="relative flex-1"
           >
             {isExploreActive || searchQuery.trim() ? (
-              <button
-                type="button"
-                onClick={() => {
-                  onSearchQueryChange("");
-                  onHomeClick?.();
-                }}
-                className="absolute left-2.5 top-1/2 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-full text-neutral-400 hover:text-white hover:bg-neutral-800/80 transition-all cursor-pointer z-10"
-                title="Back to Cablecast"
-              >
-                <ArrowLeft className="h-4 w-4 transition-transform hover:-translate-x-0.5" />
-              </button>
+              <Tooltip content="Back to Cablecast" position="bottom">
+                <button
+                  type="button"
+                  onClick={() => {
+                    playMechanicalClick();
+                    onSearchQueryChange("");
+                    onHomeClick?.();
+                  }}
+                  className="absolute left-2.5 top-1/2 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-full text-neutral-400 hover:text-white hover:bg-neutral-800/80 transition-all cursor-pointer z-10"
+                >
+                  <ArrowLeft className="h-4 w-4 transition-transform hover:-translate-x-0.5" />
+                </button>
+              </Tooltip>
             ) : (
               <Search className="pointer-events-none absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-neutral-500" />
             )}
@@ -289,35 +297,43 @@ export function AppHeader({
                 }
               }}
               placeholder="Search movies & TV shows..."
-              className={`w-full rounded-full border bg-transparent py-2.5 pl-10 pr-9 text-base text-neutral-200 placeholder:text-neutral-500 transition-colors [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-decoration]:hidden [&::-webkit-search-results-button]:hidden [&::-webkit-search-results-decoration]:hidden ${
+              className={`w-full rounded-full border bg-white/[0.03] backdrop-blur-sm py-2.5 pl-10 pr-9 text-base text-neutral-200 placeholder:text-neutral-500 transition-all [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-decoration]:hidden [&::-webkit-search-results-button]:hidden [&::-webkit-search-results-decoration]:hidden ${
                 isExploreActive
-                  ? "border-sky-500/60 shadow-[0_0_15px_rgba(14,165,233,0.15)]"
-                  : "border-neutral-700 hover:border-sky-500/40 focus:border-sky-500/60"
+                  ? "border-sky-500/60 shadow-[0_0_15px_rgba(14,165,233,0.18)] ring-1 ring-sky-500/30"
+                  : "border-neutral-700/80 hover:border-neutral-500 focus:border-sky-500/60 focus:ring-1 focus:ring-sky-500/40"
               } focus:outline-none`}
             />
             {searchQuery ? (
-              <button
-                type="button"
-                onClick={() => onSearchQueryChange("")}
-                className="absolute right-3.5 top-1/2 -translate-y-1/2 rounded-full p-0.5 text-neutral-400 hover:text-white transition-colors cursor-pointer"
-                title="Clear search"
-              >
-                <X className="h-4 w-4" />
-              </button>
+              <Tooltip content="Clear search" position="bottom">
+                <button
+                  type="button"
+                  onClick={() => {
+                    playMechanicalClick();
+                    onSearchQueryChange("");
+                  }}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 rounded-full p-0.5 text-neutral-400 hover:text-white transition-colors cursor-pointer"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </Tooltip>
             ) : isSearchLoading ? (
               <Loader2 className="pointer-events-none absolute right-3.5 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-neutral-500" />
             ) : null}
           </form>
 
           {onOpenLibrary && (
-            <button
-              type="button"
-              onClick={onOpenLibrary}
-              title="My Library (Favorites & History)"
-              className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-neutral-700 bg-transparent text-neutral-300 transition-colors hover:border-yellow-400/50 hover:text-yellow-400 cursor-pointer active:scale-95"
-            >
-              <Bookmark className="h-4 w-4" />
-            </button>
+            <Tooltip content="My Library (Vault & Tapes)" position="bottom">
+              <button
+                type="button"
+                onClick={() => {
+                  playMechanicalClick();
+                  onOpenLibrary();
+                }}
+                className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-neutral-700 bg-transparent text-neutral-300 transition-colors hover:border-yellow-400/50 hover:text-yellow-400 cursor-pointer active:scale-95"
+              >
+                <Bookmark className="h-4 w-4" />
+              </button>
+            </Tooltip>
           )}
         </div>
 
@@ -394,15 +410,19 @@ function IdentityControls({
             Admin
           </Link>
         )}
-        <button
-          type="button"
-          onClick={onSignOut}
-          aria-label="Sign out"
-          title="Sign out"
-          className="flex items-center justify-center rounded-full border border-neutral-800 p-1.5 text-neutral-500 transition-colors hover:border-red-500/50 hover:text-red-400 cursor-pointer active:scale-95"
-        >
-          <LogOut className="h-3.5 w-3.5" />
-        </button>
+        <Tooltip content="Sign out" position="left">
+          <button
+            type="button"
+            onClick={() => {
+              playMechanicalClick();
+              onSignOut?.();
+            }}
+            aria-label="Sign out"
+            className="flex items-center justify-center rounded-full border border-neutral-800 p-1.5 text-neutral-500 transition-colors hover:border-red-500/50 hover:text-red-400 cursor-pointer active:scale-95"
+          >
+            <LogOut className="h-3.5 w-3.5" />
+          </button>
+        </Tooltip>
       </div>
     </div>
   );

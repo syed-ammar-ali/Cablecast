@@ -13,6 +13,7 @@
 
 export const CABLECAST_LIBRARY_MUTATION = "cablecast:library_mutation";
 export const CABLECAST_BROADCAST_MUTATION = "cablecast:broadcast_mutation";
+export const CABLECAST_WATCH_HISTORY_MUTATION = "cablecast:watch_history_mutation";
 export const CABLECAST_ADMIN_MUTATION = "cablecast:admin_mutation";
 
 let libraryTimer: ReturnType<typeof setTimeout> | null = null;
@@ -30,6 +31,16 @@ export function notifyBroadcastMutation() {
   if (broadcastTimer) clearTimeout(broadcastTimer);
   broadcastTimer = setTimeout(() => {
     window.dispatchEvent(new Event(CABLECAST_BROADCAST_MUTATION));
+    window.dispatchEvent(new Event(CABLECAST_WATCH_HISTORY_MUTATION));
+  }, 100);
+}
+
+let watchHistoryTimer: ReturnType<typeof setTimeout> | null = null;
+export function notifyWatchHistoryMutation() {
+  if (typeof window === "undefined") return;
+  if (watchHistoryTimer) clearTimeout(watchHistoryTimer);
+  watchHistoryTimer = setTimeout(() => {
+    window.dispatchEvent(new Event(CABLECAST_WATCH_HISTORY_MUTATION));
   }, 100);
 }
 

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Bookmark, Radio, Search, ShieldCheck, Tv } from "lucide-react";
 import { triggerHaptic } from "@/lib/haptics";
+import { playMechanicalClick } from "@/lib/soundEffects";
 
 interface BottomNavProps {
   isAdmin?: boolean;
@@ -45,6 +46,7 @@ export function BottomNav({
           type="button"
           aria-current={isHomeActive ? "page" : undefined}
           onClick={() => {
+            playMechanicalClick(0.06);
             triggerHaptic(10);
             onGoHome?.();
           }}
@@ -68,6 +70,7 @@ export function BottomNav({
           type="button"
           aria-current={isBroadcastStudioOpen ? "page" : undefined}
           onClick={() => {
+            playMechanicalClick(0.06);
             triggerHaptic(10);
             onOpenBroadcastStudio();
           }}
@@ -96,6 +99,7 @@ export function BottomNav({
           type="button"
           aria-current={isLibraryOpen ? "page" : undefined}
           onClick={() => {
+            playMechanicalClick(0.06);
             triggerHaptic(10);
             onOpenLibrary();
           }}
@@ -119,6 +123,7 @@ export function BottomNav({
           type="button"
           aria-current={isSearchActive ? "page" : undefined}
           onClick={() => {
+            playMechanicalClick(0.06);
             triggerHaptic(10);
             onToggleSearch();
           }}
@@ -142,7 +147,10 @@ export function BottomNav({
           <Link
             href="/admin"
             aria-current={isAdminActive ? "page" : undefined}
-            onClick={() => triggerHaptic(10)}
+            onClick={() => {
+              playMechanicalClick(0.06);
+              triggerHaptic(10);
+            }}
             className={`group flex flex-col items-center justify-center min-h-[44px] py-1 transition-all duration-150 active:scale-95 cursor-pointer ${
               isAdminActive
                 ? "text-emerald-400 font-semibold"

@@ -5,6 +5,7 @@ import {
   Check,
   ChevronDown,
   ChevronLeft,
+  ChevronRight,
   FastForward,
   RadioTower,
   RefreshCw,
@@ -57,6 +58,10 @@ interface VideoPlayerProps {
    * first manual channel change.
    */
   initialLiveEntry?: ScheduleEntry;
+  hasPreviousEpisode?: boolean;
+  hasNextEpisode?: boolean;
+  onPreviousEpisode?: () => void;
+  onNextEpisode?: () => void;
   onClose?: () => void;
 }
 
@@ -76,6 +81,10 @@ export function VideoPlayer({
   startOffsetSeconds = 0,
   title,
   initialLiveEntry,
+  hasPreviousEpisode = false,
+  hasNextEpisode = false,
+  onPreviousEpisode,
+  onNextEpisode,
   country,
   initialRegion,
   onClose,
@@ -679,12 +688,28 @@ export function VideoPlayer({
 
       switch (event.key) {
         case "ArrowUp":
-          event.preventDefault();
-          cycleChannel(1);
+          if (isLiveMode) {
+            event.preventDefault();
+            cycleChannel(1);
+          }
           break;
         case "ArrowDown":
-          event.preventDefault();
-          cycleChannel(-1);
+          if (isLiveMode) {
+            event.preventDefault();
+            cycleChannel(-1);
+          }
+          break;
+        case "ArrowLeft":
+          if (!isLiveMode && mediaType === "tv" && hasPreviousEpisode && onPreviousEpisode) {
+            event.preventDefault();
+            onPreviousEpisode();
+          }
+          break;
+        case "ArrowRight":
+          if (!isLiveMode && mediaType === "tv" && hasNextEpisode && onNextEpisode) {
+            event.preventDefault();
+            onNextEpisode();
+          }
           break;
         default:
           break;
@@ -693,7 +718,7 @@ export function VideoPlayer({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [cycleChannel]);
+  }, [cycleChannel, isLiveMode, mediaType, hasPreviousEpisode, hasNextEpisode, onPreviousEpisode, onNextEpisode]);
 
   const isLiveNow = isLiveMode && screenMode === "content";
   // Once a third-party provider's iframe is actually up and playing, it
@@ -896,6 +921,35 @@ export function VideoPlayer({
                   <span className="hidden sm:inline">Station Break</span>
                 </button>
               )}
+            </div>
+          )}
+
+          {/* Episode Navigation Buttons (On-demand TV playback only) */}
+          {!isLiveMode && mediaType === "tv" && screenMode === "content" && (
+            <div className="flex items-center rounded-lg border border-neutral-800/80 bg-black/85 text-neutral-300 shadow-lg backdrop-blur-md">
+              <button
+                type="button"
+                onClick={onPreviousEpisode}
+                disabled={!hasPreviousEpisode}
+                title={hasPreviousEpisode ? "Previous Episode (Left Arrow)" : "No previous episode"}
+                aria-label="Previous Episode"
+                className="flex h-8 sm:h-9 items-center gap-1 px-2 sm:px-2.5 text-[10px] sm:text-[11px] font-mono font-medium text-neutral-300 hover:bg-white/10 hover:text-white transition-colors disabled:cursor-not-allowed disabled:opacity-30 cursor-pointer touch-manipulation rounded-l-lg"
+              >
+                <ChevronLeft className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Prev</span>
+              </button>
+              <div className="h-4 w-px bg-neutral-800/80" />
+              <button
+                type="button"
+                onClick={onNextEpisode}
+                disabled={!hasNextEpisode}
+                title={hasNextEpisode ? "Next Episode (Right Arrow)" : "No next episode"}
+                aria-label="Next Episode"
+                className="flex h-8 sm:h-9 items-center gap-1 px-2 sm:px-2.5 text-[10px] sm:text-[11px] font-mono font-medium text-neutral-300 hover:bg-white/10 hover:text-white transition-colors disabled:cursor-not-allowed disabled:opacity-30 cursor-pointer touch-manipulation rounded-r-lg"
+              >
+                <span className="hidden sm:inline">Next</span>
+                <ChevronRight className="h-3.5 w-3.5" />
+              </button>
             </div>
           )}
 

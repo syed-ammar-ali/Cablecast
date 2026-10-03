@@ -1,12 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, Loader2, X, ShoppingBag } from "lucide-react";
 import { VideoPlayer } from "@/components/player/VideoPlayer";
 import type { MediaSearchResult, ShowDetails } from "@/types/media";
 import type { ScheduleEntry } from "@/types/schedule";
 import { notifyLibraryMutation, notifyBroadcastMutation } from "@/lib/syncEvents";
 import { triggerHaptic } from "@/lib/haptics";
+import { useAppData } from "@/lib/AppDataContext";
+import { playMechanicalClick, playChannelStatic } from "@/lib/soundEffects";
+import { Tooltip } from "@/components/ui/Tooltip";
 
 /**
  * A single, already-resolved embed URL with no fallback chain — used for
@@ -57,18 +60,140 @@ export function PlayerModal({
 
   const [season, setSeason] = useState(initialSeason ?? 1);
   const [episode, setEpisode] = useState(initialEpisode ?? 1);
+  const [offsetSeconds, setOffsetSeconds] = useState(startOffsetSeconds);
 
-  // Reset episode to 1 when season changes (unless caller provided a specific episode)
+  // App context watch history reporting
+  const { watchHistory } = useAppData();
+  const sessionStartTimeRef = useRef(Date.now());
+
+  // Track progress only for on-demand/manual playback (exclude live guide tune-ins & direct streams)
+  const isManualPlayback = !initialLiveEntry && !directBroadcast && Boolean(media?.tmdbId);
+
   useEffect(() => {
-    if (initialEpisode === undefined) {
-      setEpisode(1);
+    sessionStartTimeRef.current = Date.now();
+  }, [media?.tmdbId, season, episode]);
+
+  const reportCurrentProgress = useCallback(
+    (isCompleted = false) => {
+      if (!isManualPlayback || !media?.tmdbId) return;
+
+      const elapsedSeconds = Math.max(0, Math.floor((Date.now() - sessionStartTimeRef.current) / 1000));
+      const currentProgress = offsetSeconds + elapsedSeconds;
+
+      // Only save if at least 10 seconds of playback
+      if (currentProgress < 10) return;
+
+      watchHistory.reportProgress({
+        tmdbId: media.tmdbId,
+        mediaType: media.mediaType,
+        title: media.title,
+        posterPath: media.posterUrl || media.posterPath || null,
+        backdropUrl: media.backdropUrl || null,
+        releaseYear: media.releaseYear ? String(media.releaseYear) : null,
+        season: isTv ? season : 0,
+        episode: isTv ? episode : 0,
+        progressSeconds: currentProgress,
+        durationSeconds: (media as unknown as { runtime?: number })?.runtime
+          ? (media as unknown as { runtime?: number }).runtime! * 60
+          : null,
+        completed: isCompleted,
+      });
+    },
+    [isManualPlayback, media, offsetSeconds, watchHistory, isTv, season, episode]
+  );
+
+  // Periodic report every 30 seconds + final report on unmount
+  useEffect(() => {
+    if (!isManualPlayback) return;
+
+    const interval = setInterval(() => {
+      reportCurrentProgress();
+    }, 30_000);
+
+    return () => {
+      clearInterval(interval);
+      reportCurrentProgress();
+    };
+  }, [isManualPlayback, reportCurrentProgress]);
+
+  // Calculate next/previous navigation targets
+  const { canGoPrev, prevTarget, canGoNext, nextTarget } = useMemo(() => {
+    if (!isTv) return { canGoPrev: false, prevTarget: null, canGoNext: false, nextTarget: null };
+
+    const validSeasons = (details?.seasons || [])
+      .filter((s) => s.seasonNumber > 0 && s.episodeCount > 0)
+      .sort((a, b) => a.seasonNumber - b.seasonNumber);
+
+    const curSeasonObj = validSeasons.find((s) => s.seasonNumber === season);
+    const curSeasonEpCount = curSeasonObj?.episodeCount || 999;
+
+    let prev: { season: number; episode: number } | null = null;
+    if (episode > 1) {
+      prev = { season, episode: episode - 1 };
+    } else if (validSeasons.length > 0) {
+      const curIdx = validSeasons.findIndex((s) => s.seasonNumber === season);
+      if (curIdx > 0) {
+        const prevSeason = validSeasons[curIdx - 1];
+        prev = { season: prevSeason.seasonNumber, episode: prevSeason.episodeCount };
+      }
     }
-  }, [season, initialEpisode]);
 
-  const onCloseRef = useRef(onClose);
+    let next: { season: number; episode: number } | null = null;
+    if (episode < curSeasonEpCount) {
+      next = { season, episode: episode + 1 };
+    } else if (validSeasons.length > 0) {
+      const curIdx = validSeasons.findIndex((s) => s.seasonNumber === season);
+      if (curIdx >= 0 && curIdx < validSeasons.length - 1) {
+        const nextSeason = validSeasons[curIdx + 1];
+        next = { season: nextSeason.seasonNumber, episode: 1 };
+      }
+    }
+
+    return {
+      canGoPrev: Boolean(prev),
+      prevTarget: prev,
+      canGoNext: Boolean(next),
+      nextTarget: next,
+    };
+  }, [isTv, details?.seasons, season, episode]);
+
+  const handlePreviousEpisode = useCallback(() => {
+    if (!prevTarget) return;
+    reportCurrentProgress();
+    triggerHaptic(10);
+    setOffsetSeconds(0);
+    setSeason(prevTarget.season);
+    setEpisode(prevTarget.episode);
+  }, [prevTarget, reportCurrentProgress]);
+
+  const handleNextEpisode = useCallback(() => {
+    if (!nextTarget) return;
+    reportCurrentProgress();
+    triggerHaptic(10);
+    setOffsetSeconds(0);
+    setSeason(nextTarget.season);
+    setEpisode(nextTarget.episode);
+  }, [nextTarget, reportCurrentProgress]);
+
+  const [isClosing, setIsClosing] = useState(false);
+
+  const handleInitiateClose = useCallback(() => {
+    if (isClosing) return;
+    playMechanicalClick();
+    setIsClosing(true);
+    setTimeout(() => {
+      onClose();
+    }, 240);
+  }, [isClosing, onClose]);
+
+  const onCloseRef = useRef(handleInitiateClose);
   useEffect(() => {
-    onCloseRef.current = onClose;
-  }, [onClose]);
+    onCloseRef.current = handleInitiateClose;
+  }, [handleInitiateClose]);
+
+  useEffect(() => {
+    playChannelStatic();
+  }, []);
 
   // ── Browser History & Native Back Navigation (Web & Mobile) ──
   useEffect(() => {
@@ -134,11 +259,11 @@ export function PlayerModal({
 
   useEffect(() => {
     function handleEscape(event: KeyboardEvent) {
-      if (event.key === "Escape") onClose();
+      if (event.key === "Escape") handleInitiateClose();
     }
     window.addEventListener("keydown", handleEscape);
     return () => window.removeEventListener("keydown", handleEscape);
-  }, [onClose]);
+  }, [handleInitiateClose]);
 
   useEffect(() => {
     document.body.style.overflow = "hidden";
@@ -207,7 +332,7 @@ export function PlayerModal({
     }
 
     const actionHandlers: [MediaSessionAction, MediaSessionActionHandler | null][] = [
-      ["stop", () => onClose()],
+      ["stop", () => handleInitiateClose()],
       [
         "pause",
         () => {
@@ -359,7 +484,9 @@ export function PlayerModal({
 
   return (
     <div
-      className="fixed inset-0 z-[100] bg-black animate-in fade-in flex flex-col overflow-hidden select-none"
+      className={`fixed inset-0 z-[100] bg-black flex flex-col overflow-hidden select-none origin-center ${
+        isClosing ? "animate-crt-off" : "animate-crt-on"
+      }`}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
@@ -368,15 +495,16 @@ export function PlayerModal({
           {/* Top Header Bar */}
           <header className="w-full shrink-0 flex items-center justify-between gap-2 px-3 sm:px-4 py-2 pt-[max(0.5rem,env(safe-area-inset-top))] border-b border-neutral-800/80 bg-neutral-950/95 backdrop-blur-md z-30">
             <div className="flex items-center gap-2 min-w-0 max-w-[75vw] sm:max-w-md">
-              <button
-                type="button"
-                onClick={onClose}
-                aria-label="Back"
-                title="Back (Esc / Back gesture)"
-                className="flex h-8 sm:h-9 w-8 sm:w-9 shrink-0 items-center justify-center rounded-lg border border-neutral-800/80 bg-black/85 text-neutral-300 shadow-lg backdrop-blur-md transition-all hover:scale-105 hover:text-white active:scale-95 cursor-pointer touch-manipulation"
-              >
-                <ChevronLeft className="h-4 w-4 sm:h-5 sm:w-5" />
-              </button>
+              <Tooltip content="Back (Esc)">
+                <button
+                  type="button"
+                  onClick={handleInitiateClose}
+                  aria-label="Back"
+                  className="flex h-8 sm:h-9 w-8 sm:w-9 shrink-0 items-center justify-center rounded-lg border border-neutral-800/80 bg-black/85 text-neutral-300 shadow-lg backdrop-blur-md transition-all hover:scale-105 hover:text-white active:scale-95 cursor-pointer touch-manipulation"
+                >
+                  <ChevronLeft className="h-4 w-4 sm:h-5 sm:w-5" />
+                </button>
+              </Tooltip>
 
               <div className="flex flex-col min-w-0 rounded-lg border border-neutral-800/80 bg-black/85 px-2.5 py-1 sm:py-1.5 shadow-lg backdrop-blur-md">
                 <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-red-400">
@@ -389,15 +517,16 @@ export function PlayerModal({
               </div>
             </div>
 
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label="Close broadcast"
-              title="Close (Esc)"
-              className="flex h-8 sm:h-9 w-8 sm:w-9 shrink-0 items-center justify-center rounded-full border border-neutral-800/80 bg-black/85 text-neutral-300 shadow-lg backdrop-blur-md transition-all hover:scale-105 hover:text-white active:scale-95 cursor-pointer touch-manipulation"
-            >
-              <X className="h-4 w-4" />
-            </button>
+            <Tooltip content="Close (Esc)">
+              <button
+                type="button"
+                onClick={handleInitiateClose}
+                aria-label="Close broadcast"
+                className="flex h-8 sm:h-9 w-8 sm:w-9 shrink-0 items-center justify-center rounded-full border border-neutral-800/80 bg-black/85 text-neutral-300 shadow-lg backdrop-blur-md transition-all hover:scale-105 hover:text-white active:scale-95 cursor-pointer touch-manipulation"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </Tooltip>
           </header>
 
           {/* Body Below Header Fitting the Screen */}
@@ -425,22 +554,26 @@ export function PlayerModal({
       ) : !media || !showPlayer || isCheckingOwnership ? (
         <div className="relative flex h-full w-full flex-col bg-black text-neutral-500">
           <header className="w-full shrink-0 flex items-center justify-between px-3 sm:px-4 py-2 pt-[max(0.5rem,env(safe-area-inset-top))] border-b border-neutral-800/80 bg-neutral-950/95 backdrop-blur-md z-30">
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label="Back"
-              className="flex h-8 sm:h-9 w-8 sm:w-9 items-center justify-center rounded-lg border border-neutral-800/80 bg-black/85 text-neutral-300 shadow-lg backdrop-blur-md transition-all hover:scale-105 hover:text-white active:scale-95 cursor-pointer touch-manipulation"
-            >
-              <ChevronLeft className="h-4 w-4 sm:h-5 sm:w-5" />
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label="Close player"
-              className="flex h-8 sm:h-9 w-8 sm:w-9 items-center justify-center rounded-full border border-neutral-800/80 bg-black/85 text-neutral-300 shadow-lg backdrop-blur-md transition-all hover:scale-105 hover:text-white active:scale-95 cursor-pointer touch-manipulation"
-            >
-              <X className="h-4 w-4" />
-            </button>
+            <Tooltip content="Back (Esc)">
+              <button
+                type="button"
+                onClick={handleInitiateClose}
+                aria-label="Back"
+                className="flex h-8 sm:h-9 w-8 sm:w-9 items-center justify-center rounded-lg border border-neutral-800/80 bg-black/85 text-neutral-300 shadow-lg backdrop-blur-md transition-all hover:scale-105 hover:text-white active:scale-95 cursor-pointer touch-manipulation"
+              >
+                <ChevronLeft className="h-4 w-4 sm:h-5 sm:w-5" />
+              </button>
+            </Tooltip>
+            <Tooltip content="Close (Esc)">
+              <button
+                type="button"
+                onClick={handleInitiateClose}
+                aria-label="Close player"
+                className="flex h-8 sm:h-9 w-8 sm:w-9 items-center justify-center rounded-full border border-neutral-800/80 bg-black/85 text-neutral-300 shadow-lg backdrop-blur-md transition-all hover:scale-105 hover:text-white active:scale-95 cursor-pointer touch-manipulation"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </Tooltip>
           </header>
           <div className="flex-1 min-h-0 flex items-center justify-center">
             <Loader2 className="h-8 w-8 animate-spin text-purple-400" />
@@ -523,7 +656,7 @@ export function PlayerModal({
 
               <button
                 type="button"
-                onClick={onClose}
+                onClick={handleInitiateClose}
                 className="w-full rounded-xl border border-neutral-800 bg-neutral-900 py-2.5 text-xs font-mono text-neutral-400 hover:text-white transition-colors cursor-pointer"
               >
                 Return to Broadcast Studio
@@ -539,12 +672,16 @@ export function PlayerModal({
           mediaType={media.mediaType}
           season={season}
           episode={episode}
-          startOffsetSeconds={startOffsetSeconds}
+          startOffsetSeconds={offsetSeconds}
           startTime={startTime}
           initialLiveEntry={initialLiveEntry}
           country={country}
           title={isTv ? `${media.title} · S${season}E${episode}` : media.title}
-          onClose={onClose}
+          hasPreviousEpisode={canGoPrev}
+          hasNextEpisode={canGoNext}
+          onPreviousEpisode={canGoPrev ? handlePreviousEpisode : undefined}
+          onNextEpisode={canGoNext ? handleNextEpisode : undefined}
+          onClose={handleInitiateClose}
         />
       )}
     </div>

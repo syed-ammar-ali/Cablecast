@@ -7,6 +7,7 @@ import { AuthInterceptor } from "@/components/auth/AuthInterceptor";
 import { PwaRegister } from "@/components/pwa/PwaRegister";
 import { NetworkStatusToast } from "@/components/pwa/NetworkStatusToast";
 import { IosInstallPrompt } from "@/components/pwa/IosInstallPrompt";
+import { FilmGrainOverlay } from "@/components/ui/FilmGrainOverlay";
 import "./globals.css";
 
 const geistSans = localFont({
@@ -75,6 +76,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           <AuthInterceptor />
           {children}
         </ToastProvider>
+        <FilmGrainOverlay />
         <SpeedInsights />
         <Analytics />
       </body>

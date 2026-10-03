@@ -905,6 +905,18 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Auto-remove from Continue Watching now that it is scheduled on broadcast
+    try {
+      await prisma.userWatchHistory.deleteMany({
+        where: {
+          sessionId: { in: userKeys },
+          tmdbId: input.tmdbId,
+        },
+      });
+    } catch (whErr) {
+      console.warn("[api/broadcast/personal] Failed to clear watch history for scheduled title:", whErr);
+    }
+
     return NextResponse.json({ success: true, createdCount: created.length, created });
   } catch (error) {
     console.error("[api/broadcast/personal] POST error:", error);

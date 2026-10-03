@@ -576,12 +576,17 @@ function EmptyState({
   hasQuery: boolean;
   onExplore: () => void;
 }) {
+  const containerClass =
+    "rounded-2xl border border-white/10 bg-gradient-to-b from-white/[0.03] to-transparent p-10 text-center shadow-inner backdrop-blur-sm";
+  const actionButtonClass =
+    "mt-5 inline-flex items-center gap-2 rounded-lg border border-white/15 bg-white/[0.06] hover:bg-white/10 px-4 py-2 text-xs font-semibold text-neutral-200 transition-all hover:scale-[1.02] active:scale-95 cursor-pointer shadow-md";
+
   if (hasQuery) {
     return (
-      <div className="rounded-xl border border-dashed border-neutral-800 p-10 text-center text-neutral-600">
-        <Search className="h-8 w-8 mx-auto mb-2 text-neutral-700" />
-        <p className="text-sm font-semibold text-neutral-400">No matching titles found</p>
-        <p className="mt-1 text-xs text-neutral-600">
+      <div className={containerClass}>
+        <Search className="h-8 w-8 mx-auto mb-2.5 text-neutral-600" />
+        <p className="text-sm font-semibold text-neutral-300">No matching titles found</p>
+        <p className="mt-1 text-xs text-neutral-500">
           Try searching for a different title or clear your search filter.
         </p>
       </div>
@@ -591,16 +596,16 @@ function EmptyState({
   switch (tabKey) {
     case "COLLECTION":
       return (
-        <div className="rounded-xl border border-dashed border-neutral-800 p-10 text-center text-neutral-600">
-          <Package className="h-8 w-8 mx-auto mb-2 text-neutral-700" />
-          <p className="text-sm font-semibold text-neutral-400">Your collection is empty</p>
-          <p className="mt-1 text-xs text-neutral-600">
+        <div className={containerClass}>
+          <Package className="h-8 w-8 mx-auto mb-2.5 text-neutral-600" />
+          <p className="text-sm font-semibold text-neutral-300">Your collection is empty</p>
+          <p className="mt-1 text-xs text-neutral-500">
             Purchased and rented titles will appear here.
           </p>
           <button
             type="button"
             onClick={onExplore}
-            className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-neutral-700 bg-neutral-900 px-3.5 py-1.5 text-xs font-semibold text-neutral-200 transition-colors hover:border-neutral-500 hover:text-white cursor-pointer"
+            className={actionButtonClass}
           >
             <Compass className="h-3.5 w-3.5" />
             <span>Explore Catalog</span>
@@ -610,16 +615,16 @@ function EmptyState({
 
     case "OWNED":
       return (
-        <div className="rounded-xl border border-dashed border-neutral-800 p-10 text-center text-neutral-600">
-          <Tag className="h-8 w-8 mx-auto mb-2 text-neutral-700" />
-          <p className="text-sm font-semibold text-neutral-400">No owned titles yet</p>
-          <p className="mt-1 text-xs text-neutral-600">
+        <div className={containerClass}>
+          <Tag className="h-8 w-8 mx-auto mb-2.5 text-neutral-600" />
+          <p className="text-sm font-semibold text-neutral-300">No owned titles yet</p>
+          <p className="mt-1 text-xs text-neutral-500">
             Media you buy permanently will be stored here.
           </p>
           <button
             type="button"
             onClick={onExplore}
-            className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-neutral-700 bg-neutral-900 px-3.5 py-1.5 text-xs font-semibold text-neutral-200 transition-colors hover:border-neutral-500 hover:text-white cursor-pointer"
+            className={actionButtonClass}
           >
             <Compass className="h-3.5 w-3.5" />
             <span>Explore Catalog</span>
@@ -629,16 +634,16 @@ function EmptyState({
 
     case "RENTED":
       return (
-        <div className="rounded-xl border border-dashed border-neutral-800 p-10 text-center text-neutral-600">
-          <Ticket className="h-8 w-8 mx-auto mb-2 text-neutral-700" />
-          <p className="text-sm font-semibold text-neutral-400">No active rentals</p>
-          <p className="mt-1 text-xs text-neutral-600">
+        <div className={containerClass}>
+          <Ticket className="h-8 w-8 mx-auto mb-2.5 text-neutral-600" />
+          <p className="text-sm font-semibold text-neutral-300">No active rentals</p>
+          <p className="mt-1 text-xs text-neutral-500">
             Rented titles will show up here along with their remaining rental window.
           </p>
           <button
             type="button"
             onClick={onExplore}
-            className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-neutral-700 bg-neutral-900 px-3.5 py-1.5 text-xs font-semibold text-neutral-200 transition-colors hover:border-neutral-500 hover:text-white cursor-pointer"
+            className={actionButtonClass}
           >
             <Compass className="h-3.5 w-3.5" />
             <span>Browse VHS Tapes</span>

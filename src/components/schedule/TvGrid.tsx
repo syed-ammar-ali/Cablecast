@@ -15,6 +15,7 @@ import type { MediaSearchResult } from "@/types/media";
 import type { PersonalScheduleItem, SubscribedChannel } from "@/types/broadcast";
 import { personalScheduleToMediaSearchResult } from "@/types/broadcast";
 import { triggerHaptic } from "@/lib/haptics";
+import { playMechanicalClick } from "@/lib/soundEffects";
 
 export type { BroadcastSelection } from "@/types/broadcastSelection";
 
@@ -263,8 +264,11 @@ export function TvGrid({
       {isAwayFromLive && (
         <button
           type="button"
-          onClick={handleJumpToLive}
-          className="fixed bottom-[max(4.75rem,calc(env(safe-area-inset-bottom)+4.25rem))] md:bottom-8 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-2 rounded-full border border-red-500/60 bg-neutral-950/95 px-3.5 py-1.5 text-xs font-bold uppercase tracking-wider text-white shadow-2xl shadow-red-950/80 backdrop-blur-md transition-all hover:bg-red-950/70 hover:border-red-400 active:scale-95 animate-in fade-in slide-in-from-bottom-3 duration-200 cursor-pointer whitespace-nowrap select-none"
+          onClick={() => {
+            playMechanicalClick();
+            handleJumpToLive();
+          }}
+          className="fixed bottom-[max(4.75rem,calc(env(safe-area-inset-bottom)+4.25rem))] md:bottom-8 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-2 rounded-full border border-red-500/60 bg-neutral-950/95 px-3.5 py-1.5 text-xs font-bold uppercase tracking-wider text-white shadow-2xl shadow-red-950/80 backdrop-blur-md transition-all hover:bg-red-950/70 hover:border-red-400 active:scale-95 animate-spring-in cursor-pointer whitespace-nowrap select-none"
           title="Jump to current live time on schedule"
         >
           <span className="relative flex h-2 w-2 shrink-0">
@@ -319,16 +323,23 @@ export function TvGrid({
               style={{ width: "calc(1440 * var(--px-per-min))", height: HEADER_HEIGHT_PX }}
             >
               {blockLabels.map((blockStart) => {
-                const isCurrent = blockStart === currentBlockStart;
+                const isCurrent = isToday && blockStart === currentBlockStart;
                 return (
                   <div
                     key={blockStart}
-                    className={`flex shrink-0 snap-start items-center justify-center border-r border-neutral-900 bg-black text-[9px] md:text-[11px] uppercase tracking-wide transition-colors px-0.5 truncate ${isCurrent
-                        ? "bg-neutral-800 text-white font-bold"
+                    className={`flex shrink-0 snap-start items-center justify-center border-r border-neutral-900 bg-black text-[9px] md:text-[11px] uppercase tracking-wide transition-colors px-1 truncate ${
+                      isCurrent
+                        ? "bg-neutral-800/90 text-white font-bold shadow-[inset_0_0_10px_rgba(239,68,68,0.25)] border-t-2 border-t-red-500"
                         : "text-neutral-500 hover:text-neutral-300"
-                      }`}
+                    }`}
                     style={{ width: "calc(30 * var(--px-per-min))", height: HEADER_HEIGHT_PX }}
                   >
+                    {isCurrent && (
+                      <span className="relative flex h-1.5 w-1.5 mr-1.5 shrink-0">
+                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
+                        <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-red-500" />
+                      </span>
+                    )}
                     <span className="truncate">{formatBlockRangeLabel(blockStart)}</span>
                   </div>
                 );
@@ -407,7 +418,7 @@ function LiveSweepLine() {
 
   return (
     <div
-      className="pointer-events-none absolute top-[44px] bottom-0 z-10 w-px bg-red-500/90 shadow-[0_0_8px_rgba(239,68,68,0.7)] left-24 md:left-52"
+      className="pointer-events-none absolute top-[44px] bottom-0 z-10 w-px bg-gradient-to-b from-red-500 via-red-500/80 to-transparent shadow-[0_0_12px_rgba(239,68,68,0.9)] left-24 md:left-52"
       style={{
         transform: `translateX(calc(${minutesNow} * var(--px-per-min)))`,
       }}
@@ -475,7 +486,7 @@ function PersonalChannelRow({
       >
         {items.length === 0 ? (
           <div
-            className="absolute inset-y-1 left-2 right-2 flex items-center justify-center rounded border border-dashed border-neutral-800/80 bg-neutral-950/40 text-center"
+            className="absolute inset-y-1 left-2 right-2 flex items-center justify-center rounded-lg border border-white/10 bg-white/[0.02] backdrop-blur-sm text-center shadow-inner"
           >
             <span className="text-[10px] md:text-[11px] font-mono uppercase tracking-wider text-neutral-400 truncate px-2">
               {isOwner
@@ -788,7 +799,7 @@ function ProgramCard({
   const accentClass = isLive
     ? "border-l-red-500 bg-red-950/20 hover:bg-red-900/30 shadow-[inset_0_0_12px_rgba(239,68,68,0.2)]"
     : isFuture
-      ? "border-l-neutral-700/60 opacity-70"
+      ? "border-l-neutral-700/60 opacity-70 hover:opacity-100 hover:bg-white/[0.04] hover:border-l-neutral-400 transition-all duration-200"
       : "border-l-neutral-800/40 opacity-35 grayscale";
 
   return (

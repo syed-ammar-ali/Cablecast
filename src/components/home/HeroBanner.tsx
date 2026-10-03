@@ -6,6 +6,8 @@ import { ChevronLeft, ChevronRight, Clock, Loader2, PlayCircle, ShoppingBag } fr
 import { useTouchGestures } from "@/lib/useTouchGestures";
 import type { MediaSearchResult } from "@/types/media";
 import type { BroadcastScheduleItem } from "@/types/tvmaze";
+import { playMechanicalClick } from "@/lib/soundEffects";
+import { Tooltip } from "@/components/ui/Tooltip";
 
 const SLIDE_DURATION_MS = 8000;
 const MAX_SLIDES = 8;
@@ -72,11 +74,13 @@ export function HeroBanner({
 
   const goNext = useCallback(() => {
     if (slides.length <= 1) return;
+    playMechanicalClick(0.05);
     goToSlide((activeIndex + 1) % slides.length);
   }, [activeIndex, slides.length, goToSlide]);
 
   const goPrev = useCallback(() => {
     if (slides.length <= 1) return;
+    playMechanicalClick(0.05);
     goToSlide((activeIndex - 1 + slides.length) % slides.length);
   }, [activeIndex, slides.length, goToSlide]);
 
@@ -145,26 +149,30 @@ export function HeroBanner({
 
       {/* Left arrow */}
       {slides.length > 1 && (
-        <button
-          type="button"
-          onClick={goPrev}
-          aria-label="Previous slide"
-          className="absolute left-2 sm:left-3 top-1/2 z-20 -translate-y-1/2 flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-full border border-white/20 bg-black/50 text-white opacity-80 sm:opacity-0 backdrop-blur-md transition-all sm:group-hover:opacity-100 hover:bg-black/80 hover:opacity-100 hover:scale-105 active:scale-90 cursor-pointer"
-        >
-          <ChevronLeft className="h-4 w-4 sm:h-5 sm:w-5" />
-        </button>
+        <Tooltip content="Previous slide" position="right">
+          <button
+            type="button"
+            onClick={goPrev}
+            aria-label="Previous slide"
+            className="absolute left-2 sm:left-3 top-1/2 z-20 -translate-y-1/2 flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-full border border-white/20 bg-black/50 text-white opacity-80 sm:opacity-0 backdrop-blur-md transition-all sm:group-hover:opacity-100 hover:bg-black/80 hover:opacity-100 hover:scale-105 active:scale-90 cursor-pointer"
+          >
+            <ChevronLeft className="h-4 w-4 sm:h-5 sm:w-5" />
+          </button>
+        </Tooltip>
       )}
 
       {/* Right arrow */}
       {slides.length > 1 && (
-        <button
-          type="button"
-          onClick={goNext}
-          aria-label="Next slide"
-          className="absolute right-2 sm:right-3 top-1/2 z-20 -translate-y-1/2 flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-full border border-white/20 bg-black/50 text-white opacity-80 sm:opacity-0 backdrop-blur-md transition-all sm:group-hover:opacity-100 hover:bg-black/80 hover:opacity-100 hover:scale-105 active:scale-90 cursor-pointer"
-        >
-          <ChevronRight className="h-4 w-4 sm:h-5 sm:w-5" />
-        </button>
+        <Tooltip content="Next slide" position="left">
+          <button
+            type="button"
+            onClick={goNext}
+            aria-label="Next slide"
+            className="absolute right-2 sm:right-3 top-1/2 z-20 -translate-y-1/2 flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-full border border-white/20 bg-black/50 text-white opacity-80 sm:opacity-0 backdrop-blur-md transition-all sm:group-hover:opacity-100 hover:bg-black/80 hover:opacity-100 hover:scale-105 active:scale-90 cursor-pointer"
+          >
+            <ChevronRight className="h-4 w-4 sm:h-5 sm:w-5" />
+          </button>
+        </Tooltip>
       )}
 
       {/* Bottom content */}
@@ -176,7 +184,7 @@ export function HeroBanner({
               <p className="mb-0.5 sm:mb-1 text-[10px] sm:text-xs font-semibold uppercase tracking-widest text-amber-400">
                 Trending Now
               </p>
-              <h1 className="text-xl sm:text-4xl lg:text-5xl font-bold uppercase tracking-wide text-white line-clamp-2 drop-shadow-md">
+              <h1 className="text-xl sm:text-4xl lg:text-5xl font-bold uppercase tracking-wide text-white line-clamp-2 drop-shadow-[0_4px_12px_rgba(0,0,0,0.85)] chromatic-hover select-none">
                 {featured.title}
               </h1>
               {featured.releaseYear && (
@@ -193,18 +201,8 @@ export function HeroBanner({
               {featured && (
                 <div className="mt-2.5 sm:mt-3 flex items-center gap-2 sm:gap-2.5">
                   {/* Rent Button */}
-                  <button
-                    type="button"
-                    onClick={() => onRent?.(featured)}
-                    disabled={isOwned?.(featured.tmdbId)}
-                    className={`pointer-events-auto inline-flex h-8 sm:h-9 min-w-[100px] sm:min-w-[116px] items-center justify-center gap-1.5 sm:gap-2 rounded-lg px-3 sm:px-4 text-[11px] sm:text-xs font-bold uppercase tracking-wider backdrop-blur-md shadow-lg transition-all cursor-pointer active:scale-95 ${
-                      isOwned?.(featured.tmdbId)
-                        ? "border border-neutral-800 bg-neutral-900/50 text-neutral-500 cursor-not-allowed opacity-50"
-                        : isRented?.(featured.tmdbId)
-                          ? "border border-amber-400/60 bg-amber-900/80 hover:bg-amber-800/90 text-white shadow-amber-950/40"
-                          : "border border-amber-500/50 bg-amber-950/70 hover:bg-amber-900/90 text-amber-300 hover:border-amber-400 hover:text-white"
-                    }`}
-                    title={
+                  <Tooltip
+                    content={
                       isOwned?.(featured.tmdbId)
                         ? "Already owned in collection"
                         : isRented?.(featured.tmdbId)
@@ -212,41 +210,61 @@ export function HeroBanner({
                           : "Rent this tape"
                     }
                   >
-                    <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-amber-400 shrink-0" />
-                    <span className="truncate">{isRented?.(featured.tmdbId) ? "✓ Rented" : "Rent"}</span>
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        playMechanicalClick();
+                        onRent?.(featured);
+                      }}
+                      disabled={isOwned?.(featured.tmdbId)}
+                      className={`pointer-events-auto inline-flex h-8 sm:h-9 min-w-[100px] sm:min-w-[116px] items-center justify-center gap-1.5 sm:gap-2 rounded-lg px-3 sm:px-4 text-[11px] sm:text-xs font-bold uppercase tracking-wider backdrop-blur-md shadow-lg transition-all cursor-pointer active:scale-95 ${
+                        isOwned?.(featured.tmdbId)
+                          ? "border border-neutral-800 bg-neutral-900/50 text-neutral-500 cursor-not-allowed opacity-50"
+                          : isRented?.(featured.tmdbId)
+                            ? "border border-amber-400/60 bg-amber-900/80 hover:bg-amber-800/90 text-white shadow-amber-950/40"
+                            : "border border-amber-500/50 bg-amber-950/70 hover:bg-amber-900/90 text-amber-300 hover:border-amber-400 hover:text-white"
+                      }`}
+                    >
+                      <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-amber-400 shrink-0" />
+                      <span className="truncate">{isRented?.(featured.tmdbId) ? "✓ Rented" : "Rent"}</span>
+                    </button>
+                  </Tooltip>
 
                   {/* Buy Button */}
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      if (isBuying) return;
-                      setIsBuying(true);
-                      try {
-                        await onBuy?.(featured);
-                      } finally {
-                        setIsBuying(false);
-                      }
-                    }}
-                    disabled={isOwned?.(featured.tmdbId) || isBuying}
-                    className={`pointer-events-auto inline-flex h-8 sm:h-9 min-w-[100px] sm:min-w-[116px] items-center justify-center gap-1.5 sm:gap-2 rounded-lg px-3 sm:px-4 text-[11px] sm:text-xs font-bold uppercase tracking-wider backdrop-blur-md shadow-lg transition-all cursor-pointer active:scale-95 ${
-                      isOwned?.(featured.tmdbId)
-                        ? "border border-emerald-800/60 bg-emerald-950/70 text-emerald-300"
-                        : "border border-white/20 bg-white hover:bg-neutral-200 text-black shadow-white/10 hover:scale-[1.02]"
-                    } disabled:cursor-not-allowed`}
-                    title={
+                  <Tooltip
+                    content={
                       isOwned?.(featured.tmdbId)
                         ? "Permanently owned in collection"
                         : "Purchase tape permanently"
                     }
                   >
-                    {isBuying ? (
-                      <Loader2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 animate-spin text-black shrink-0" />
-                    ) : (
-                      <ShoppingBag className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />
-                    )}
-                    <span className="truncate">{isOwned?.(featured.tmdbId) ? "✓ Owned" : "Buy"}</span>
-                  </button>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (isBuying) return;
+                        playMechanicalClick();
+                        setIsBuying(true);
+                        try {
+                          await onBuy?.(featured);
+                        } finally {
+                          setIsBuying(false);
+                        }
+                      }}
+                      disabled={isOwned?.(featured.tmdbId) || isBuying}
+                      className={`pointer-events-auto inline-flex h-8 sm:h-9 min-w-[100px] sm:min-w-[116px] items-center justify-center gap-1.5 sm:gap-2 rounded-lg px-3 sm:px-4 text-[11px] sm:text-xs font-bold uppercase tracking-wider backdrop-blur-md shadow-lg transition-all cursor-pointer active:scale-95 ${
+                        isOwned?.(featured.tmdbId)
+                          ? "border border-emerald-800/60 bg-emerald-950/70 text-emerald-300"
+                          : "border border-white/20 bg-white hover:bg-neutral-200 text-black shadow-white/10 hover:scale-[1.02]"
+                      } disabled:cursor-not-allowed`}
+                    >
+                      {isBuying ? (
+                        <Loader2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 animate-spin text-black shrink-0" />
+                      ) : (
+                        <ShoppingBag className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />
+                      )}
+                      <span className="truncate">{isOwned?.(featured.tmdbId) ? "✓ Owned" : "Buy"}</span>
+                    </button>
+                  </Tooltip>
                 </div>
               )}
             </div>
@@ -300,7 +318,11 @@ export function HeroBanner({
             ) : (
               <button
                 type="button"
-                onClick={(e) => { e.stopPropagation(); onSelectLive(liveNow); }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  playMechanicalClick();
+                  onSelectLive(liveNow);
+                }}
                 className="mt-1 inline-flex items-center gap-1 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-white backdrop-blur-sm transition-all hover:bg-white/20 cursor-pointer active:scale-95"
               >
                 <PlayCircle className="h-3 w-3 text-red-400" />
@@ -313,7 +335,7 @@ export function HeroBanner({
 
       {/* Scan-line progress indicators */}
       {slides.length > 1 && (
-        <div className="pointer-events-auto absolute bottom-2.5 left-1/2 z-10 flex -translate-x-1/2 items-center gap-1.5 sm:bottom-4">
+        <div className="pointer-events-auto absolute bottom-2.5 left-1/2 z-10 flex -translate-x-1/2 items-center gap-1.5 sm:bottom-4 rounded-full bg-black/40 backdrop-blur-md px-2.5 py-1.5 shadow-xl border border-white/10">
           {slides.map((slide, idx) => {
             const isActive = idx === activeIndex;
             const isPast = idx < activeIndex;

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import dynamic from "next/dynamic";
 import { AppHeader } from "@/components/home/AppHeader";
 import { HeroBanner } from "@/components/home/HeroBanner";
+import { ContinueWatchingRow } from "@/components/home/ContinueWatchingRow";
 import type { EpisodeSelection } from "@/components/media/MediaDetailsModal";
 import type { DirectBroadcast } from "@/components/player/PlayerModal";
 import { TvGrid } from "@/components/schedule/TvGrid";
@@ -82,8 +83,8 @@ function CablecastAppContent({ initialView = "home" }: CablecastAppProps) {
   const [selectedCountry, setSelectedCountry] = useState("US");
   const [now, setNow] = useState(() => new Date());
 
-  // Shared Library & Favourites & Broadcast state from AppDataContext
-  const { library, personalBroadcast } = useAppData();
+  // Shared Library & Favourites & Broadcast & Watch History state from AppDataContext
+  const { library, personalBroadcast, watchHistory } = useAppData();
   const [isLibraryOpen, setIsLibraryOpen] = useState(initialView === "library");
   const [isAdmin, setIsAdmin] = useState(false);
 
@@ -379,8 +380,9 @@ function CablecastAppContent({ initialView = "home" }: CablecastAppProps) {
     await Promise.allSettled([
       personalBroadcast.refresh(),
       library.refreshCollection(),
+      watchHistory.refresh(),
     ]);
-  }, [personalBroadcast, library]);
+  }, [personalBroadcast, library, watchHistory]);
 
   return (
     <main className="min-h-screen bg-black pb-0">
@@ -434,6 +436,36 @@ function CablecastAppContent({ initialView = "home" }: CablecastAppProps) {
                 enabled={isScheduleEnabled}
               />
             </div>
+
+            {/* Continue Watching Row (only manual playback, excludes broadcasts) */}
+            <ContinueWatchingRow
+              items={watchHistory.continueWatching}
+              onPlay={(item) => {
+                setPlayerTarget({
+                  media: {
+                    tmdbId: item.tmdbId,
+                    mediaType: item.mediaType,
+                    title: item.title,
+                    posterPath: item.posterPath,
+                    posterUrl: item.posterPath
+                      ? (item.posterPath.startsWith("http")
+                        ? item.posterPath
+                        : `https://image.tmdb.org/t/p/w780${item.posterPath}`)
+                      : null,
+                    backdropUrl: item.backdropUrl,
+                    releaseYear: item.releaseYear,
+                    overview: "",
+                    voteAverage: 0,
+                  },
+                  initialSeason: item.mediaType === "tv" ? item.season : undefined,
+                  initialEpisode: item.mediaType === "tv" ? item.episode : undefined,
+                  startOffsetSeconds: item.progressSeconds || 0,
+                });
+              }}
+              onRemove={(item) => {
+                void watchHistory.removeEntry({ id: item.id });
+              }}
+            />
 
             <div className="relative z-20 h-auto">
               <div id="broadcast-schedule-grid" className="scroll-mt-14 sm:scroll-mt-16 md:scroll-mt-0 bg-black px-0 md:px-4 pb-0 pt-2 h-auto shadow-[0_-8px_20px_rgba(0,0,0,0.9)]">
