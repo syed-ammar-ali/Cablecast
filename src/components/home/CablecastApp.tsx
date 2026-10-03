@@ -437,38 +437,39 @@ function CablecastAppContent({ initialView = "home" }: CablecastAppProps) {
               />
             </div>
 
-            {/* Continue Watching Row (only manual playback, excludes broadcasts) */}
-            <ContinueWatchingRow
-              items={watchHistory.continueWatching}
-              onPlay={(item) => {
-                setPlayerTarget({
-                  media: {
-                    tmdbId: item.tmdbId,
-                    mediaType: item.mediaType,
-                    title: item.title,
-                    posterPath: item.posterPath,
-                    posterUrl: item.posterPath
-                      ? (item.posterPath.startsWith("http")
-                        ? item.posterPath
-                        : `https://image.tmdb.org/t/p/w780${item.posterPath}`)
-                      : null,
-                    backdropUrl: item.backdropUrl,
-                    releaseYear: item.releaseYear,
-                    overview: "",
-                    voteAverage: 0,
-                  },
-                  initialSeason: item.mediaType === "tv" ? item.season : undefined,
-                  initialEpisode: item.mediaType === "tv" ? item.episode : undefined,
-                  startOffsetSeconds: item.progressSeconds || 0,
-                });
-              }}
-              onRemove={(item) => {
-                void watchHistory.removeEntry({ id: item.id });
-              }}
-            />
+            {/* Wrapper for Continue Watching & Schedule Grid to obscure sticky HeroBanner on scroll */}
+            <div className="relative z-20 h-auto bg-black shadow-[0_-8px_20px_rgba(0,0,0,0.9)]">
+              {/* Continue Watching Row (only manual playback, excludes broadcasts) */}
+              <ContinueWatchingRow
+                items={watchHistory.continueWatching}
+                onPlay={(item) => {
+                  setPlayerTarget({
+                    media: {
+                      tmdbId: item.tmdbId,
+                      mediaType: item.mediaType,
+                      title: item.title,
+                      posterPath: item.posterPath,
+                      posterUrl: item.posterPath
+                        ? (item.posterPath.startsWith("http")
+                          ? item.posterPath
+                          : `https://image.tmdb.org/t/p/w780${item.posterPath}`)
+                        : null,
+                      backdropUrl: item.backdropUrl,
+                      releaseYear: item.releaseYear,
+                      overview: "",
+                      voteAverage: 0,
+                    },
+                    initialSeason: item.mediaType === "tv" ? item.season : undefined,
+                    initialEpisode: item.mediaType === "tv" ? item.episode : undefined,
+                    startOffsetSeconds: item.progressSeconds || 0,
+                  });
+                }}
+                onRemove={(item) => {
+                  void watchHistory.removeEntry({ id: item.id });
+                }}
+              />
 
-            <div className="relative z-20 h-auto">
-              <div id="broadcast-schedule-grid" className="scroll-mt-14 sm:scroll-mt-16 md:scroll-mt-0 bg-black px-0 md:px-4 pb-0 pt-2 h-auto shadow-[0_-8px_20px_rgba(0,0,0,0.9)]">
+              <div id="broadcast-schedule-grid" className="scroll-mt-14 sm:scroll-mt-16 md:scroll-mt-0 px-0 md:px-4 pb-0 pt-2 h-auto">
                 <TvGrid
                   schedule={schedule}
                   isLoading={isGuideLoading}

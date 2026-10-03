@@ -297,7 +297,7 @@ export function AppHeader({
                 }
               }}
               placeholder="Search movies & TV shows..."
-              className={`w-full rounded-full border bg-white/[0.03] backdrop-blur-sm py-2.5 pl-10 pr-9 text-base text-neutral-200 placeholder:text-neutral-500 transition-all [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-decoration]:hidden [&::-webkit-search-results-button]:hidden [&::-webkit-search-results-decoration]:hidden ${
+              className={`h-10 w-full rounded-full border bg-white/[0.03] backdrop-blur-sm pl-10 pr-9 text-base text-neutral-200 placeholder:text-neutral-500 transition-all [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-decoration]:hidden [&::-webkit-search-results-button]:hidden [&::-webkit-search-results-decoration]:hidden ${
                 isExploreActive
                   ? "border-sky-500/60 shadow-[0_0_15px_rgba(14,165,233,0.18)] ring-1 ring-sky-500/30"
                   : "border-neutral-700/80 hover:border-neutral-500 focus:border-sky-500/60 focus:ring-1 focus:ring-sky-500/40"
