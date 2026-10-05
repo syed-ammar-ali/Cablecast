@@ -233,14 +233,17 @@ export function getNextAirDate(
   blockStartMinutes: number,
   now: Date = new Date(),
   tzOffset: number = 0,
+  blockCount: number = 1,
 ): Date {
   const localMs = now.getTime() - tzOffset * 60 * 1000;
   const local = new Date(localMs);
   const currentDay = local.getUTCDay();
   const currentMinutes = local.getUTCHours() * 60 + local.getUTCMinutes();
+  const blockEndMinutes = blockStartMinutes + blockCount * 30; // BLOCK_MINUTES is 30
 
   let daysUntil = (dayOfWeek - currentDay + 7) % 7;
-  if (daysUntil === 0 && currentMinutes > blockStartMinutes) {
+  // If it's the same day, but the broadcast has fully finished, wait until next week
+  if (daysUntil === 0 && currentMinutes >= blockEndMinutes) {
     daysUntil = 7;
   }
 

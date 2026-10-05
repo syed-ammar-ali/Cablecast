@@ -142,43 +142,11 @@ export async function POST(request: NextRequest) {
       return blockStartMinutes < appEnd && entryEnd > app.blockStartMinutes;
     });
 
-    // If there is an overridden broadcast and the calendar entry is for today or upcoming,
-    // ensure the overridden broadcast goes to Missed & Reruns queue
     let conflictWarning: string | null = null;
     if (conflictingAppointment) {
       conflictWarning = `Overrides weekly broadcast "${conflictingAppointment.title}" at ${formatBlockTime(
         conflictingAppointment.blockStartMinutes,
       )}`;
-
-      // Automatically add the overridden weekly broadcast into the Missed & Reruns queue
-      const existingMissed = await prisma.userMissedBroadcast.findFirst({
-        where: {
-          sessionId: { in: userKeys },
-          scheduleId: conflictingAppointment.id,
-          originalAirDate: scheduledDate,
-        },
-      });
-
-      if (!existingMissed) {
-        await prisma.userMissedBroadcast.create({
-          data: {
-            sessionId: userId,
-            scheduleId: conflictingAppointment.id,
-            tmdbId: conflictingAppointment.tmdbId,
-            mediaType: conflictingAppointment.mediaType,
-            title: conflictingAppointment.title,
-            posterPath: conflictingAppointment.posterPath,
-            backdropUrl: conflictingAppointment.backdropUrl,
-            runtimeMinutes: conflictingAppointment.runtimeMinutes,
-            blockCount: conflictingAppointment.blockCount,
-            season: conflictingAppointment.mediaType === "tv" ? conflictingAppointment.currentSeason : null,
-            episode: conflictingAppointment.mediaType === "tv" ? conflictingAppointment.currentEpisode : null,
-            episodeTitle: null,
-            originalAirDate: scheduledDate,
-            originalAirTime: formatBlockTime(conflictingAppointment.blockStartMinutes),
-          },
-        });
-      }
     }
 
     // Create the CalendarEntry

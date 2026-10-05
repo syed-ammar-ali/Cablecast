@@ -616,6 +616,7 @@ export async function dispatchStartingSoonForSlot(
     slot.blockStartMinutes,
     new Date(now.getTime() - 20 * 60 * 1000),
     effectiveOffset,
+    slot.blockCount,
   );
   const diffMs = nextAir.getTime() - now.getTime();
   if (diffMs > 25 * 60 * 1000 || diffMs < -10 * 60 * 1000) {
@@ -720,13 +721,15 @@ export async function dispatchStartingSoonForSlot(
   if (!slot.isRerun) {
     try {
       const { scheduleDelayedBroadcastAlert } = await import("./qstash");
-      // Advance 1 hour past now so getNextAirDate locks to next week's occurrence
-      const reference = new Date(now.getTime() + 60 * 60 * 1000);
+      // Advance past the slot's full duration so getNextAirDate locks to next week's occurrence
+      const durationMs = slot.blockCount * 30 * 60 * 1000;
+      const reference = new Date(now.getTime() + Math.max(60 * 60 * 1000, durationMs + 30 * 60 * 1000));
       const nextWeekAir = getNextAirDate(
         slot.dayOfWeek,
         slot.blockStartMinutes,
         reference,
         effectiveOffset,
+        slot.blockCount,
       );
       const nextWeekAlertTime = new Date(nextWeekAir.getTime() - 10 * 60 * 1000);
       await scheduleDelayedBroadcastAlert({ scheduleId: slot.id, alertTime: nextWeekAlertTime, requestOrigin });

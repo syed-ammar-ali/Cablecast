@@ -106,6 +106,7 @@ export async function POST(request: NextRequest) {
           updated.blockStartMinutes,
           new Date(),
           updated.timezoneOffset ?? 0,
+          updated.blockCount,
         );
         const alertTime = new Date(nextAir.getTime() - 10 * 60 * 1000);
         const host = request.headers.get("x-forwarded-host") || request.headers.get("host");
@@ -158,11 +159,7 @@ export async function POST(request: NextRequest) {
           })
         : null;
 
-      if (!originalSchedule) {
-        originalSchedule = await prisma.userPersonalSchedule.findFirst({
-          where: { sessionId: { in: userKeys }, tmdbId: missedItem.tmdbId, isRerun: false },
-        });
-      }
+
 
       // 2. Accurately determine runtime and blockCount (e.g. 120m / 4 blocks for movies)
       let runtimeMinutes =
@@ -224,10 +221,12 @@ export async function POST(request: NextRequest) {
       // Clean title without redundant "(Rerun)" tags
       const cleanTitle = missedItem.title.replace(/\s*\(Rerun\)\s*$/i, "").trim();
 
+      let targetSlotId: string | undefined = undefined;
+
       if (mode === "move") {
         // Move weekly broadcast: Update the existing slot, rewind sequence, NO duplicates in lineup!
         if (originalSchedule) {
-          await prisma.userPersonalSchedule.update({
+          const updated = await prisma.userPersonalSchedule.update({
             where: { id: originalSchedule.id },
             data: {
               title: cleanTitle,
@@ -240,10 +239,12 @@ export async function POST(request: NextRequest) {
               lastAiredDate: null,
               wasWatched: false,
               isRerun: false,
+              timezoneOffset: typeof body.timezoneOffset === "number" ? body.timezoneOffset : originalSchedule.timezoneOffset,
             },
           });
+          targetSlotId = updated.id;
         } else {
-          await prisma.userPersonalSchedule.create({
+          const created = await prisma.userPersonalSchedule.create({
             data: {
               sessionId: userId,
               tmdbId: missedItem.tmdbId,
@@ -257,18 +258,21 @@ export async function POST(request: NextRequest) {
               blockCount,
               currentSeason: missedItem.season ?? 1,
               currentEpisode: missedItem.episode ?? 1,
+              totalEpisodes: missedItem.mediaType === "tv" ? 12 : null,
               isRerun: false,
+              timezoneOffset: typeof body.timezoneOffset === "number" ? body.timezoneOffset : 0,
             },
           });
+          targetSlotId = created.id;
         }
       } else {
         // One-off encore rerun: Scheduled as dedicated rerun slot that auto-retires once aired
-        await prisma.userPersonalSchedule.create({
+        const createdRerun = await prisma.userPersonalSchedule.create({
           data: {
             sessionId: userId,
             tmdbId: missedItem.tmdbId,
             mediaType: missedItem.mediaType,
-            title: cleanTitle,
+            title: `${cleanTitle} (Rerun)`,
             posterPath: missedItem.posterPath,
             backdropUrl: missedItem.backdropUrl,
             runtimeMinutes,
@@ -277,9 +281,12 @@ export async function POST(request: NextRequest) {
             blockCount,
             currentSeason: missedItem.season ?? 1,
             currentEpisode: missedItem.episode ?? 1,
+            totalEpisodes: originalSchedule?.totalEpisodes ?? (missedItem.mediaType === "tv" ? 12 : null),
             isRerun: true,
+            timezoneOffset: typeof body.timezoneOffset === "number" ? body.timezoneOffset : (originalSchedule?.timezoneOffset ?? 0),
           },
         });
+        targetSlotId = createdRerun.id;
       }
 
       // Mark missed broadcast resolved
@@ -290,12 +297,11 @@ export async function POST(request: NextRequest) {
 
       // Automatically schedule exact-time delayed alert for rerun via QStash
       try {
-        const targetSlotId = originalSchedule?.id || missedItem.scheduleId;
         if (targetSlotId) {
           const { scheduleDelayedBroadcastAlert } = await import("@/lib/notifications/qstash");
           const { getNextAirDate } = await import("@/lib/schedule");
-          const rerunTz = originalSchedule?.timezoneOffset ?? (typeof body.timezoneOffset === "number" ? body.timezoneOffset : 0);
-          const nextAir = getNextAirDate(day, startMin, new Date(), rerunTz);
+          const rerunTz = typeof body.timezoneOffset === "number" ? body.timezoneOffset : (originalSchedule?.timezoneOffset ?? 0);
+          const nextAir = getNextAirDate(day, startMin, new Date(), rerunTz, blockCount);
           const alertTime = new Date(nextAir.getTime() - 10 * 60 * 1000);
           const host = request.headers.get("x-forwarded-host") || request.headers.get("host");
           const proto = request.headers.get("x-forwarded-proto") || "https";

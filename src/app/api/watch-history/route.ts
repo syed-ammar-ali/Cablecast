@@ -96,7 +96,7 @@ export async function POST(request: NextRequest) {
 
     // 1. Strict guard: if this title is scheduled on personal broadcast, do NOT track or keep watch history
     const isBroadcasted = await prisma.userPersonalSchedule.findFirst({
-      where: { sessionId: { in: userKeys }, tmdbId },
+      where: { sessionId: { in: userKeys }, tmdbId, isRerun: false },
       select: { id: true },
     });
 

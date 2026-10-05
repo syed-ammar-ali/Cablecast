@@ -162,7 +162,8 @@ export async function getBroadcastSlotStatus(
     orderBy: { expiresAt: "desc" },
   });
 
-  if (latestRental && (latestRental.expiresAt.getTime() > Date.now() || targetDate.getTime() <= latestRental.expiresAt.getTime())) {
+  const checkTimeMs = targetDate.getTime() <= Date.now() ? Date.now() : targetDate.getTime();
+  if (latestRental && latestRental.expiresAt.getTime() >= checkTimeMs) {
     return "RENTED_VALID";
   }
 

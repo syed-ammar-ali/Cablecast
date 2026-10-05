@@ -42,14 +42,17 @@ function getNextAirDate(
   blockStartMinutes: number,
   now: Date,
   tzOffset: number = 0,
+  blockCount: number = 1,
 ): Date {
   const localMs = now.getTime() - tzOffset * 60 * 1000;
   const local = new Date(localMs);
   const currentDay = local.getUTCDay();
   const currentMinutes = local.getUTCHours() * 60 + local.getUTCMinutes();
+  const blockEndMinutes = blockStartMinutes + blockCount * 30; // BLOCK_MINUTES is 30
 
   let daysUntil = (dayOfWeek - currentDay + 7) % 7;
-  if (daysUntil === 0 && currentMinutes > blockStartMinutes) {
+  // If it's the same day, but the broadcast has fully finished, wait until next week
+  if (daysUntil === 0 && currentMinutes >= blockEndMinutes) {
     daysUntil = 7;
   }
 
@@ -66,19 +69,18 @@ interface PastOccurrence {
 }
 
 /**
- * Accurately determines the most recent completed occurrence of a recurring slot
- * in the user's local timezone.
- * Returns null if the slot has not aired yet or if the occurrence finished before
- * the schedule item was created.
+ * Accurately determines all completed occurrences of a recurring slot
+ * since the last aired date (or creation) in the user's local timezone.
  */
-function getMostRecentPastOccurrence(
+function getMissedOccurrences(
   dayOfWeek: number,
   blockStartMinutes: number,
   blockCount: number,
+  sinceDateIso: string | null,
   createdAt: Date,
   now: Date,
   tzOffset: number = 0,
-): PastOccurrence | null {
+): PastOccurrence[] {
   const localMs = now.getTime() - tzOffset * 60 * 1000;
   const local = new Date(localMs);
   const localCurrentDay = local.getUTCDay();
@@ -96,22 +98,41 @@ function getMostRecentPastOccurrence(
     daysAgo = (localCurrentDay - dayOfWeek + 7) % 7;
   }
 
-  const occurrenceLocalMs = localMs - daysAgo * 24 * 60 * 60 * 1000;
-  const occurrenceLocal = new Date(occurrenceLocalMs);
-  const isoDate = occurrenceLocal.toISOString().slice(0, 10);
+  const occurrences: PastOccurrence[] = [];
+  const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+  let currentDaysAgo = daysAgo;
+  let currentLocalMs = localMs - currentDaysAgo * 24 * 60 * 60 * 1000;
+  
+  // Safe parsing of createdAt timestamp
+  const createdTime = createdAt ? new Date(createdAt).getTime() : 0;
 
-  const [y, m, d] = isoDate.split("-").map(Number);
-  const occurrenceEndUtcMs = Date.UTC(y, m - 1, d, 0, blockEndMinutes, 0) + tzOffset * 60 * 1000;
-
-  // Occurrence cannot be in the future, nor before the schedule item's creation
-  if (occurrenceEndUtcMs > now.getTime()) {
-    return null;
+  for (let i = 0; i < 52; i++) { // Max 1 year of catch-up
+    const occurrenceLocal = new Date(currentLocalMs);
+    const isoDate = occurrenceLocal.toISOString().slice(0, 10);
+    
+    // Stop if we reach the last aired date
+    if (sinceDateIso && isoDate === sinceDateIso) {
+      break;
+    }
+    
+    const [y, m, d] = isoDate.split("-").map(Number);
+    const occurrenceEndUtcMs = Date.UTC(y, m - 1, d, 0, blockEndMinutes, 0) + tzOffset * 60 * 1000;
+    
+    // Stop if before the schedule item's creation
+    if (createdTime > 0 && occurrenceEndUtcMs < createdTime) {
+      break;
+    }
+    
+    // Valid past occurrence
+    if (occurrenceEndUtcMs <= now.getTime()) {
+      occurrences.unshift({ isoDate, occurrenceEndUtcMs, daysAgo: currentDaysAgo });
+    }
+    
+    currentDaysAgo += 7;
+    currentLocalMs -= ONE_WEEK_MS;
   }
-  if (createdAt && occurrenceEndUtcMs < new Date(createdAt).getTime()) {
-    return null;
-  }
 
-  return { isoDate, occurrenceEndUtcMs, daysAgo };
+  return occurrences;
 }
 
 function findNextOpenSlotForDay(
@@ -246,119 +267,153 @@ export async function GET(request: NextRequest) {
     // Check for past broadcast slots that completed (retroactively checks across all past days)
     for (const item of items) {
       const itemTz = typeof item.timezoneOffset === "number" ? item.timezoneOffset : userTzOffset;
-      const pastOccurrence = getMostRecentPastOccurrence(
+      const missedOccurrences = getMissedOccurrences(
         item.dayOfWeek,
         item.blockStartMinutes,
         item.blockCount,
+        item.lastAiredDate,
         item.createdAt,
         now,
         itemTz,
       );
 
-      if (pastOccurrence && item.lastAiredDate !== pastOccurrence.isoDate) {
-        const airIsoDate = pastOccurrence.isoDate;
+      if (missedOccurrences.length > 0) {
+        const mostRecent = missedOccurrences[missedOccurrences.length - 1];
+        const latestAirIsoDate = mostRecent.isoDate;
 
-        if (item.isRerun) {
-          // One-off rerun has completed its airing window!
-          // Remove it from the schedule so it doesn't repeat weekly.
-          await prisma.userPersonalSchedule.deleteMany({
-            where: { id: item.id },
-          }).catch(() => {});
-          continue;
-        }
-
-        // Atomic lock: Only the first concurrent worker to mark lastAiredDate proceeds with advancing & alerts
-        const lockUpdate = await prisma.userPersonalSchedule.updateMany({
-          where: { id: item.id, NOT: { lastAiredDate: airIsoDate } },
-          data: { lastAiredDate: airIsoDate },
-        });
-
-        if (lockUpdate.count === 0) {
-          // Concurrently already claimed and processed by another request
-          continue;
-        }
-
-        if (!item.wasWatched) {
-          // Record as missed broadcast if not already recorded
-          const existingMissed = await prisma.userMissedBroadcast.findFirst({
-            where: {
-              sessionId: { in: userKeys },
-              scheduleId: item.id,
-              originalAirDate: airIsoDate,
-            },
+        await prisma.$transaction(async (tx) => {
+          // Atomic lock: Only the first concurrent worker to mark lastAiredDate proceeds with advancing & alerts
+          // Placed inside the transaction to guarantee rollback of lastAiredDate if the server crashes before increments complete
+          const lockUpdate = await tx.userPersonalSchedule.updateMany({
+            where: { id: item.id, NOT: { lastAiredDate: latestAirIsoDate } },
+            data: { lastAiredDate: latestAirIsoDate },
           });
 
-          if (!existingMissed) {
-            await prisma.userMissedBroadcast.create({
-              data: {
-                sessionId: userId,
-                scheduleId: item.id,
-                tmdbId: item.tmdbId,
-                mediaType: item.mediaType,
-                title: item.title,
-                posterPath: item.posterPath,
-                backdropUrl: item.backdropUrl,
-                runtimeMinutes: item.runtimeMinutes,
-                blockCount: item.blockCount,
-                season: item.mediaType === "tv" ? item.currentSeason : null,
-                episode: item.mediaType === "tv" ? item.currentEpisode : null,
-                episodeTitle: null,
-                originalAirDate: airIsoDate,
-                originalAirTime: formatBlockTime(item.blockStartMinutes),
-              },
-            });
+          if (lockUpdate.count === 0) {
+            // Concurrently already claimed and processed by another request
+            return;
           }
-        }
 
-        // TV episodic progression & Season completion check
-        if (item.mediaType === "tv") {
-          // Count total non-rerun weekly broadcast slots for this TV show
+          // TV episodic progression variables
+          let runningEpisode = item.currentEpisode;
+          let lastAiredEp = item.lastAiredEpisode ?? item.currentEpisode;
+          let seasonCompleted = false;
+
           const showWeeklySlots = items.filter((it) => it.tmdbId === item.tmdbId && !it.isRerun);
           const weeklyIncrement = Math.max(1, showWeeklySlots.length);
-          const nextEpisode = item.currentEpisode + weeklyIncrement;
           const totalSeasonEpisodes = item.totalEpisodes ?? 12;
 
-          if (nextEpisode > totalSeasonEpisodes) {
-            // Season completed! Create alert and drop show from schedule
-            // Note: nextSeason (currentSeason + 1) is provisional; client validates against TMDB season count before scheduling
-            await prisma.userSeasonCompletedAlert.create({
-              data: {
-                sessionId: userId,
-                tmdbId: item.tmdbId,
-                title: item.title,
-                posterPath: item.posterPath,
-                backdropUrl: item.backdropUrl,
-                completedSeason: item.currentSeason,
-                nextSeason: item.currentSeason + 1,
+          for (let i = 0; i < missedOccurrences.length; i++) {
+            if (seasonCompleted) break; // Stop processing if season ended
+
+            const occ = missedOccurrences[i];
+            const isLatest = i === missedOccurrences.length - 1;
+
+            // Record as missed broadcast if not already recorded
+            const existingMissed = await tx.userMissedBroadcast.findFirst({
+              where: {
+                sessionId: { in: userKeys },
+                scheduleId: item.id,
+                originalAirDate: occ.isoDate,
               },
             });
 
-            await prisma.userPersonalSchedule.deleteMany({
-              where: { sessionId: { in: userKeys }, tmdbId: item.tmdbId },
-            });
-          } else {
-            // Advance this specific slot to its next weekly episode occurrence
-            await prisma.userPersonalSchedule.update({
-              where: { id: item.id },
-              data: {
-                currentEpisode: nextEpisode,
-                lastAiredDate: airIsoDate,
-                lastAiredSeason: item.currentSeason,
-                lastAiredEpisode: item.currentEpisode,
-                wasWatched: false,
-              },
-            });
+            // Only assume it was watched if it's the latest occurrence AND item.wasWatched is true
+            if (!existingMissed && !(isLatest && item.wasWatched)) {
+              await tx.userMissedBroadcast.create({
+                data: {
+                  sessionId: userId,
+                  scheduleId: item.id,
+                  tmdbId: item.tmdbId,
+                  mediaType: item.mediaType,
+                  title: item.title,
+                  posterPath: item.posterPath,
+                  backdropUrl: item.backdropUrl,
+                  runtimeMinutes: item.runtimeMinutes,
+                  blockCount: item.blockCount,
+                  season: item.mediaType === "tv" ? item.currentSeason : null,
+                  episode: item.mediaType === "tv" ? runningEpisode : null,
+                  episodeTitle: null,
+                  originalAirDate: occ.isoDate,
+                  originalAirTime: formatBlockTime(item.blockStartMinutes),
+                },
+              });
+            }
+
+            if (item.mediaType === "tv") {
+              lastAiredEp = runningEpisode;
+              runningEpisode += weeklyIncrement;
+              if (runningEpisode > totalSeasonEpisodes) {
+                seasonCompleted = true;
+              }
+            }
           }
-        } else {
-          // Movie broadcast completed
-          await prisma.userPersonalSchedule.update({
-            where: { id: item.id },
-            data: {
-              lastAiredDate: airIsoDate,
-              wasWatched: false,
-            },
-          });
-        }
+
+          // TV episodic progression & Season completion check
+          if (item.mediaType === "tv") {
+            if (item.isRerun) {
+              // One-off rerun completed. Clean up this specific rerun slot
+              await tx.userPersonalSchedule.deleteMany({
+                where: { id: item.id },
+              });
+              if (seasonCompleted) {
+                await tx.userSeasonCompletedAlert.create({
+                  data: {
+                    sessionId: userId,
+                    tmdbId: item.tmdbId,
+                    title: item.title.replace(/\s*\(Rerun\)\s*$/i, "").trim(),
+                    posterPath: item.posterPath,
+                    backdropUrl: item.backdropUrl,
+                    completedSeason: item.currentSeason,
+                    nextSeason: item.currentSeason + 1,
+                  },
+                });
+              }
+            } else if (seasonCompleted) {
+              // Season completed! Create alert and drop show from schedule
+              await tx.userSeasonCompletedAlert.create({
+                data: {
+                  sessionId: userId,
+                  tmdbId: item.tmdbId,
+                  title: item.title,
+                  posterPath: item.posterPath,
+                  backdropUrl: item.backdropUrl,
+                  completedSeason: item.currentSeason,
+                  nextSeason: item.currentSeason + 1,
+                },
+              });
+
+              await tx.userPersonalSchedule.deleteMany({
+                where: { sessionId: { in: userKeys }, tmdbId: item.tmdbId },
+              });
+            } else {
+              // Advance this specific slot to its next weekly episode occurrence
+              await tx.userPersonalSchedule.update({
+                where: { id: item.id },
+                data: {
+                  currentEpisode: runningEpisode,
+                  lastAiredSeason: item.currentSeason,
+                  lastAiredEpisode: lastAiredEp,
+                  wasWatched: false,
+                },
+              });
+            }
+          } else {
+            // Movie broadcast completed
+            if (item.isRerun) {
+              await tx.userPersonalSchedule.deleteMany({
+                where: { id: item.id },
+              });
+            } else {
+              await tx.userPersonalSchedule.update({
+                where: { id: item.id },
+                data: {
+                  wasWatched: false,
+                },
+              });
+            }
+          }
+        });
       }
     }
 
@@ -411,15 +466,18 @@ export async function GET(request: NextRequest) {
     function getBatchedSlotStatus(
       tmdbId: number,
       season: number,
-      targetDate: Date
-    ): BroadcastSlotStatus {
+      checkTime: Date,
+    ): { slotStatus: BroadcastSlotStatus; rentalExpiresAt: string | null } {
       const key = `${tmdbId}:${season}`;
-      if (ownedSet.has(key)) return "OWNED";
+      if (ownedSet.has(key)) return { slotStatus: "OWNED", rentalExpiresAt: null };
       const expiresAt = rentalMap.get(key);
-      if (expiresAt && (expiresAt.getTime() > Date.now() || targetDate.getTime() <= expiresAt.getTime())) {
-        return "RENTED_VALID";
+      if (expiresAt && expiresAt.getTime() >= checkTime.getTime()) {
+        return { slotStatus: "RENTED_VALID", rentalExpiresAt: expiresAt.toISOString() };
       }
-      return "RETURNED_EXPIRED";
+      return {
+        slotStatus: "RETURNED_EXPIRED",
+        rentalExpiresAt: expiresAt ? expiresAt.toISOString() : null,
+      };
     }
 
     // Dynamically evaluate slot status for all schedule items in-memory
@@ -427,12 +485,13 @@ export async function GET(request: NextRequest) {
       const itemTz = typeof item.timezoneOffset === "number" ? item.timezoneOffset : userTzOffset;
       const liveState = computeLiveState(item.dayOfWeek, item.blockStartMinutes, item.blockCount, now, itemTz);
       const dayName = DAYS_OF_WEEK.find((d) => d.day === item.dayOfWeek)?.name ?? `Day ${item.dayOfWeek}`;
-      const targetAirDate = getNextAirDate(item.dayOfWeek, item.blockStartMinutes, now, itemTz);
+      const targetAirDate = getNextAirDate(item.dayOfWeek, item.blockStartMinutes, now, itemTz, item.blockCount);
+      const checkTime = liveState.isLiveNow ? now : targetAirDate;
 
-      const slotStatus = getBatchedSlotStatus(
+      const { slotStatus, rentalExpiresAt } = getBatchedSlotStatus(
         item.tmdbId,
         item.mediaType === "tv" ? item.currentSeason : 0,
-        targetAirDate
+        checkTime,
       );
 
       const isExpired = slotStatus === "RETURNED_EXPIRED";
@@ -463,6 +522,7 @@ export async function GET(request: NextRequest) {
         isLiveNow: liveState.isLiveNow && !isExpired,
         liveOffsetSeconds: isExpired ? null : liveState.liveOffsetSeconds,
         slotStatus,
+        rentalExpiresAt,
         isExpired,
         createdAt: item.createdAt.toISOString(),
         updatedAt: item.updatedAt.toISOString(),
@@ -889,6 +949,7 @@ export async function POST(request: NextRequest) {
             item.blockStartMinutes,
             now,
             item.timezoneOffset ?? 0,
+            item.blockCount,
           );
           const alertTime = new Date(nextAir.getTime() - 10 * 60 * 1000);
           const host = request.headers.get("x-forwarded-host") || request.headers.get("host");
