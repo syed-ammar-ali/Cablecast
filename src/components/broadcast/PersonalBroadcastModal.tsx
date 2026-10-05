@@ -73,6 +73,7 @@ interface PersonalBroadcastModalProps {
     targetBlockStartMinutes: number,
   ) => Promise<{ success: boolean; error?: string }>;
   onDismissMissed: (missedId: string) => void;
+  onRefresh?: () => void;
   isAdmin?: boolean;
   onPlay: (target: {
     media: MediaSearchResult;
@@ -151,6 +152,7 @@ export function PersonalBroadcastModal({
   onRescheduleActiveSlot,
   onRescheduleMissed,
   onDismissMissed,
+  onRefresh,
   isAdmin = false,
   onPlay,
 }: PersonalBroadcastModalProps) {
@@ -213,12 +215,13 @@ export function PersonalBroadcastModal({
 
   useEffect(() => {
     if (isOpen) {
+      onRefresh?.();
       // eslint-disable-next-line react-hooks/set-state-in-effect
       void fetchCalendarEntries();
       // eslint-disable-next-line react-hooks/set-state-in-effect
       void fetchNostalgiaCampaigns();
     }
-  }, [isOpen, fetchCalendarEntries, fetchNostalgiaCampaigns]);
+  }, [isOpen, onRefresh, fetchCalendarEntries, fetchNostalgiaCampaigns]);
 
   const [confirmDeleteCampaign, setConfirmDeleteCampaign] = useState<{
     tmdbId: number;

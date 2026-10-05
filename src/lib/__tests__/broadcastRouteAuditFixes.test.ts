@@ -107,4 +107,95 @@ describe("Broadcast Route Audit Fixes", () => {
       expect(remainingSlots.map((s) => s.id)).toEqual(["slot-weekly-1", "slot-weekly-2"]);
     });
   });
+
+  describe("Atomic lock NULL-safe check for newly created slots", () => {
+    function canAcquireLock(
+      currentLastAiredDate: string | null,
+      latestAirIsoDate: string,
+    ): boolean {
+      // Simulates Prisma OR: [{ lastAiredDate: null }, { lastAiredDate: { not: latestAirIsoDate } }]
+      if (currentLastAiredDate === null) return true;
+      return currentLastAiredDate !== latestAirIsoDate;
+    }
+
+    it("successfully acquires lock when slot has never aired before (lastAiredDate is null)", () => {
+      const lockAcquired = canAcquireLock(null, "2026-10-05");
+      expect(lockAcquired).toBe(true);
+    });
+
+    it("successfully acquires lock when slot previously aired on an earlier date", () => {
+      const lockAcquired = canAcquireLock("2026-09-28", "2026-10-05");
+      expect(lockAcquired).toBe(true);
+    });
+
+    it("rejects lock if already claimed and processed for the same date", () => {
+      const lockAcquired = canAcquireLock("2026-10-05", "2026-10-05");
+      expect(lockAcquired).toBe(false);
+    });
+  });
+
+  describe("Missed broadcast occurrences on creation day", () => {
+    function simulateGetMissedOccurrences(
+      dayOfWeek: number,
+      blockStartMinutes: number,
+      blockCount: number,
+      createdDate: Date,
+      now: Date,
+    ) {
+      const tzOffset = 0;
+      const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+      const createdTime = createdDate.getTime();
+      const occurrences: { isoDate: string; occurrenceEndUtcMs: number; daysAgo: number }[] = [];
+      const blockEndMinutes = blockStartMinutes + blockCount * 30;
+
+      let currentDaysAgo = 0;
+      let currentLocalMs = now.getTime();
+
+      for (let lookback = 0; lookback < 4; lookback++) {
+        const checkDate = new Date(currentLocalMs);
+        const curDay = checkDate.getUTCDay();
+        const curMinutes = checkDate.getUTCHours() * 60 + checkDate.getUTCMinutes();
+        const daysDiff = (curDay - dayOfWeek + 7) % 7;
+
+        if (daysDiff === 0 && curMinutes < blockEndMinutes) {
+          // Current live airing or hasn't finished yet
+          currentDaysAgo += 7;
+          currentLocalMs -= ONE_WEEK_MS;
+          continue;
+        }
+
+        const occurrenceDate = new Date(currentLocalMs - daysDiff * 24 * 60 * 60 * 1000);
+        const isoDate = occurrenceDate.toISOString().split("T")[0];
+
+        const [y, m, d] = isoDate.split("-").map(Number);
+        const occurrenceEndUtcMs = Date.UTC(y, m - 1, d, 0, blockEndMinutes, 0) + tzOffset * 60 * 1000;
+
+        // Stop if before creation, but allow airings on the creation date itself (currentDaysAgo === 0)
+        if (currentDaysAgo > 0 && createdTime > 0 && occurrenceEndUtcMs < createdTime) {
+          break;
+        }
+
+        if (occurrenceEndUtcMs <= now.getTime()) {
+          occurrences.unshift({ isoDate, occurrenceEndUtcMs, daysAgo: currentDaysAgo });
+        }
+
+        currentDaysAgo += 7;
+        currentLocalMs -= ONE_WEEK_MS;
+      }
+
+      return occurrences;
+    }
+
+    it("captures missed broadcast if the show finished today after user added the schedule today", () => {
+      // User created the schedule slot at 1:00 PM today (Monday)
+      const created = new Date("2026-10-05T13:00:00Z");
+      // The show was scheduled for 8:00 PM - 8:30 PM (1200 - 1230 mins)
+      // Current time is 9:00 PM (1260 mins)
+      const now = new Date("2026-10-05T21:00:00Z");
+
+      const occurrences = simulateGetMissedOccurrences(1, 1200, 1, created, now);
+      expect(occurrences.length).toBe(1);
+      expect(occurrences[0].isoDate).toBe("2026-10-05");
+    });
+  });
 });

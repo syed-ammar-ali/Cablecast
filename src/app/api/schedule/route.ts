@@ -148,8 +148,31 @@ export async function POST(request: NextRequest) {
   }
 
   const userId = getPersistentUserId(session);
+  const userKeys = Array.from(new Set([userId, session.id, session.accessCodeId])).filter(Boolean) as string[];
 
   try {
+    const requestedStart = body.blockStartMinutes!;
+    const requestedEnd = requestedStart + (body.blockCount ?? 1) * BLOCK_MINUTES;
+
+    const existingAppointments = await prisma.scheduledAppointment.findMany({
+      where: {
+        sessionId: { in: userKeys },
+        channelNumber: body.channelNumber!,
+        dayOfWeek: body.dayOfWeek!,
+      },
+    });
+
+    const overlapping = existingAppointments.find((existing) => {
+      const existingEnd = existing.blockStartMinutes + existing.blockCount * BLOCK_MINUTES;
+      return existing.blockStartMinutes < requestedEnd && existingEnd > requestedStart;
+    });
+
+    if (overlapping) {
+      return NextResponse.json(
+        { error: "Time slot conflict: You already have an appointment during this time block." },
+        { status: 409 }
+      );
+    }
     const appointment = await prisma.scheduledAppointment.create({
       data: {
         sessionId: userId,

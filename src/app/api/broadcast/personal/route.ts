@@ -118,8 +118,8 @@ function getMissedOccurrences(
     const [y, m, d] = isoDate.split("-").map(Number);
     const occurrenceEndUtcMs = Date.UTC(y, m - 1, d, 0, blockEndMinutes, 0) + tzOffset * 60 * 1000;
     
-    // Stop if before the schedule item's creation
-    if (createdTime > 0 && occurrenceEndUtcMs < createdTime) {
+    // Stop if before the schedule item's creation (except allow airings on the creation date itself)
+    if (currentDaysAgo > 0 && createdTime > 0 && occurrenceEndUtcMs < createdTime) {
       break;
     }
     
@@ -285,7 +285,13 @@ export async function GET(request: NextRequest) {
           // Atomic lock: Only the first concurrent worker to mark lastAiredDate proceeds with advancing & alerts
           // Placed inside the transaction to guarantee rollback of lastAiredDate if the server crashes before increments complete
           const lockUpdate = await tx.userPersonalSchedule.updateMany({
-            where: { id: item.id, NOT: { lastAiredDate: latestAirIsoDate } },
+            where: {
+              id: item.id,
+              OR: [
+                { lastAiredDate: null },
+                { lastAiredDate: { not: latestAirIsoDate } },
+              ],
+            },
             data: { lastAiredDate: latestAirIsoDate },
           });
 
@@ -914,55 +920,63 @@ export async function POST(request: NextRequest) {
 
     // Create appointments for each selected day and daily slot with sequential episode numbers
     const created = [];
-    const sortedDays = [...input.daysOfWeek].sort((a, b) => a - b);
     const baseEpisode = Math.max(1, Number(input.startEpisode) || 1);
+    
+    // Sort the combination of day and daily slot based on their very next chronological air date relative to now
+    const chronoSortedSlots = [];
+    for (const day of input.daysOfWeek) {
+      for (const slotMinutes of targetDailySlots) {
+        const nextAir = getNextAirDate(
+          day,
+          slotMinutes,
+          now,
+          typeof input.timezoneOffset === "number" ? input.timezoneOffset : 0,
+          blockCount,
+        );
+        chronoSortedSlots.push({ day, slotMinutes, nextAirTime: nextAir.getTime() });
+      }
+    }
+    
+    chronoSortedSlots.sort((a, b) => a.nextAirTime - b.nextAirTime);
+
     let episodeOffsetCounter = 0;
 
-    for (const day of sortedDays) {
-      for (const slotMinutes of targetDailySlots) {
-        const episodeNum = input.mediaType === "tv" ? baseEpisode + episodeOffsetCounter : 1;
-        const item = await prisma.userPersonalSchedule.create({
-          data: {
-            sessionId: userId,
-            tmdbId: input.tmdbId,
-            mediaType: input.mediaType,
-            title: input.title,
-            posterPath: input.posterPath ?? null,
-            backdropUrl: input.backdropUrl ?? null,
-            runtimeMinutes,
-            dayOfWeek: day,
-            blockStartMinutes: slotMinutes,
-            blockCount,
-            currentSeason: targetSeason,
-            currentEpisode: episodeNum,
-            totalEpisodes: totalEpisodes ?? (input.mediaType === "tv" ? 12 : null),
-            timezoneOffset: typeof input.timezoneOffset === "number" ? input.timezoneOffset : 0,
-          },
-        });
-        created.push(item);
+    for (const slot of chronoSortedSlots) {
+      const episodeNum = input.mediaType === "tv" ? baseEpisode + episodeOffsetCounter : 1;
+      const item = await prisma.userPersonalSchedule.create({
+        data: {
+          sessionId: userId,
+          tmdbId: input.tmdbId,
+          mediaType: input.mediaType,
+          title: input.title,
+          posterPath: input.posterPath ?? null,
+          backdropUrl: input.backdropUrl ?? null,
+          runtimeMinutes,
+          dayOfWeek: slot.day,
+          blockStartMinutes: slot.slotMinutes,
+          blockCount,
+          currentSeason: targetSeason,
+          currentEpisode: episodeNum,
+          totalEpisodes: totalEpisodes ?? (input.mediaType === "tv" ? 12 : null),
+          timezoneOffset: typeof input.timezoneOffset === "number" ? input.timezoneOffset : 0,
+        },
+      });
+      created.push(item);
 
-        // Automatically schedule exact-time delayed alert via QStash (10 mins before air)
-        try {
-          const { scheduleDelayedBroadcastAlert } = await import("@/lib/notifications/qstash");
-          const nextAir = getNextAirDate(
-            item.dayOfWeek,
-            item.blockStartMinutes,
-            now,
-            item.timezoneOffset ?? 0,
-            item.blockCount,
-          );
-          const alertTime = new Date(nextAir.getTime() - 10 * 60 * 1000);
-          const host = request.headers.get("x-forwarded-host") || request.headers.get("host");
-          const proto = request.headers.get("x-forwarded-proto") || "https";
-          const requestOrigin = host ? `${proto}://${host}` : request.nextUrl.origin;
-          await scheduleDelayedBroadcastAlert({ scheduleId: item.id, alertTime, requestOrigin });
-        } catch (e) {
-          console.error("[QStash] Failed to schedule initial alert:", e);
-        }
+      // Automatically schedule exact-time delayed alert via QStash (10 mins before air)
+      try {
+        const { scheduleDelayedBroadcastAlert } = await import("@/lib/notifications/qstash");
+        const alertTime = new Date(slot.nextAirTime - 10 * 60 * 1000);
+        const host = request.headers.get("x-forwarded-host") || request.headers.get("host");
+        const proto = request.headers.get("x-forwarded-proto") || "https";
+        const requestOrigin = host ? `${proto}://${host}` : request.nextUrl.origin;
+        await scheduleDelayedBroadcastAlert({ scheduleId: item.id, alertTime, requestOrigin });
+      } catch (e) {
+        console.error("[QStash] Failed to schedule initial alert:", e);
+      }
 
-        if (input.mediaType === "tv") {
-          episodeOffsetCounter++;
-        }
+      if (input.mediaType === "tv") {
+        episodeOffsetCounter++;
       }
     }
 

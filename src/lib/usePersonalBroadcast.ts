@@ -131,21 +131,38 @@ export function usePersonalBroadcast() {
     }
   }, []);
 
-  // Fetch once on mount, and re-fetch ONLY on mutation events or tab focus
+  // Fetch on mount, and re-sync on mutation events, tab focus, visibility change, or periodic interval
   useEffect(() => {
-
     const controller = new AbortController();
     void syncFromServer(controller.signal);
 
-    const handleMutation = () => {
+    const handleSync = () => {
       void syncFromServer();
     };
 
-    window.addEventListener(CABLECAST_BROADCAST_MUTATION, handleMutation);
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void syncFromServer();
+      }
+    };
+
+    window.addEventListener(CABLECAST_BROADCAST_MUTATION, handleSync);
+    window.addEventListener("focus", handleSync);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    // Heartbeat every 30s so elapsed broadcast windows transition to missed automatically
+    const intervalId = setInterval(() => {
+      if (typeof document === "undefined" || document.visibilityState === "visible") {
+        void syncFromServer();
+      }
+    }, 30000);
 
     return () => {
       controller.abort();
-      window.removeEventListener(CABLECAST_BROADCAST_MUTATION, handleMutation);
+      clearInterval(intervalId);
+      window.removeEventListener(CABLECAST_BROADCAST_MUTATION, handleSync);
+      window.removeEventListener("focus", handleSync);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [syncFromServer]);
 

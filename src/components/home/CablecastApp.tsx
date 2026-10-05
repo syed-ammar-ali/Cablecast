@@ -594,6 +594,7 @@ function CablecastAppContent({ initialView = "home" }: CablecastAppProps) {
         onRescheduleActiveSlot={personalBroadcast.rescheduleActiveSlot}
         onRescheduleMissed={personalBroadcast.rescheduleMissed}
         onDismissMissed={personalBroadcast.dismissMissed}
+        onRefresh={personalBroadcast.refresh}
         onPlay={({ media, season, episode, startOffsetSeconds }) => {
           const liveSlot = personalBroadcast.schedule.find(
             (s) => s.isLiveNow && s.tmdbId === media.tmdbId,
