@@ -49,6 +49,10 @@ const ChannelRemote = dynamic(
   () => import("@/components/remote/ChannelRemote").then((mod) => mod.ChannelRemote),
   { ssr: false }
 );
+const BroadcasterPanel = dynamic(
+  () => import("@/components/broadcaster/BroadcasterPanel").then((mod) => mod.BroadcasterPanel),
+  { ssr: false }
+);
 const ExploreView = dynamic(
   () => import("@/components/explore/ExploreView").then((mod) => mod.ExploreView),
   { ssr: false }
@@ -385,7 +389,7 @@ function CablecastAppContent({ initialView = "home" }: CablecastAppProps) {
   }, [personalBroadcast, library, watchHistory]);
 
   return (
-    <main className="min-h-screen bg-black pb-0">
+    <main className="min-h-screen bg-black pb-20 md:pb-8">
       {/* Top Header — hidden when the fullscreen player is open to prevent double-header stacking */}
       {!isPlayerOpen && (
         <div className="sticky top-0 md:relative md:top-auto z-50 bg-black">
@@ -424,7 +428,7 @@ function CablecastAppContent({ initialView = "home" }: CablecastAppProps) {
       ) : (
         <PullToRefresh onRefresh={handlePullRefresh}>
           <div key="home-view" className="animate-[fadeIn_150ms_cubic-bezier(0.16,1,0.3,1)] [will-change:auto]">
-            <div className="sticky top-[calc(3.5rem+env(safe-area-inset-top,0px))] sm:top-[calc(4rem+env(safe-area-inset-top,0px))] md:top-0 z-10 px-3 pt-2 sm:px-4 sm:pt-3">
+            <div className="relative z-10 px-3 pt-2 sm:px-4 sm:pt-3">
               <HeroBanner
                 liveNow={liveNow}
                 onSelectLive={(item) => resolver.resolveBroadcast(item, now)}
@@ -437,8 +441,8 @@ function CablecastAppContent({ initialView = "home" }: CablecastAppProps) {
               />
             </div>
 
-            {/* Wrapper for Continue Watching & Schedule Grid to obscure sticky HeroBanner on scroll */}
-            <div className="relative z-20 h-auto bg-black shadow-[0_-8px_20px_rgba(0,0,0,0.9)]">
+            {/* Standard Flow: Continue Watching & Schedule Grid */}
+            <div className="relative z-20 h-auto bg-black">
               {/* Continue Watching Row (only manual playback, excludes broadcasts) */}
               <ContinueWatchingRow
                 items={watchHistory.continueWatching}
@@ -670,8 +674,68 @@ function CablecastAppContent({ initialView = "home" }: CablecastAppProps) {
         />
       )}
 
-      {/* Floating channel remote */}
-      {!playerTarget &&
+      {/* Floating Broadcaster AI Panel (replaces ChannelRemote for now — remote preserved below) */}
+      {!playerTarget && !directBroadcastTarget && !detailsTarget && !isModalOpen && (
+        <BroadcasterPanel
+          onNavigate={(view) => {
+            navigateTo(view);
+          }}
+          onRefreshSchedule={() => {
+            void personalBroadcast.refresh();
+          }}
+          onTuneIn={(opts) => {
+            const liveSlot = personalBroadcast.schedule.find(
+              (s) => s.isLiveNow && (!opts?.tmdbId || s.tmdbId === opts.tmdbId),
+            );
+            if (liveSlot) {
+              void personalBroadcast.markAsWatched(liveSlot.id, liveSlot.tmdbId);
+              setPlayerTarget({
+                media: {
+                  tmdbId: liveSlot.tmdbId,
+                  mediaType: liveSlot.mediaType === "movie" ? "movie" : "tv",
+                  title: liveSlot.title,
+                  releaseYear: null,
+                  posterPath: null,
+                  posterUrl: null,
+                  backdropUrl: null,
+                  overview: "",
+                  voteAverage: 0,
+                },
+                initialSeason: liveSlot.currentSeason,
+                initialEpisode: liveSlot.currentEpisode,
+                startOffsetSeconds: 0,
+              });
+            } else if (personalBroadcast.schedule.length > 0) {
+              const firstSlot = personalBroadcast.schedule[0];
+              setPlayerTarget({
+                media: {
+                  tmdbId: firstSlot.tmdbId,
+                  mediaType: firstSlot.mediaType === "movie" ? "movie" : "tv",
+                  title: firstSlot.title,
+                  releaseYear: null,
+                  posterPath: null,
+                  posterUrl: null,
+                  backdropUrl: null,
+                  overview: "",
+                  voteAverage: 0,
+                },
+                initialSeason: firstSlot.currentSeason,
+                initialEpisode: firstSlot.currentEpisode,
+                startOffsetSeconds: 0,
+              });
+            } else {
+              navigateTo("broadcast");
+            }
+          }}
+          onOpenStoreModal={(media) => {
+            setSelectedMedia(media);
+            setIsModalOpen(true);
+          }}
+        />
+      )}
+
+      {/* ChannelRemote — hidden, preserved for future re-enable */}
+      {false && !playerTarget &&
         !directBroadcastTarget &&
         !detailsTarget &&
         !isModalOpen &&

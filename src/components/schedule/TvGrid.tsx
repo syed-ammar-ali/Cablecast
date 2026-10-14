@@ -299,7 +299,7 @@ export function TvGrid({
       <div
         ref={gridScrollRef}
         onScroll={checkLiveDistance}
-        className="no-scrollbar relative h-auto overflow-x-auto border-b border-neutral-900 bg-neutral-950/40 pb-20 md:pb-0 overscroll-x-contain snap-x snap-proximity md:snap-none"
+        className="no-scrollbar relative h-auto overflow-x-auto border-b border-neutral-900 bg-neutral-950/40 pb-0 overscroll-x-contain snap-x snap-proximity md:snap-none"
         style={{ WebkitOverflowScrolling: "touch" }}
       >
         <div className="relative min-w-max">

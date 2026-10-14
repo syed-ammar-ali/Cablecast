@@ -147,32 +147,30 @@ export function HeroBanner({
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black via-black/50 via-40% to-transparent" />
       <div className="pointer-events-none absolute inset-0 rounded-md ring-1 ring-inset ring-black/50" />
 
-      {/* Left arrow */}
+      {/* Left arrow (Vertically centered at top-1/2 on left edge) */}
       {slides.length > 1 && (
-        <Tooltip content="Previous slide" position="right">
-          <button
-            type="button"
-            onClick={goPrev}
-            aria-label="Previous slide"
-            className="absolute left-2 sm:left-3 top-1/2 z-20 -translate-y-1/2 flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-full border border-white/20 bg-black/50 text-white opacity-80 sm:opacity-0 backdrop-blur-md transition-all sm:group-hover:opacity-100 hover:bg-black/80 hover:opacity-100 hover:scale-105 active:scale-90 cursor-pointer"
-          >
-            <ChevronLeft className="h-4 w-4 sm:h-5 sm:w-5" />
-          </button>
-        </Tooltip>
+        <button
+          type="button"
+          onClick={goPrev}
+          aria-label="Previous slide"
+          title="Previous slide"
+          className="absolute left-3 sm:left-5 top-1/2 z-30 -translate-y-1/2 flex h-9 w-9 sm:h-11 sm:w-11 items-center justify-center rounded-full border border-white/25 bg-black/60 text-white shadow-2xl backdrop-blur-md transition-all hover:bg-black/85 hover:border-white/45 hover:scale-110 active:scale-95 cursor-pointer opacity-85 hover:opacity-100"
+        >
+          <ChevronLeft className="h-5 w-5 sm:h-6 sm:w-6" />
+        </button>
       )}
 
-      {/* Right arrow */}
+      {/* Right arrow (Vertically centered at top-1/2 on right edge) */}
       {slides.length > 1 && (
-        <Tooltip content="Next slide" position="left">
-          <button
-            type="button"
-            onClick={goNext}
-            aria-label="Next slide"
-            className="absolute right-2 sm:right-3 top-1/2 z-20 -translate-y-1/2 flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-full border border-white/20 bg-black/50 text-white opacity-80 sm:opacity-0 backdrop-blur-md transition-all sm:group-hover:opacity-100 hover:bg-black/80 hover:opacity-100 hover:scale-105 active:scale-90 cursor-pointer"
-          >
-            <ChevronRight className="h-4 w-4 sm:h-5 sm:w-5" />
-          </button>
-        </Tooltip>
+        <button
+          type="button"
+          onClick={goNext}
+          aria-label="Next slide"
+          title="Next slide"
+          className="absolute right-3 sm:right-5 top-1/2 z-30 -translate-y-1/2 flex h-9 w-9 sm:h-11 sm:w-11 items-center justify-center rounded-full border border-white/25 bg-black/60 text-white shadow-2xl backdrop-blur-md transition-all hover:bg-black/85 hover:border-white/45 hover:scale-110 active:scale-95 cursor-pointer opacity-85 hover:opacity-100"
+        >
+          <ChevronRight className="h-5 w-5 sm:h-6 sm:w-6" />
+        </button>
       )}
 
       {/* Bottom content */}
