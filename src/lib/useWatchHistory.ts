@@ -118,8 +118,8 @@ export function useWatchHistory() {
 
       try {
         const params = new URLSearchParams();
-        if (target.id) params.set("id", target.id);
-        else if (target.tmdbId) params.set("tmdbId", String(target.tmdbId));
+        if (target.tmdbId) params.set("tmdbId", String(target.tmdbId));
+        else if (target.id) params.set("id", target.id);
 
         const res = await fetch(`/api/watch-history?${params.toString()}`, {
           method: "DELETE",

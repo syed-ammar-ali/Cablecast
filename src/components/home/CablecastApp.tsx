@@ -465,7 +465,7 @@ function CablecastAppContent({ initialView = "home" }: CablecastAppProps) {
                   });
                 }}
                 onRemove={(item) => {
-                  void watchHistory.removeEntry({ id: item.id });
+                  void watchHistory.removeEntry({ id: item.id, tmdbId: item.tmdbId });
                 }}
               />
 
