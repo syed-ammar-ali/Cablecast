@@ -56,6 +56,16 @@ input,
 textarea {
   -webkit-user-select: text;
   user-select: text;
+  -webkit-tap-highlight-color: transparent;
+}
+
+input:focus,
+input:focus-visible,
+textarea:focus,
+textarea:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+  border-color: transparent !important;
 }
 
 html::-webkit-scrollbar,

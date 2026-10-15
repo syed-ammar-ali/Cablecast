@@ -1064,9 +1064,9 @@ export function BroadcasterPanel({
         )}
 
         {/* ── Bottom Input Pill (Sandblasted Glass Capsule) ────────────────── */}
-        <div className="p-3.5 border-t border-white/[0.08] bg-black/35 relative z-20">
+        <div className="p-3 border-t border-white/[0.08] bg-black/40 backdrop-blur-xl relative z-20">
           <div
-            className="flex items-center gap-2 rounded-full px-3.5 py-1.5 transition-all shadow-inner bg-white/[0.08] border border-white/[0.18]"
+            className="flex items-center gap-2 rounded-full pl-2 pr-2 py-1.5 transition-all duration-300 bg-white/[0.06] border border-white/[0.12] focus-within:border-violet-400/50 focus-within:bg-white/[0.09] focus-within:shadow-[0_0_20px_rgba(139,92,246,0.2)]"
           >
             {/* Mic Toggle Button */}
             <button
@@ -1075,10 +1075,10 @@ export function BroadcasterPanel({
               title={isListening ? "Stop listening" : "Talk to Broadcaster"}
               aria-label="Voice input"
               onClick={toggleListening}
-              className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full transition-all active:scale-90 ${
+              className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full transition-all duration-200 active:scale-90 ${
                 isListening
-                  ? "bg-red-500 text-white shadow-[0_0_12px_rgba(239,68,68,0.8)] animate-pulse"
-                  : "bg-white/[0.12] text-neutral-200 hover:bg-white/[0.22] hover:text-white"
+                  ? "bg-red-500 text-white shadow-[0_0_14px_rgba(239,68,68,0.7)] animate-pulse"
+                  : "bg-white/[0.08] text-neutral-300 hover:text-white hover:bg-white/[0.16] border border-white/[0.06]"
               }`}
             >
               {isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
@@ -1089,13 +1089,22 @@ export function BroadcasterPanel({
               ref={inputRef}
               id={inputId}
               type="text"
-              placeholder={isListening ? "Listening…" : "Type your message…"}
+              autoComplete="off"
+              autoCorrect="off"
+              spellCheck="false"
+              placeholder={isListening ? "Listening…" : "Ask Broadcaster or tap mic…"}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={onKeyDown}
               disabled={isLoading}
               aria-label="Message Broadcaster"
-              className="flex-1 bg-transparent text-[13px] text-white placeholder-neutral-300 outline-none disabled:opacity-50 min-w-0 font-normal"
+              style={{
+                outline: "none",
+                boxShadow: "none",
+                border: "none",
+                WebkitTapHighlightColor: "transparent",
+              }}
+              className="flex-1 bg-transparent text-[13px] text-white placeholder-neutral-400 border-0 outline-none ring-0 shadow-none focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none disabled:opacity-50 min-w-0 font-normal px-1 selection:bg-violet-500/30"
             />
 
             {/* Circular Send Button */}
@@ -1105,12 +1114,16 @@ export function BroadcasterPanel({
               aria-label="Send message"
               onClick={() => void sendMessage()}
               disabled={!input.trim() || isLoading}
-              className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-white text-black transition-all hover:bg-neutral-100 active:scale-90 disabled:opacity-25 cursor-pointer disabled:cursor-not-allowed shadow-md"
+              className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full transition-all duration-200 active:scale-90 shadow-md ${
+                input.trim() && !isLoading
+                  ? "bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-[0_0_12px_rgba(139,92,246,0.45)] hover:brightness-110 cursor-pointer"
+                  : "bg-white/[0.06] text-neutral-500 border border-white/[0.06] cursor-not-allowed opacity-40"
+              }`}
             >
               {isLoading ? (
-                <Loader2 className="h-3.5 w-3.5 text-black animate-spin" />
+                <Loader2 className="h-3.5 w-3.5 text-white animate-spin" />
               ) : (
-                <Send className="h-3.5 w-3.5 text-black translate-x-0.2" />
+                <Send className={`h-3.5 w-3.5 translate-x-0.2 ${input.trim() ? "text-white fill-current/15" : "text-neutral-500"}`} />
               )}
             </button>
           </div>
