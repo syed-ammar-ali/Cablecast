@@ -47,12 +47,12 @@ const DAYS_NAMES = [
 
 function parseTimeToBlockMinutes(input: unknown): number | null {
   if (typeof input === "number" && !isNaN(input) && input >= 0 && input < 1440) {
-    return Math.floor(input / 30) * 30;
+    return Math.floor(input);
   }
   if (typeof input !== "string") return null;
   const s = input.trim().toLowerCase();
 
-  // Match e.g. "9:00 pm", "9:30pm", "9 pm", "9pm", "11:00 am", "11am"
+  // Match e.g. "9:00 pm", "9:23pm", "9 pm", "9pm", "11:15 am", "11am"
   const match12 = s.match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)$/);
   if (match12) {
     let h = parseInt(match12[1], 10);
@@ -61,17 +61,17 @@ function parseTimeToBlockMinutes(input: unknown): number | null {
     if (isPm && h < 12) h += 12;
     if (!isPm && h === 12) h = 0;
     if (h >= 0 && h < 24 && m >= 0 && m < 60) {
-      return Math.floor((h * 60 + m) / 30) * 30;
+      return h * 60 + m;
     }
   }
 
-  // Match 24-hour e.g. "21:00", "09:30", "9:30", "15:00"
+  // Match 24-hour e.g. "21:00", "09:23", "9:23", "15:45"
   const match24 = s.match(/^(\d{1,2}):(\d{2})$/);
   if (match24) {
     const h = parseInt(match24[1], 10);
     const m = parseInt(match24[2], 10);
     if (h >= 0 && h < 24 && m >= 0 && m < 60) {
-      return Math.floor((h * 60 + m) / 30) * 30;
+      return h * 60 + m;
     }
   }
 

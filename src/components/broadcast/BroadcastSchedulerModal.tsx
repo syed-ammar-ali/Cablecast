@@ -9,6 +9,7 @@ import {
   CalendarDays,
   ChevronDown,
   ChevronRight,
+  ChevronUp,
   Clock,
   Film,
   Layers,
@@ -70,33 +71,11 @@ export interface BroadcastSchedulerModalProps {
   }) => Promise<{ success: boolean; error?: string }>;
 }
 
-// 12-hour block slots (12:00, 12:30, 1:00 ... 11:30)
-const HALF_DAY_SLOTS = [
-  { hour12: 12, minute: 0, label: "12:00" },
-  { hour12: 12, minute: 30, label: "12:30" },
-  { hour12: 1, minute: 0, label: "1:00" },
-  { hour12: 1, minute: 30, label: "1:30" },
-  { hour12: 2, minute: 0, label: "2:00" },
-  { hour12: 2, minute: 30, label: "2:30" },
-  { hour12: 3, minute: 0, label: "3:00" },
-  { hour12: 3, minute: 30, label: "3:30" },
-  { hour12: 4, minute: 0, label: "4:00" },
-  { hour12: 4, minute: 30, label: "4:30" },
-  { hour12: 5, minute: 0, label: "5:00" },
-  { hour12: 5, minute: 30, label: "5:30" },
-  { hour12: 6, minute: 0, label: "6:00" },
-  { hour12: 6, minute: 30, label: "6:30" },
-  { hour12: 7, minute: 0, label: "7:00" },
-  { hour12: 7, minute: 30, label: "7:30" },
-  { hour12: 8, minute: 0, label: "8:00" },
-  { hour12: 8, minute: 30, label: "8:30" },
-  { hour12: 9, minute: 0, label: "9:00" },
-  { hour12: 9, minute: 30, label: "9:30" },
-  { hour12: 10, minute: 0, label: "10:00" },
-  { hour12: 10, minute: 30, label: "10:30" },
-  { hour12: 11, minute: 0, label: "11:00" },
-  { hour12: 11, minute: 30, label: "11:30" },
-];
+export interface ClockTime {
+  hour: number;
+  minute: number;
+  meridiem: "AM" | "PM";
+}
 
 function toMinutesFromMidnight(hour12: number, minute: number, meridiem: "AM" | "PM"): number {
   let hours24 = hour12 % 12;
@@ -104,18 +83,14 @@ function toMinutesFromMidnight(hour12: number, minute: number, meridiem: "AM" | 
   return hours24 * 60 + minute;
 }
 
-function fromMinutesToSlot(minutes: number): { slotIndex: number; meridiem: "AM" | "PM" } {
-  const norm = ((minutes % 1440) + 1440) % 1440;
+function parseMinutesToTime(totalMinutes: number): ClockTime {
+  const norm = ((totalMinutes % 1440) + 1440) % 1440;
   const isPM = norm >= 720;
-  const meridiem: "AM" | "PM" = isPM ? "PM" : "AM";
   const hour24 = Math.floor(norm / 60);
   const min = norm % 60;
   let hour12 = hour24 % 12;
   if (hour12 === 0) hour12 = 12;
-  const slotIndex = HALF_DAY_SLOTS.findIndex(
-    (s) => s.hour12 === hour12 && s.minute === (min >= 30 ? 30 : 0),
-  );
-  return { slotIndex: slotIndex !== -1 ? slotIndex : 0, meridiem };
+  return { hour: hour12, minute: min, meridiem: isPM ? "PM" : "AM" };
 }
 
 function getSafePosterUrl(posterPath?: string | null, posterUrl?: string | null): string | null {
@@ -276,18 +251,15 @@ export function BroadcastSchedulerModal({
   // Common time configuration
   const now = useMemo(() => new Date(), [isOpen]); // eslint-disable-line react-hooks/exhaustive-deps
   const [selectedDays, setSelectedDays] = useState<number[]>([now.getDay()]);
-  const [meridiem, setMeridiem] = useState<"AM" | "PM">("PM");
-  const [selectedSlotIndex, setSelectedSlotIndex] = useState<number>(17); // 8:30 PM default
+  const [slot1Time, setSlot1Time] = useState<ClockTime>({ hour: 8, minute: 30, meridiem: "PM" });
   const [startSeason, setStartSeason] = useState<number>(initialSeason || 1);
   const [startEpisode, setStartEpisode] = useState<number>(initialEpisode || 1);
 
   // Multi-episode per day (TV)
   const [episodesPerDay, setEpisodesPerDay] = useState<1 | 2 | 3>(1);
   const [activeSlotEditing, setActiveSlotEditing] = useState<number>(0);
-  const [slot2Index, setSlot2Index] = useState<number>(18); // 9:00 PM default
-  const [slot2Meridiem, setSlot2Meridiem] = useState<"AM" | "PM">("PM");
-  const [slot3Index, setSlot3Index] = useState<number>(19); // 9:30 PM default
-  const [slot3Meridiem, setSlot3Meridiem] = useState<"AM" | "PM">("PM");
+  const [slot2Time, setSlot2Time] = useState<ClockTime>({ hour: 9, minute: 0, meridiem: "PM" });
+  const [slot3Time, setSlot3Time] = useState<ClockTime>({ hour: 9, minute: 30, meridiem: "PM" });
 
   // Screening mode state
   const [screeningDate, setScreeningDate] = useState<string>(initialDate || todayStr);
@@ -558,14 +530,9 @@ export function BroadcastSchedulerModal({
   const selectedSeasonEpisodeCount = selectedSeasonMeta?.episodeCount || 0;
 
   // Time calculations
-  const currentSlot = HALF_DAY_SLOTS[selectedSlotIndex] || HALF_DAY_SLOTS[17];
-  const blockStartMinutes = toMinutesFromMidnight(currentSlot.hour12, currentSlot.minute, meridiem);
-
-  const slot2Slot = HALF_DAY_SLOTS[slot2Index] || HALF_DAY_SLOTS[18];
-  const slot2Minutes = toMinutesFromMidnight(slot2Slot.hour12, slot2Slot.minute, slot2Meridiem);
-
-  const slot3Slot = HALF_DAY_SLOTS[slot3Index] || HALF_DAY_SLOTS[19];
-  const slot3Minutes = toMinutesFromMidnight(slot3Slot.hour12, slot3Slot.minute, slot3Meridiem);
+  const blockStartMinutes = toMinutesFromMidnight(slot1Time.hour, slot1Time.minute, slot1Time.meridiem);
+  const slot2Minutes = toMinutesFromMidnight(slot2Time.hour, slot2Time.minute, slot2Time.meridiem);
+  const slot3Minutes = toMinutesFromMidnight(slot3Time.hour, slot3Time.minute, slot3Time.meridiem);
 
   const dailySlots = useMemo(() => {
     if (!isTv || episodesPerDay === 1) return [blockStartMinutes];
@@ -586,24 +553,22 @@ export function BroadcastSchedulerModal({
   const handleSnapBackToBack = useCallback(() => {
     triggerHaptic(10);
     setPreviewResult(null);
-    const blockDuration = effectiveBlockCount * BLOCK_MINUTES;
-    const s2 = fromMinutesToSlot(blockStartMinutes + blockDuration);
-    setSlot2Index(s2.slotIndex);
-    setSlot2Meridiem(s2.meridiem);
+    const duration = effectiveRuntime;
+    const s2 = parseMinutesToTime(blockStartMinutes + duration);
+    setSlot2Time(s2);
     if (episodesPerDay === 3) {
-      const s3 = fromMinutesToSlot(blockStartMinutes + blockDuration * 2);
-      setSlot3Index(s3.slotIndex);
-      setSlot3Meridiem(s3.meridiem);
+      const s3 = parseMinutesToTime(blockStartMinutes + duration * 2);
+      setSlot3Time(s3);
     }
-    toast.info("Time slots snapped consecutively back-to-back.", "Back-to-Back");
-  }, [blockStartMinutes, episodesPerDay, effectiveBlockCount, toast]);
+    toast.info("Time slots snapped consecutively according to show runtime.", "Back-to-Back");
+  }, [blockStartMinutes, episodesPerDay, effectiveRuntime, toast]);
 
   const intraSlotOverlapError = useMemo(() => {
     if (!isTv || episodesPerDay === 1) return null;
-    const blockDuration = effectiveBlockCount * BLOCK_MINUTES;
+    const duration = effectiveRuntime;
     if (episodesPerDay >= 2) {
-      if (slot2Minutes < blockStartMinutes + blockDuration && slot2Minutes >= blockStartMinutes) {
-        return `Episode 2 starts before Episode 1 finishes (${effectiveBlockCount * 30}m block). Space out times or snap back-to-back.`;
+      if (slot2Minutes < blockStartMinutes + duration && slot2Minutes >= blockStartMinutes) {
+        return `Episode 2 starts before Episode 1 finishes (${duration}m runtime). Please space out your times.`;
       }
       if (blockStartMinutes === slot2Minutes) {
         return "Episode 1 and Episode 2 cannot air at the exact same time.";
@@ -613,8 +578,8 @@ export function BroadcastSchedulerModal({
       }
     }
     if (episodesPerDay === 3) {
-      if (slot3Minutes < slot2Minutes + blockDuration && slot3Minutes >= slot2Minutes) {
-        return `Episode 3 starts before Episode 2 finishes (${effectiveBlockCount * 30}m block). Space out times or snap back-to-back.`;
+      if (slot3Minutes < slot2Minutes + duration && slot3Minutes >= slot2Minutes) {
+        return `Episode 3 starts before Episode 2 finishes (${duration}m runtime). Please space out your times.`;
       }
       if (slot3Minutes === blockStartMinutes || slot3Minutes === slot2Minutes) {
         return "Episode 3 cannot air at the exact same time as an earlier episode.";
@@ -624,13 +589,13 @@ export function BroadcastSchedulerModal({
       }
     }
     return null;
-  }, [isTv, episodesPerDay, blockStartMinutes, slot2Minutes, slot3Minutes, effectiveBlockCount]);
+  }, [isTv, episodesPerDay, blockStartMinutes, slot2Minutes, slot3Minutes, effectiveRuntime]);
 
   // Conflict detection with existing weekly schedule
   const scheduleOverlapConflict = useMemo(() => {
     if (mode !== "weekly" || !selectedMedia || existingSchedule.length === 0) return null;
 
-    const blockDuration = effectiveBlockCount * BLOCK_MINUTES;
+    const duration = effectiveRuntime;
 
     for (const day of selectedDays) {
       const daySchedules = existingSchedule.filter(
@@ -639,12 +604,16 @@ export function BroadcastSchedulerModal({
 
       for (const scheduled of daySchedules) {
         const schedStart = scheduled.blockStartMinutes;
-        const schedEnd = schedStart + scheduled.blockCount * BLOCK_MINUTES;
+        const schedDuration =
+          scheduled.runtimeMinutes && scheduled.runtimeMinutes > 0
+            ? scheduled.runtimeMinutes
+            : scheduled.blockCount * BLOCK_MINUTES;
+        const schedEnd = schedStart + schedDuration;
 
         // Check each planned episode slot
         for (let sIdx = 0; sIdx < dailySlots.length; sIdx++) {
           const plannedStart = dailySlots[sIdx];
-          const plannedEnd = plannedStart + blockDuration;
+          const plannedEnd = plannedStart + duration;
           const isOverlap = plannedStart < schedEnd && plannedEnd > schedStart;
           if (isOverlap) {
             const dayName = DAYS_OF_WEEK.find((d) => d.day === day)?.short || "Day";
@@ -661,63 +630,64 @@ export function BroadcastSchedulerModal({
       }
     }
     return null;
-  }, [mode, selectedMedia, existingSchedule, selectedDays, dailySlots, effectiveBlockCount]);
+  }, [mode, selectedMedia, existingSchedule, selectedDays, dailySlots, effectiveRuntime]);
 
   const nextAvailableSlot = useMemo(() => {
     if (!scheduleOverlapConflict || mode !== "weekly") return null;
-    const blockDuration = effectiveBlockCount * BLOCK_MINUTES;
+    const duration = effectiveRuntime;
     const day = scheduleOverlapConflict.conflictDay;
     const dayItems = existingSchedule
       .filter((s) => s.dayOfWeek === day && s.tmdbId !== selectedMedia?.tmdbId)
       .sort((a, b) => a.blockStartMinutes - b.blockStartMinutes);
 
-    // Search forward from the end of conflicting show
+    // Search forward in 1-minute steps from the end of conflicting show
     const searchFrom = Math.min(1440, scheduleOverlapConflict.conflictEnd);
-    for (let m = searchFrom; m <= 1440 - blockDuration; m += BLOCK_MINUTES) {
-      const end = m + blockDuration;
+    for (let m = searchFrom; m <= 1440 - duration; m++) {
+      const end = m + duration;
       const overlaps = dayItems.some((item) => {
-        const itemEnd = item.blockStartMinutes + item.blockCount * BLOCK_MINUTES;
+        const itemDuration =
+          item.runtimeMinutes && item.runtimeMinutes > 0 ? item.runtimeMinutes : item.blockCount * BLOCK_MINUTES;
+        const itemEnd = item.blockStartMinutes + itemDuration;
         return m < itemEnd && end > item.blockStartMinutes;
       });
       if (!overlaps) return m;
     }
 
     // Wrap around to earlier in the day
-    for (let m = 0; m < scheduleOverlapConflict.conflictStart; m += BLOCK_MINUTES) {
-      if (m + blockDuration > 1440) break;
-      const end = m + blockDuration;
+    for (let m = 0; m < scheduleOverlapConflict.conflictStart; m++) {
+      if (m + duration > 1440) break;
+      const end = m + duration;
       const overlaps = dayItems.some((item) => {
-        const itemEnd = item.blockStartMinutes + item.blockCount * BLOCK_MINUTES;
+        const itemDuration =
+          item.runtimeMinutes && item.runtimeMinutes > 0 ? item.runtimeMinutes : item.blockCount * BLOCK_MINUTES;
+        const itemEnd = item.blockStartMinutes + itemDuration;
         return m < itemEnd && end > item.blockStartMinutes;
       });
       if (!overlaps) return m;
     }
 
     return null;
-  }, [scheduleOverlapConflict, mode, effectiveBlockCount, existingSchedule, selectedMedia?.tmdbId]);
+  }, [scheduleOverlapConflict, mode, effectiveRuntime, existingSchedule, selectedMedia?.tmdbId]);
 
   const handleShiftToNextAvailable = useCallback(() => {
     if (nextAvailableSlot === null) return;
     triggerHaptic(12);
-    const { slotIndex, meridiem: newMeridiem } = fromMinutesToSlot(nextAvailableSlot);
-    setSelectedSlotIndex(slotIndex);
-    setMeridiem(newMeridiem);
+    const s1 = parseMinutesToTime(nextAvailableSlot);
+    setSlot1Time(s1);
     if (episodesPerDay >= 2) {
-      const blockDuration = effectiveBlockCount * BLOCK_MINUTES;
-      const s2 = fromMinutesToSlot(nextAvailableSlot + blockDuration);
-      setSlot2Index(s2.slotIndex);
-      setSlot2Meridiem(s2.meridiem);
+      const duration = effectiveRuntime;
+      const s2 = parseMinutesToTime(nextAvailableSlot + duration);
+      setSlot2Time(s2);
       if (episodesPerDay === 3) {
-        const s3 = fromMinutesToSlot(nextAvailableSlot + blockDuration * 2);
-        setSlot3Index(s3.slotIndex);
-        setSlot3Meridiem(s3.meridiem);
+        const s3 = parseMinutesToTime(nextAvailableSlot + duration * 2);
+        setSlot3Time(s3);
       }
     }
     toast.success(
       `Shifted broadcast to next open slot: ${formatBlockTime(nextAvailableSlot)}`,
       "Slot Auto-Shifted",
     );
-  }, [nextAvailableSlot, episodesPerDay, effectiveBlockCount, toast]);
+  }, [nextAvailableSlot, episodesPerDay, effectiveRuntime, toast]);
 
   // Days toggling
   const toggleDay = useCallback((day: number) => {
@@ -1465,16 +1435,14 @@ export function BroadcastSchedulerModal({
                           triggerHaptic(8);
                           setEpisodesPerDay(cnt);
                           setActiveSlotEditing(0);
-                          const blockDuration = effectiveBlockCount * BLOCK_MINUTES;
+                          const duration = effectiveRuntime;
                           if (cnt >= 2) {
-                            const s2 = fromMinutesToSlot(blockStartMinutes + blockDuration);
-                            setSlot2Index(s2.slotIndex);
-                            setSlot2Meridiem(s2.meridiem);
+                            const s2 = parseMinutesToTime(blockStartMinutes + duration);
+                            setSlot2Time(s2);
                           }
                           if (cnt === 3) {
-                            const s3 = fromMinutesToSlot(blockStartMinutes + blockDuration * 2);
-                            setSlot3Index(s3.slotIndex);
-                            setSlot3Meridiem(s3.meridiem);
+                            const s3 = parseMinutesToTime(blockStartMinutes + duration * 2);
+                            setSlot3Time(s3);
                           }
                         }}
                         className={`rounded-xl py-2 font-mono text-xs font-bold transition-all cursor-pointer min-h-[38px] ${
@@ -1711,87 +1679,208 @@ export function BroadcastSchedulerModal({
               </div>
             )}
 
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-mono font-bold uppercase tracking-wider text-neutral-300">
-                {isTv && episodesPerDay > 1
-                  ? `Select Air Time for Episode ${activeSlotEditing + 1}`
-                  : `Air Time (${formattedDailyTimesSummary})`}
-              </span>
+            {/* DIGITAL VCR & RETRO CLOCK DISPLAY */}
+            {(() => {
+              const activeTime = activeSlotEditing === 0 ? slot1Time : activeSlotEditing === 1 ? slot2Time : slot3Time;
+              const activeMinutes = activeSlotEditing === 0 ? blockStartMinutes : activeSlotEditing === 1 ? slot2Minutes : slot3Minutes;
+              const updateActiveTime = (updater: (prev: ClockTime) => ClockTime) => {
+                if (activeSlotEditing === 0) setSlot1Time(updater);
+                else if (activeSlotEditing === 1) setSlot2Time(updater);
+                else setSlot3Time(updater);
+                setPreviewResult(null);
+              };
 
-              {/* AM/PM Switch */}
-              <div className="flex items-center rounded-xl bg-neutral-900 p-1 border border-neutral-800 gap-1">
-                <button
-                  type="button"
-                  onClick={() => {
-                    triggerHaptic(8);
-                    if (activeSlotEditing === 0) setMeridiem("AM");
-                    else if (activeSlotEditing === 1) setSlot2Meridiem("AM");
-                    else setSlot3Meridiem("AM");
-                    setPreviewResult(null);
-                  }}
-                  className={`flex items-center gap-1.5 rounded-lg px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer ${
-                    (activeSlotEditing === 0 ? meridiem : activeSlotEditing === 1 ? slot2Meridiem : slot3Meridiem) === "AM"
-                      ? "bg-neutral-800 text-white shadow-md"
-                      : "text-neutral-400 hover:text-white"
-                  }`}
-                >
-                  <Sun className="h-3 w-3" />
-                  <span>AM</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    triggerHaptic(8);
-                    if (activeSlotEditing === 0) setMeridiem("PM");
-                    else if (activeSlotEditing === 1) setSlot2Meridiem("PM");
-                    else setSlot3Meridiem("PM");
-                    setPreviewResult(null);
-                  }}
-                  className={`flex items-center gap-1.5 rounded-lg px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer ${
-                    (activeSlotEditing === 0 ? meridiem : activeSlotEditing === 1 ? slot2Meridiem : slot3Meridiem) === "PM"
-                      ? "bg-neutral-800 text-white shadow-md"
-                      : "text-neutral-400 hover:text-white"
-                  }`}
-                >
-                  <Moon className="h-3 w-3" />
-                  <span>PM</span>
-                </button>
-              </div>
-            </div>
+              const handleHourNudge = (delta: number) => {
+                triggerHaptic(6);
+                updateActiveTime((prev) => {
+                  let nextH = prev.hour + delta;
+                  if (nextH > 12) nextH = 1;
+                  if (nextH < 1) nextH = 12;
+                  return { ...prev, hour: nextH };
+                });
+              };
 
-            {/* Time Slots Grid */}
-            <div className="grid grid-cols-4 sm:grid-cols-6 gap-1 max-h-[125px] overflow-y-auto no-scrollbar rounded-xl border border-neutral-800 bg-neutral-950 p-2">
-              {HALF_DAY_SLOTS.map((slot, index) => {
-                const currentSlotIndex =
-                  activeSlotEditing === 0
-                    ? selectedSlotIndex
-                    : activeSlotEditing === 1
-                      ? slot2Index
-                      : slot3Index;
-                const isSelected = currentSlotIndex === index;
+              const handleMinuteNudge = (delta: number) => {
+                triggerHaptic(6);
+                updateActiveTime((prev) => {
+                  let nextM = prev.minute + delta;
+                  let nextH = prev.hour;
+                  let nextMer = prev.meridiem;
+                  if (nextM >= 60) {
+                    nextM = 0;
+                    nextH = nextH === 12 ? 1 : nextH + 1;
+                  } else if (nextM < 0) {
+                    nextM = 59;
+                    nextH = nextH === 1 ? 12 : nextH - 1;
+                  }
+                  return { ...prev, hour: nextH, minute: nextM, meridiem: nextMer };
+                });
+              };
 
-                return (
-                  <button
-                    key={`${slot.label}-${activeSlotEditing}`}
-                    type="button"
-                    onClick={() => {
-                      triggerHaptic(8);
-                      if (activeSlotEditing === 0) setSelectedSlotIndex(index);
-                      else if (activeSlotEditing === 1) setSlot2Index(index);
-                      else setSlot3Index(index);
-                      setPreviewResult(null);
-                    }}
-                    className={`rounded-lg px-1.5 py-1.5 font-mono text-xs font-semibold transition-all cursor-pointer ${
-                      isSelected
-                        ? "border border-purple-500/60 bg-purple-950/80 text-purple-200 font-bold shadow-md ring-1 ring-purple-500/30"
-                        : "border border-neutral-800/80 bg-neutral-900/60 text-neutral-400 hover:border-neutral-700 hover:text-white"
-                    }`}
-                  >
-                    <span>{slot.label}</span>
-                  </button>
-                );
-              })}
-            </div>
+              return (
+                <div className="rounded-2xl border border-neutral-800/90 bg-neutral-950 p-3.5 sm:p-4 shadow-[inset_0_2px_12px_rgba(0,0,0,0.9)] space-y-3">
+                  <div className="flex items-center justify-between text-xs font-mono">
+                    <span className="font-bold uppercase tracking-wider text-neutral-300 flex items-center gap-1.5">
+                      <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse inline-block" />
+                      <span>
+                        {isTv && episodesPerDay > 1
+                          ? `VCR Timer · Ep ${activeSlotEditing + 1} Air Time`
+                          : "VCR Digital On-Air Timer"}
+                      </span>
+                    </span>
+                    <span className="text-[11px] text-purple-300 font-semibold bg-purple-950/60 border border-purple-800/40 rounded-md px-2 py-0.5">
+                      Exact Runtime: {effectiveRuntime}m
+                    </span>
+                  </div>
+
+                  {/* Digits Display Chassis */}
+                  <div className="flex items-center justify-center gap-2 sm:gap-3.5 py-1">
+                    {/* Hour Stepper Box */}
+                    <div className="flex flex-col items-center">
+                      <button
+                        type="button"
+                        onClick={() => handleHourNudge(1)}
+                        className="p-1 text-neutral-500 hover:text-purple-300 hover:scale-110 active:scale-95 transition-all cursor-pointer"
+                        title="Hour +1"
+                      >
+                        <ChevronUp className="h-5 w-5" />
+                      </button>
+                      <input
+                        type="number"
+                        min={1}
+                        max={12}
+                        value={activeTime.hour}
+                        onChange={(e) => {
+                          const num = parseInt(e.target.value, 10);
+                          if (!isNaN(num) && num >= 1 && num <= 12) {
+                            updateActiveTime((prev) => ({ ...prev, hour: num }));
+                          }
+                        }}
+                        className="w-16 sm:w-20 h-16 sm:h-20 text-center font-mono text-3xl sm:text-4xl font-bold bg-neutral-900/90 border border-neutral-700/80 rounded-2xl text-white shadow-[inset_0_2px_8px_rgba(0,0,0,0.8)] focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 focus:outline-none transition-all select-all"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleHourNudge(-1)}
+                        className="p-1 text-neutral-500 hover:text-purple-300 hover:scale-110 active:scale-95 transition-all cursor-pointer"
+                        title="Hour -1"
+                      >
+                        <ChevronDown className="h-5 w-5" />
+                      </button>
+                      <span className="text-[10px] font-mono uppercase tracking-wider text-neutral-500 mt-0.5">Hour</span>
+                    </div>
+
+                    {/* Glowing Monospace Digital Colon */}
+                    <div className="flex flex-col items-center justify-center pb-5">
+                      <span className="text-3xl sm:text-4xl font-mono font-bold text-purple-400/90 animate-pulse select-none">
+                        :
+                      </span>
+                    </div>
+
+                    {/* Minute Stepper Box */}
+                    <div className="flex flex-col items-center">
+                      <button
+                        type="button"
+                        onClick={() => handleMinuteNudge(1)}
+                        className="p-1 text-neutral-500 hover:text-purple-300 hover:scale-110 active:scale-95 transition-all cursor-pointer"
+                        title="Minute +1"
+                      >
+                        <ChevronUp className="h-5 w-5" />
+                      </button>
+                      <input
+                        type="number"
+                        min={0}
+                        max={59}
+                        value={String(activeTime.minute).padStart(2, "0")}
+                        onChange={(e) => {
+                          const num = parseInt(e.target.value, 10);
+                          if (!isNaN(num) && num >= 0 && num <= 59) {
+                            updateActiveTime((prev) => ({ ...prev, minute: num }));
+                          }
+                        }}
+                        className="w-16 sm:w-20 h-16 sm:h-20 text-center font-mono text-3xl sm:text-4xl font-bold bg-neutral-900/90 border border-neutral-700/80 rounded-2xl text-white shadow-[inset_0_2px_8px_rgba(0,0,0,0.8)] focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 focus:outline-none transition-all select-all"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleMinuteNudge(-1)}
+                        className="p-1 text-neutral-500 hover:text-purple-300 hover:scale-110 active:scale-95 transition-all cursor-pointer"
+                        title="Minute -1"
+                      >
+                        <ChevronDown className="h-5 w-5" />
+                      </button>
+                      <span className="text-[10px] font-mono uppercase tracking-wider text-neutral-500 mt-0.5">Min</span>
+                    </div>
+
+                    {/* AM / PM LED Toggle Buttons */}
+                    <div className="flex flex-col gap-1.5 pb-5 ml-1 sm:ml-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          triggerHaptic(8);
+                          updateActiveTime((prev) => ({ ...prev, meridiem: "AM" }));
+                        }}
+                        className={`px-3 py-2 rounded-xl text-xs font-mono font-bold uppercase transition-all cursor-pointer ${
+                          activeTime.meridiem === "AM"
+                            ? "bg-purple-900 text-white border border-purple-400 shadow-md shadow-purple-950"
+                            : "bg-neutral-900 text-neutral-500 hover:text-white border border-neutral-800"
+                        }`}
+                      >
+                        AM
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          triggerHaptic(8);
+                          updateActiveTime((prev) => ({ ...prev, meridiem: "PM" }));
+                        }}
+                        className={`px-3 py-2 rounded-xl text-xs font-mono font-bold uppercase transition-all cursor-pointer ${
+                          activeTime.meridiem === "PM"
+                            ? "bg-purple-900 text-white border border-purple-400 shadow-md shadow-purple-950"
+                            : "bg-neutral-900 text-neutral-500 hover:text-white border border-neutral-800"
+                        }`}
+                      >
+                        PM
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Quick-Preset Minute Chips */}
+                  <div className="flex items-center justify-center gap-1.5 pt-2 border-t border-neutral-900/80">
+                    <span className="text-[10px] font-mono uppercase text-neutral-500 mr-1">Quick:</span>
+                    {[0, 15, 30, 45].map((m) => (
+                      <button
+                        key={m}
+                        type="button"
+                        onClick={() => {
+                          triggerHaptic(8);
+                          updateActiveTime((prev) => ({ ...prev, minute: m }));
+                        }}
+                        className={`px-2.5 py-1 rounded-lg font-mono text-[11px] transition-all cursor-pointer ${
+                          activeTime.minute === m
+                            ? "bg-purple-950 text-purple-200 border border-purple-500/60 font-bold shadow-sm"
+                            : "bg-neutral-900/80 text-neutral-400 hover:text-white border border-neutral-800"
+                        }`}
+                      >
+                        :{String(m).padStart(2, "0")}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Live Air Window Indicator */}
+                  <div className="flex items-center justify-between rounded-xl bg-purple-950/20 border border-purple-800/30 px-3 py-2 text-xs font-mono">
+                    <div className="flex items-center gap-2">
+                      <Clock className="h-3.5 w-3.5 text-purple-400 shrink-0" />
+                      <span className="text-neutral-400">Air Window:</span>
+                      <span className="font-bold text-white">
+                        {formatBlockTime(activeMinutes)} – {formatBlockTime((activeMinutes + effectiveRuntime) % 1440)}
+                      </span>
+                    </div>
+                    <span className="text-[11px] text-purple-300 font-semibold shrink-0">
+                      {effectiveRuntime}m
+                    </span>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
 
           {/* Nostalgia Multi-Year Roadmap Preview */}

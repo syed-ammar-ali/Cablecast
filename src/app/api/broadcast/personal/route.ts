@@ -17,6 +17,7 @@ function computeLiveState(
   blockCount: number,
   now: Date = new Date(),
   tzOffset: number = 0,
+  runtimeMinutes?: number | null,
 ) {
   const localMs = now.getTime() - tzOffset * 60 * 1000;
   const local = new Date(localMs);
@@ -26,7 +27,8 @@ function computeLiveState(
   }
 
   const currentMinutes = local.getUTCHours() * 60 + local.getUTCMinutes();
-  const blockEndMinutes = blockStartMinutes + blockCount * BLOCK_MINUTES;
+  const duration = runtimeMinutes && runtimeMinutes > 0 ? runtimeMinutes : blockCount * BLOCK_MINUTES;
+  const blockEndMinutes = blockStartMinutes + duration;
 
   if (currentMinutes >= blockStartMinutes && currentMinutes < blockEndMinutes) {
     const elapsedMinutes = currentMinutes - blockStartMinutes;
@@ -43,12 +45,14 @@ function getNextAirDate(
   now: Date,
   tzOffset: number = 0,
   blockCount: number = 1,
+  runtimeMinutes?: number | null,
 ): Date {
   const localMs = now.getTime() - tzOffset * 60 * 1000;
   const local = new Date(localMs);
   const currentDay = local.getUTCDay();
   const currentMinutes = local.getUTCHours() * 60 + local.getUTCMinutes();
-  const blockEndMinutes = blockStartMinutes + blockCount * 30; // BLOCK_MINUTES is 30
+  const duration = runtimeMinutes && runtimeMinutes > 0 ? runtimeMinutes : blockCount * 30;
+  const blockEndMinutes = blockStartMinutes + duration;
 
   let daysUntil = (dayOfWeek - currentDay + 7) % 7;
   // If it's the same day, but the broadcast has fully finished, wait until next week
@@ -80,12 +84,14 @@ function getMissedOccurrences(
   createdAt: Date,
   now: Date,
   tzOffset: number = 0,
+  runtimeMinutes?: number | null,
 ): PastOccurrence[] {
   const localMs = now.getTime() - tzOffset * 60 * 1000;
   const local = new Date(localMs);
   const localCurrentDay = local.getUTCDay();
   const localCurrentMinutes = local.getUTCHours() * 60 + local.getUTCMinutes();
-  const blockEndMinutes = blockStartMinutes + blockCount * BLOCK_MINUTES;
+  const duration = runtimeMinutes && runtimeMinutes > 0 ? runtimeMinutes : blockCount * BLOCK_MINUTES;
+  const blockEndMinutes = blockStartMinutes + duration;
 
   let daysAgo: number;
   if (dayOfWeek === localCurrentDay) {
@@ -136,26 +142,28 @@ function getMissedOccurrences(
 }
 
 function findNextOpenSlotForDay(
-  dayMatches: { blockStartMinutes: number; blockCount: number }[],
-  blockCount: number,
+  dayMatches: { blockStartMinutes: number; blockCount: number; runtimeMinutes?: number | null }[],
+  durationMinutes: number,
   preferredStart: number,
 ): number | null {
-  const blockDuration = blockCount * BLOCK_MINUTES;
-  // First search from preferredStart forward up to end of day
-  for (let m = preferredStart; m <= 1440 - blockDuration; m += BLOCK_MINUTES) {
-    const end = m + blockDuration;
+  const getItemDuration = (item: { runtimeMinutes?: number | null; blockCount: number }) =>
+    item.runtimeMinutes && item.runtimeMinutes > 0 ? item.runtimeMinutes : item.blockCount * BLOCK_MINUTES;
+
+  // First search from preferredStart forward up to end of day in 1-minute steps
+  for (let m = preferredStart; m <= 1440 - durationMinutes; m++) {
+    const end = m + durationMinutes;
     const hasOverlap = dayMatches.some((item) => {
-      const itemEnd = item.blockStartMinutes + item.blockCount * BLOCK_MINUTES;
+      const itemEnd = item.blockStartMinutes + getItemDuration(item);
       return m < itemEnd && end > item.blockStartMinutes;
     });
     if (!hasOverlap) return m;
   }
   // Wrap around from beginning of day
-  for (let m = 0; m < preferredStart; m += BLOCK_MINUTES) {
-    if (m + blockDuration > 1440) break;
-    const end = m + blockDuration;
+  for (let m = 0; m < preferredStart; m++) {
+    if (m + durationMinutes > 1440) break;
+    const end = m + durationMinutes;
     const hasOverlap = dayMatches.some((item) => {
-      const itemEnd = item.blockStartMinutes + item.blockCount * BLOCK_MINUTES;
+      const itemEnd = item.blockStartMinutes + getItemDuration(item);
       return m < itemEnd && end > item.blockStartMinutes;
     });
     if (!hasOverlap) return m;
@@ -275,6 +283,7 @@ export async function GET(request: NextRequest) {
         item.createdAt,
         now,
         itemTz,
+        item.runtimeMinutes,
       );
 
       if (missedOccurrences.length > 0) {
@@ -489,9 +498,9 @@ export async function GET(request: NextRequest) {
     // Dynamically evaluate slot status for all schedule items in-memory
     const schedule: PersonalScheduleItem[] = updatedItems.map((item) => {
       const itemTz = typeof item.timezoneOffset === "number" ? item.timezoneOffset : userTzOffset;
-      const liveState = computeLiveState(item.dayOfWeek, item.blockStartMinutes, item.blockCount, now, itemTz);
+      const liveState = computeLiveState(item.dayOfWeek, item.blockStartMinutes, item.blockCount, now, itemTz, item.runtimeMinutes);
       const dayName = DAYS_OF_WEEK.find((d) => d.day === item.dayOfWeek)?.name ?? `Day ${item.dayOfWeek}`;
-      const targetAirDate = getNextAirDate(item.dayOfWeek, item.blockStartMinutes, now, itemTz, item.blockCount);
+      const targetAirDate = getNextAirDate(item.dayOfWeek, item.blockStartMinutes, now, itemTz, item.blockCount, item.runtimeMinutes);
       const checkTime = liveState.isLiveNow ? now : targetAirDate;
 
       const { slotStatus, rentalExpiresAt } = getBatchedSlotStatus(
@@ -618,7 +627,8 @@ export async function GET(request: NextRequest) {
         const dayOfWeek = Number(item.dayOfWeek);
         const blockStartMinutes = Number(item.blockStartMinutes);
         const blockCount = Number(item.blockCount || 1);
-        const liveState = computeLiveState(dayOfWeek, blockStartMinutes, blockCount, now, userTzOffset);
+        const runtimeMinutes = item.runtimeMinutes ? Number(item.runtimeMinutes) : null;
+        const liveState = computeLiveState(dayOfWeek, blockStartMinutes, blockCount, now, userTzOffset, runtimeMinutes);
         const dayName =
           DAYS_OF_WEEK.find((d) => d.day === dayOfWeek)?.name ??
           `Day ${dayOfWeek}`;
@@ -754,9 +764,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "At least one day of the week is required." }, { status: 400 });
     }
 
-    if (typeof input.blockStartMinutes !== "number" || input.blockStartMinutes % BLOCK_MINUTES !== 0) {
+    if (
+      typeof input.blockStartMinutes !== "number" ||
+      isNaN(input.blockStartMinutes) ||
+      input.blockStartMinutes < 0 ||
+      input.blockStartMinutes >= 1440
+    ) {
       return NextResponse.json(
-        { error: "Start time must be aligned to a 30-minute block." },
+        { error: "Start time must be a valid minute between 0 and 1439 (12:00 AM – 11:59 PM)." },
         { status: 400 },
       );
     }
@@ -831,7 +846,7 @@ export async function POST(request: NextRequest) {
     }
 
     const blockCount = Math.max(1, Math.ceil(runtimeMinutes / BLOCK_MINUTES));
-    const requestedEnd = input.blockStartMinutes + blockCount * BLOCK_MINUTES;
+    const effectiveSlotDuration = runtimeMinutes;
 
     // Fetch existing schedule for this user to validate conflicts and duplicates
     const existing = await prisma.userPersonalSchedule.findMany({
@@ -858,18 +873,22 @@ export async function POST(request: NextRequest) {
         ? input.dailySlots.map(Number)
         : [Number(input.blockStartMinutes)];
 
+    // Helper for determining the air duration of an existing slot
+    const getItemDuration = (item: { runtimeMinutes?: number | null; blockCount: number }) =>
+      item.runtimeMinutes && item.runtimeMinutes > 0 ? item.runtimeMinutes : item.blockCount * BLOCK_MINUTES;
+
     // 1. Intra-request slot collision validation
     if (targetDailySlots.length > 1) {
       for (let i = 0; i < targetDailySlots.length; i++) {
         for (let j = i + 1; j < targetDailySlots.length; j++) {
           const s1 = targetDailySlots[i];
           const s2 = targetDailySlots[j];
-          const s1End = s1 + blockCount * BLOCK_MINUTES;
-          const s2End = s2 + blockCount * BLOCK_MINUTES;
+          const s1End = s1 + effectiveSlotDuration;
+          const s2End = s2 + effectiveSlotDuration;
           if (s1 < s2End && s1End > s2) {
             return NextResponse.json(
               {
-                error: `Episode time slot conflict: ${formatBlockTime(s1)} overlaps with ${formatBlockTime(s2)}. Each episode requires a ${blockCount * BLOCK_MINUTES}m block. Please space out your episode times.`,
+                error: `Episode time slot conflict: ${formatBlockTime(s1)} overlaps with ${formatBlockTime(s2)}. Each episode runs for ${effectiveSlotDuration}m. Please space out your episode times.`,
               },
               { status: 400 },
             );
@@ -884,18 +903,18 @@ export async function POST(request: NextRequest) {
 
       for (let sIdx = 0; sIdx < targetDailySlots.length; sIdx++) {
         const slotStart = targetDailySlots[sIdx];
-        const slotEnd = slotStart + blockCount * BLOCK_MINUTES;
+        const slotEnd = slotStart + effectiveSlotDuration;
 
         const overlappingItem = dayMatches.find((item) => {
-          const itemEnd = item.blockStartMinutes + item.blockCount * BLOCK_MINUTES;
+          const itemEnd = item.blockStartMinutes + getItemDuration(item);
           return slotStart < itemEnd && slotEnd > item.blockStartMinutes;
         });
 
         if (overlappingItem) {
           const nextOpen = findNextOpenSlotForDay(
             dayMatches,
-            blockCount,
-            overlappingItem.blockStartMinutes + overlappingItem.blockCount * BLOCK_MINUTES,
+            effectiveSlotDuration,
+            overlappingItem.blockStartMinutes + getItemDuration(overlappingItem),
           );
 
           if (input.autoShiftOnConflict && nextOpen !== null) {

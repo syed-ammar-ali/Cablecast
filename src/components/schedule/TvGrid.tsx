@@ -501,7 +501,11 @@ function PersonalChannelRow({
 
             return sorted.map((item, i) => {
               const startMinutes = item.blockStartMinutes;
-              let totalMinutes = item.blockCount * BLOCK_MINUTES;
+              const slotDuration =
+                item.runtimeMinutes && item.runtimeMinutes > 0
+                  ? item.runtimeMinutes
+                  : (item.blockCount || 1) * BLOCK_MINUTES;
+              let totalMinutes = slotDuration;
 
               const nextItem = sorted[i + 1];
               if (nextItem) {
@@ -552,11 +556,11 @@ function PersonalChannelRow({
                       </span>
                       {item.mediaType === "tv" ? (
                         <span className="text-neutral-400 font-mono text-[8px] md:text-[9px] shrink-0 truncate">
-                          S{item.currentSeason}E{item.currentEpisode}
+                          S{item.currentSeason}E{item.currentEpisode} ({totalMinutes}m)
                         </span>
                       ) : (
                         <span className="text-neutral-400 text-[8px] md:text-[9px] shrink-0 truncate">
-                          {item.blockCount * 30}m
+                          {totalMinutes}m
                         </span>
                       )}
                     </div>
@@ -601,11 +605,11 @@ function PersonalChannelRow({
                     </span>
                     {item.mediaType === "tv" ? (
                       <span className="text-neutral-400 font-mono text-[8px] md:text-[9px] shrink-0 truncate">
-                        S{item.currentSeason}E{item.currentEpisode}
+                        S{item.currentSeason}E{item.currentEpisode} ({totalMinutes}m)
                       </span>
                     ) : (
                       <span className="text-neutral-400 text-[8px] md:text-[9px] shrink-0 truncate">
-                        {item.blockCount * 30}m
+                        {totalMinutes}m
                       </span>
                     )}
                   </div>

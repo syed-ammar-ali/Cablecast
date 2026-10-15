@@ -113,6 +113,7 @@ interface AppointmentTiming {
   dayOfWeek: number;
   blockStartMinutes: number;
   blockCount: number;
+  runtimeMinutes?: number | null;
 }
 
 /**
@@ -124,6 +125,11 @@ export function isAppointmentLiveNow(
   now: Date = new Date(),
   tzOffset?: number,
 ): boolean {
+  const duration =
+    appointment.runtimeMinutes && appointment.runtimeMinutes > 0
+      ? appointment.runtimeMinutes
+      : appointment.blockCount * BLOCK_MINUTES;
+
   if (tzOffset !== undefined) {
     const localMs = now.getTime() - tzOffset * 60 * 1000;
     const local = new Date(localMs);
@@ -131,7 +137,7 @@ export function isAppointmentLiveNow(
 
     const minutesNow = local.getUTCHours() * 60 + local.getUTCMinutes();
     const start = appointment.blockStartMinutes;
-    const end = start + appointment.blockCount * BLOCK_MINUTES;
+    const end = start + duration;
 
     return minutesNow >= start && minutesNow < end;
   }
@@ -140,7 +146,7 @@ export function isAppointmentLiveNow(
 
   const minutesNow = now.getHours() * 60 + now.getMinutes();
   const start = appointment.blockStartMinutes;
-  const end = start + appointment.blockCount * BLOCK_MINUTES;
+  const end = start + duration;
 
   return minutesNow >= start && minutesNow < end;
 }
@@ -174,12 +180,16 @@ export function getAppointmentStartDate(
 
 /** Builds a concrete Date for "today" at the moment the appointment's reserved block ends. */
 export function getAppointmentEndDate(
-  appointment: Pick<AppointmentTiming, "blockStartMinutes" | "blockCount">,
+  appointment: Pick<AppointmentTiming, "blockStartMinutes" | "blockCount"> & { runtimeMinutes?: number | null },
   now: Date = new Date(),
   tzOffset?: number,
 ): Date {
   const start = getAppointmentStartDate(appointment, now, tzOffset);
-  return new Date(start.getTime() + appointment.blockCount * BLOCK_MINUTES * 60_000);
+  const duration =
+    appointment.runtimeMinutes && appointment.runtimeMinutes > 0
+      ? appointment.runtimeMinutes
+      : appointment.blockCount * BLOCK_MINUTES;
+  return new Date(start.getTime() + duration * 60_000);
 }
 
 /** Milliseconds from `now` until the top of the next 30-minute block. */
@@ -208,9 +218,14 @@ export function getLiveOffsetForAppointment(
     return elapsedMinutes * 60 + local.getUTCSeconds();
   }
 
+  const duration =
+    appointment.runtimeMinutes && appointment.runtimeMinutes > 0
+      ? appointment.runtimeMinutes
+      : appointment.blockCount * BLOCK_MINUTES;
+
   return calculateLiveOffset(
     getAppointmentStartDate(appointment, now),
-    appointment.blockCount * BLOCK_MINUTES,
+    duration,
     now,
   );
 }
@@ -234,12 +249,14 @@ export function getNextAirDate(
   now: Date = new Date(),
   tzOffset: number = 0,
   blockCount: number = 1,
+  runtimeMinutes?: number | null,
 ): Date {
   const localMs = now.getTime() - tzOffset * 60 * 1000;
   const local = new Date(localMs);
   const currentDay = local.getUTCDay();
   const currentMinutes = local.getUTCHours() * 60 + local.getUTCMinutes();
-  const blockEndMinutes = blockStartMinutes + blockCount * 30; // BLOCK_MINUTES is 30
+  const duration = runtimeMinutes && runtimeMinutes > 0 ? runtimeMinutes : blockCount * 30;
+  const blockEndMinutes = blockStartMinutes + duration;
 
   let daysUntil = (dayOfWeek - currentDay + 7) % 7;
   // If it's the same day, but the broadcast has fully finished, wait until next week

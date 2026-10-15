@@ -63,7 +63,11 @@ export function BroadcastSlotCard({
     onRemove(item.id);
   };
 
-  const timeRangeLabel = formatBlockTimeRange(item.blockStartMinutes, item.blockCount);
+  const duration =
+    item.runtimeMinutes && item.runtimeMinutes > 0
+      ? item.runtimeMinutes
+      : (item.blockCount || 1) * 30;
+  const timeRangeLabel = formatBlockTimeRange(item.blockStartMinutes, duration, true);
 
   return (
     <div

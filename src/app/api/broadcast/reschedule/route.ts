@@ -53,9 +53,11 @@ export async function POST(request: NextRequest) {
 
       const day = body.targetDayOfWeek;
       const startMin = body.targetBlockStartMinutes;
-      const blockCount =
-        activeSchedule.blockCount && activeSchedule.blockCount > 0 ? activeSchedule.blockCount : 1;
-      const requestedEnd = startMin + blockCount * BLOCK_MINUTES;
+      const activeDuration =
+        activeSchedule.runtimeMinutes && activeSchedule.runtimeMinutes > 0
+          ? activeSchedule.runtimeMinutes
+          : (activeSchedule.blockCount || 1) * BLOCK_MINUTES;
+      const requestedEnd = startMin + activeDuration;
 
       // Conflict verification: look for overlaps on target day excluding this slot itself
       const existingOnDay = await prisma.userPersonalSchedule.findMany({
@@ -67,12 +69,14 @@ export async function POST(request: NextRequest) {
       });
 
       for (const item of existingOnDay) {
-        const itemEnd = item.blockStartMinutes + item.blockCount * BLOCK_MINUTES;
+        const itemDuration =
+          item.runtimeMinutes && item.runtimeMinutes > 0 ? item.runtimeMinutes : item.blockCount * BLOCK_MINUTES;
+        const itemEnd = item.blockStartMinutes + itemDuration;
         const overlaps = startMin < itemEnd && requestedEnd > item.blockStartMinutes;
 
         if (overlaps) {
           const dayName = DAYS_OF_WEEK.find((d) => d.day === day)?.name ?? `Day ${day}`;
-          const itemTime = formatBlockTimeRange(item.blockStartMinutes, item.blockCount);
+          const itemTime = formatBlockTimeRange(item.blockStartMinutes, itemDuration, true);
           return NextResponse.json(
             {
               error: `Slot conflict on ${dayName} (${itemTime}): Already occupied by "${item.title}". Choose an open slot.`,
@@ -183,14 +187,12 @@ export async function POST(request: NextRequest) {
 
       const safeRuntimeMinutes = runtimeMinutes ?? (missedItem.mediaType === "movie" ? 105 : 25);
 
-      const blockCount =
-        missedItem.blockCount && missedItem.blockCount > 0
-          ? missedItem.blockCount
-          : originalSchedule?.blockCount && originalSchedule.blockCount > 0
-            ? originalSchedule.blockCount
-            : Math.max(1, Math.ceil(safeRuntimeMinutes / BLOCK_MINUTES));
-
-      const requestedEnd = startMin + blockCount * BLOCK_MINUTES;
+      const effectiveDuration =
+        missedItem.runtimeMinutes && missedItem.runtimeMinutes > 0
+          ? missedItem.runtimeMinutes
+          : safeRuntimeMinutes;
+      const blockCount = Math.max(1, Math.ceil(effectiveDuration / BLOCK_MINUTES));
+      const requestedEnd = startMin + effectiveDuration;
 
       // 3. Slot conflict verification covering the FULL duration
       const existing = await prisma.userPersonalSchedule.findMany({
@@ -203,12 +205,14 @@ export async function POST(request: NextRequest) {
           continue;
         }
 
-        const itemEnd = item.blockStartMinutes + item.blockCount * BLOCK_MINUTES;
+        const itemDuration =
+          item.runtimeMinutes && item.runtimeMinutes > 0 ? item.runtimeMinutes : item.blockCount * BLOCK_MINUTES;
+        const itemEnd = item.blockStartMinutes + itemDuration;
         const overlaps = startMin < itemEnd && requestedEnd > item.blockStartMinutes;
 
         if (overlaps) {
           const dayName = DAYS_OF_WEEK.find((d) => d.day === day)?.name ?? `Day ${day}`;
-          const itemTime = formatBlockTimeRange(item.blockStartMinutes, item.blockCount);
+          const itemTime = formatBlockTimeRange(item.blockStartMinutes, itemDuration, true);
           return NextResponse.json(
             {
               error: `Slot conflict on ${dayName} (${itemTime}): Already occupied by "${item.title}". Choose an open slot.`,
@@ -301,7 +305,7 @@ export async function POST(request: NextRequest) {
           const { scheduleDelayedBroadcastAlert } = await import("@/lib/notifications/qstash");
           const { getNextAirDate } = await import("@/lib/schedule");
           const rerunTz = typeof body.timezoneOffset === "number" ? body.timezoneOffset : (originalSchedule?.timezoneOffset ?? 0);
-          const nextAir = getNextAirDate(day, startMin, new Date(), rerunTz, blockCount);
+          const nextAir = getNextAirDate(day, startMin, new Date(), rerunTz, blockCount, effectiveDuration);
           const alertTime = new Date(nextAir.getTime() - 10 * 60 * 1000);
           const host = request.headers.get("x-forwarded-host") || request.headers.get("host");
           const proto = request.headers.get("x-forwarded-proto") || "https";

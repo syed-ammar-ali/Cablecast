@@ -102,10 +102,29 @@ export function formatBlockTime(blockStartMinutes: number): string {
   return `${hours12}:${String(minutes).padStart(2, "0")} ${period}`;
 }
 
-export function formatBlockTimeRange(blockStartMinutes: number, blockCount: number = 1): string {
+export function formatAiringRange(
+  startMinutes: number,
+  runtimeMinutes?: number | null,
+  blockCount: number = 1,
+): string {
+  const startStr = formatBlockTime(startMinutes);
+  const duration =
+    runtimeMinutes && runtimeMinutes > 0 ? runtimeMinutes : Math.max(1, blockCount || 1) * 30;
+  const endMinutes = (startMinutes + duration) % 1440;
+  const endStr = formatBlockTime(endMinutes);
+  return `${startStr} – ${endStr}`;
+}
+
+export function formatBlockTimeRange(
+  blockStartMinutes: number,
+  blockCountOrRuntime: number = 1,
+  isExactMinutes: boolean = false,
+): string {
   const startStr = formatBlockTime(blockStartMinutes);
-  const safeBlocks = Math.max(1, blockCount || 1);
-  const endMinutes = blockStartMinutes + safeBlocks * 30;
+  const duration = isExactMinutes
+    ? blockCountOrRuntime
+    : Math.max(1, blockCountOrRuntime || 1) * 30;
+  const endMinutes = (blockStartMinutes + duration) % 1440;
   const endStr = formatBlockTime(endMinutes);
   return `${startStr} – ${endStr}`;
 }

@@ -21,6 +21,8 @@ import {
   Sun,
   Trash2,
   Bell,
+  ChevronDown,
+  ChevronUp,
   Tv,
   Share2,
   X,
@@ -85,37 +87,219 @@ interface PersonalBroadcastModalProps {
 
 type TabKey = "grid" | "lineup" | "missed" | "calendar";
 
-const HALF_DAY_SLOTS = [
-  { hour12: 12, minute: 0, label: "12:00" },
-  { hour12: 12, minute: 30, label: "12:30" },
-  { hour12: 1, minute: 0, label: "1:00" },
-  { hour12: 1, minute: 30, label: "1:30" },
-  { hour12: 2, minute: 0, label: "2:00" },
-  { hour12: 2, minute: 30, label: "2:30" },
-  { hour12: 3, minute: 0, label: "3:00" },
-  { hour12: 3, minute: 30, label: "3:30" },
-  { hour12: 4, minute: 0, label: "4:00" },
-  { hour12: 4, minute: 30, label: "4:30" },
-  { hour12: 5, minute: 0, label: "5:00" },
-  { hour12: 5, minute: 30, label: "5:30" },
-  { hour12: 6, minute: 0, label: "6:00" },
-  { hour12: 6, minute: 30, label: "6:30" },
-  { hour12: 7, minute: 0, label: "7:00" },
-  { hour12: 7, minute: 30, label: "7:30" },
-  { hour12: 8, minute: 0, label: "8:00" },
-  { hour12: 8, minute: 30, label: "8:30" },
-  { hour12: 9, minute: 0, label: "9:00" },
-  { hour12: 9, minute: 30, label: "9:30" },
-  { hour12: 10, minute: 0, label: "10:00" },
-  { hour12: 10, minute: 30, label: "10:30" },
-  { hour12: 11, minute: 0, label: "11:00" },
-  { hour12: 11, minute: 30, label: "11:30" },
-];
+export interface ClockTime {
+  hour: number;
+  minute: number;
+  meridiem: "AM" | "PM";
+}
 
 function toMinutesFromMidnight(hour12: number, minute: number, meridiem: "AM" | "PM"): number {
   let hours24 = hour12 % 12;
   if (meridiem === "PM") hours24 += 12;
   return hours24 * 60 + minute;
+}
+
+function parseMinutesToTime(totalMinutes: number): ClockTime {
+  const norm = ((totalMinutes % 1440) + 1440) % 1440;
+  const isPM = norm >= 720;
+  const hour24 = Math.floor(norm / 60);
+  const min = norm % 60;
+  let hour12 = hour24 % 12;
+  if (hour12 === 0) hour12 = 12;
+  return { hour: hour12, minute: min, meridiem: isPM ? "PM" : "AM" };
+}
+
+interface DigitalVcrTimeDisplayProps {
+  value: ClockTime;
+  onChange: (updater: (prev: ClockTime) => ClockTime) => void;
+  runtimeMinutes: number;
+  label?: string;
+}
+
+function DigitalVcrTimeDisplay({
+  value,
+  onChange,
+  runtimeMinutes,
+  label = "VCR On-Air Timer",
+}: DigitalVcrTimeDisplayProps) {
+  const currentTotalMinutes = toMinutesFromMidnight(value.hour, value.minute, value.meridiem);
+  const endMinutes = (currentTotalMinutes + runtimeMinutes) % 1440;
+
+  const handleHourNudge = (delta: number) => {
+    onChange((prev) => {
+      let nextH = prev.hour + delta;
+      if (nextH > 12) nextH = 1;
+      if (nextH < 1) nextH = 12;
+      return { ...prev, hour: nextH };
+    });
+  };
+
+  const handleMinuteNudge = (delta: number) => {
+    onChange((prev) => {
+      let nextM = prev.minute + delta;
+      let nextH = prev.hour;
+      let nextMer = prev.meridiem;
+      if (nextM >= 60) {
+        nextM = 0;
+        nextH = nextH === 12 ? 1 : nextH + 1;
+      } else if (nextM < 0) {
+        nextM = 59;
+        nextH = nextH === 1 ? 12 : nextH - 1;
+      }
+      return { ...prev, hour: nextH, minute: nextM, meridiem: nextMer };
+    });
+  };
+
+  return (
+    <div className="rounded-2xl border border-neutral-800/90 bg-neutral-950 p-3.5 sm:p-4 shadow-[inset_0_2px_12px_rgba(0,0,0,0.9)] space-y-3">
+      <div className="flex items-center justify-between text-xs font-mono">
+        <span className="font-bold uppercase tracking-wider text-neutral-300 flex items-center gap-1.5">
+          <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse inline-block" />
+          <span>{label}</span>
+        </span>
+        <span className="text-[11px] text-yellow-400 font-semibold bg-yellow-950/40 border border-yellow-800/40 rounded-md px-2 py-0.5">
+          Exact Runtime: {runtimeMinutes}m
+        </span>
+      </div>
+
+      {/* Digits Display Chassis */}
+      <div className="flex items-center justify-center gap-2 sm:gap-3.5 py-1">
+        {/* Hour Stepper Box */}
+        <div className="flex flex-col items-center">
+          <button
+            type="button"
+            onClick={() => handleHourNudge(1)}
+            className="p-1 text-neutral-500 hover:text-yellow-400 hover:scale-110 active:scale-95 transition-all cursor-pointer"
+            title="Hour +1"
+          >
+            <ChevronUp className="h-5 w-5" />
+          </button>
+          <input
+            type="number"
+            min={1}
+            max={12}
+            value={value.hour}
+            onChange={(e) => {
+              const num = parseInt(e.target.value, 10);
+              if (!isNaN(num) && num >= 1 && num <= 12) {
+                onChange((prev) => ({ ...prev, hour: num }));
+              }
+            }}
+            className="w-16 sm:w-20 h-16 sm:h-20 text-center font-mono text-3xl sm:text-4xl font-bold bg-neutral-900/90 border border-neutral-700/80 rounded-2xl text-white shadow-[inset_0_2px_8px_rgba(0,0,0,0.8)] focus:border-yellow-500 focus:ring-2 focus:ring-yellow-500/20 focus:outline-none transition-all select-all"
+          />
+          <button
+            type="button"
+            onClick={() => handleHourNudge(-1)}
+            className="p-1 text-neutral-500 hover:text-yellow-400 hover:scale-110 active:scale-95 transition-all cursor-pointer"
+            title="Hour -1"
+          >
+            <ChevronDown className="h-5 w-5" />
+          </button>
+          <span className="text-[10px] font-mono uppercase tracking-wider text-neutral-500 mt-0.5">Hour</span>
+        </div>
+
+        {/* Glowing Monospace Digital Colon */}
+        <div className="flex flex-col items-center justify-center pb-5">
+          <span className="text-3xl sm:text-4xl font-mono font-bold text-yellow-400/90 animate-pulse select-none">
+            :
+          </span>
+        </div>
+
+        {/* Minute Stepper Box */}
+        <div className="flex flex-col items-center">
+          <button
+            type="button"
+            onClick={() => handleMinuteNudge(1)}
+            className="p-1 text-neutral-500 hover:text-yellow-400 hover:scale-110 active:scale-95 transition-all cursor-pointer"
+            title="Minute +1"
+          >
+            <ChevronUp className="h-5 w-5" />
+          </button>
+          <input
+            type="number"
+            min={0}
+            max={59}
+            value={String(value.minute).padStart(2, "0")}
+            onChange={(e) => {
+              const num = parseInt(e.target.value, 10);
+              if (!isNaN(num) && num >= 0 && num <= 59) {
+                onChange((prev) => ({ ...prev, minute: num }));
+              }
+            }}
+            className="w-16 sm:w-20 h-16 sm:h-20 text-center font-mono text-3xl sm:text-4xl font-bold bg-neutral-900/90 border border-neutral-700/80 rounded-2xl text-white shadow-[inset_0_2px_8px_rgba(0,0,0,0.8)] focus:border-yellow-500 focus:ring-2 focus:ring-yellow-500/20 focus:outline-none transition-all select-all"
+          />
+          <button
+            type="button"
+            onClick={() => handleMinuteNudge(-1)}
+            className="p-1 text-neutral-500 hover:text-yellow-400 hover:scale-110 active:scale-95 transition-all cursor-pointer"
+            title="Minute -1"
+          >
+            <ChevronDown className="h-5 w-5" />
+          </button>
+          <span className="text-[10px] font-mono uppercase tracking-wider text-neutral-500 mt-0.5">Min</span>
+        </div>
+
+        {/* AM / PM LED Toggle Buttons */}
+        <div className="flex flex-col gap-1.5 pb-5 ml-1 sm:ml-2">
+          <button
+            type="button"
+            onClick={() => onChange((prev) => ({ ...prev, meridiem: "AM" }))}
+            className={`px-3 py-2 rounded-xl text-xs font-mono font-bold uppercase transition-all cursor-pointer ${
+              value.meridiem === "AM"
+                ? "bg-yellow-500 text-black border border-yellow-300 font-extrabold shadow-md shadow-yellow-950"
+                : "bg-neutral-900 text-neutral-500 hover:text-white border border-neutral-800"
+            }`}
+          >
+            AM
+          </button>
+          <button
+            type="button"
+            onClick={() => onChange((prev) => ({ ...prev, meridiem: "PM" }))}
+            className={`px-3 py-2 rounded-xl text-xs font-mono font-bold uppercase transition-all cursor-pointer ${
+              value.meridiem === "PM"
+                ? "bg-yellow-500 text-black border border-yellow-300 font-extrabold shadow-md shadow-yellow-950"
+                : "bg-neutral-900 text-neutral-500 hover:text-white border border-neutral-800"
+            }`}
+          >
+            PM
+          </button>
+        </div>
+      </div>
+
+      {/* Quick-Preset Minute Chips */}
+      <div className="flex items-center justify-center gap-1.5 pt-2 border-t border-neutral-900/80">
+        <span className="text-[10px] font-mono uppercase text-neutral-500 mr-1">Quick:</span>
+        {[0, 15, 30, 45].map((m) => (
+          <button
+            key={m}
+            type="button"
+            onClick={() => onChange((prev) => ({ ...prev, minute: m }))}
+            className={`px-2.5 py-1 rounded-lg font-mono text-[11px] transition-all cursor-pointer ${
+              value.minute === m
+                ? "bg-yellow-950 text-yellow-300 border border-yellow-500/60 font-bold shadow-sm"
+                : "bg-neutral-900/80 text-neutral-400 hover:text-white border border-neutral-800"
+            }`}
+          >
+            :{String(m).padStart(2, "0")}
+          </button>
+        ))}
+      </div>
+
+      {/* Live Air Window Indicator */}
+      <div className="flex items-center justify-between rounded-xl bg-yellow-950/20 border border-yellow-800/30 px-3 py-2 text-xs font-mono">
+        <div className="flex items-center gap-2">
+          <Clock className="h-3.5 w-3.5 text-yellow-400 shrink-0" />
+          <span className="text-neutral-400">Air Window:</span>
+          <span className="font-bold text-white">
+            {formatBlockTime(currentTotalMinutes)} – {formatBlockTime(endMinutes)}
+          </span>
+        </div>
+        <span className="text-[11px] text-yellow-300 font-semibold shrink-0">
+          {runtimeMinutes}m
+        </span>
+      </div>
+    </div>
+  );
 }
 
 function getSafePosterUrl(posterPath?: string | null, backdropUrl?: string | null): string | null {
@@ -1456,35 +1640,37 @@ function RescheduleRerunModal({
 
   const [mode, setMode] = useState<"move" | "one_off">("move");
   const [day, setDay] = useState<number>(new Date().getDay());
-  const [meridiem, setMeridiem] = useState<"AM" | "PM">("PM");
-  const [selectedSlotIndex, setSelectedSlotIndex] = useState<number>(16); // 8:00 PM default
+  const [clockTime, setClockTime] = useState<ClockTime>({ hour: 8, minute: 0, meridiem: "PM" });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const currentSlot = HALF_DAY_SLOTS[selectedSlotIndex] ?? HALF_DAY_SLOTS[16];
-  const targetBlockStartMinutes = toMinutesFromMidnight(currentSlot.hour12, currentSlot.minute, meridiem);
-  const timeRangeLabel = formatBlockTimeRange(targetBlockStartMinutes, blockCount);
+  const targetBlockStartMinutes = toMinutesFromMidnight(clockTime.hour, clockTime.minute, clockTime.meridiem);
+  const itemDuration =
+    item.runtimeMinutes && item.runtimeMinutes > 0 ? item.runtimeMinutes : blockCount * 30;
+  const timeRangeLabel = formatBlockTimeRange(targetBlockStartMinutes, itemDuration, true);
   const dayName = DAYS_OF_WEEK.find((d) => d.day === day)?.name ?? `Day ${day}`;
 
   // Real-time conflict validation against existing schedule
   const conflict = useMemo(() => {
     const dayItems = schedule.filter((s) => s.dayOfWeek === day);
-    const requestedEnd = targetBlockStartMinutes + blockCount * 30;
+    const requestedEnd = targetBlockStartMinutes + itemDuration;
 
     for (const s of dayItems) {
       // In move mode, if s is the original schedule item, it won't conflict with its old slot
       if (mode === "move" && s.id === item.scheduleId) continue;
-      const sEnd = s.blockStartMinutes + s.blockCount * 30;
+      const sDuration =
+        s.runtimeMinutes && s.runtimeMinutes > 0 ? s.runtimeMinutes : s.blockCount * 30;
+      const sEnd = s.blockStartMinutes + sDuration;
       const overlaps = targetBlockStartMinutes < sEnd && requestedEnd > s.blockStartMinutes;
       if (overlaps) {
         return {
           title: s.title,
-          timeStr: formatBlockTimeRange(s.blockStartMinutes, s.blockCount),
+          timeStr: formatBlockTimeRange(s.blockStartMinutes, sDuration, true),
         };
       }
     }
     return null;
-  }, [schedule, day, targetBlockStartMinutes, blockCount, mode, item.scheduleId]);
+  }, [schedule, day, targetBlockStartMinutes, itemDuration, mode, item.scheduleId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1627,67 +1813,17 @@ function RescheduleRerunModal({
             </div>
           </div>
 
-          {/* Step 3: Time selection */}
+          {/* Step 3: Air Time with Digital VCR Clock Display */}
           <div className="border-t border-neutral-900 pt-4 space-y-2">
-            <div className="flex items-center justify-between">
-              <label className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-neutral-400">
-                <Clock className="h-3.5 w-3.5 text-neutral-500" />
-                3. Air Time ({formatBlockTime(targetBlockStartMinutes)})
-              </label>
-
-              {/* AM / PM Segmented Switch */}
-              <div className="flex items-center rounded-xl bg-neutral-950 p-1 border border-neutral-800">
-                <button
-                  type="button"
-                  onClick={() => setMeridiem("AM")}
-                  className={`flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
-                    meridiem === "AM"
-                      ? "bg-neutral-800 text-white shadow-md"
-                      : "text-neutral-400 hover:text-neutral-200"
-                  }`}
-                >
-                  <Sun className="h-3 w-3" />
-                  <span>AM</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setMeridiem("PM")}
-                  className={`flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
-                    meridiem === "PM"
-                      ? "bg-neutral-800 text-white shadow-md"
-                      : "text-neutral-400 hover:text-neutral-200"
-                  }`}
-                >
-                  <Moon className="h-3 w-3" />
-                  <span>PM</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Time Slot Matrix */}
-            <div className="grid grid-cols-4 sm:grid-cols-6 gap-1 max-h-[120px] overflow-y-auto no-scrollbar rounded-xl border border-neutral-800 bg-neutral-950 p-2">
-              {HALF_DAY_SLOTS.map((slot, index) => {
-                const isSelected = selectedSlotIndex === index;
-                return (
-                  <button
-                    key={`${slot.label}-${meridiem}`}
-                    type="button"
-                    onClick={() => {
-                      setSelectedSlotIndex(index);
-                      setError(null);
-                    }}
-                    className={`rounded-lg px-1.5 py-1 font-mono text-xs font-semibold transition-all cursor-pointer ${
-                      isSelected
-                        ? "border border-neutral-600 bg-neutral-800 text-white font-bold shadow-md ring-1 ring-neutral-500"
-                        : "border border-neutral-800/80 bg-neutral-900/60 text-neutral-400 hover:border-neutral-700 hover:text-white"
-                    }`}
-                  >
-                    {slot.label}
-                  </button>
-                );
-              })}
-            </div>
+            <DigitalVcrTimeDisplay
+              value={clockTime}
+              onChange={(updater) => {
+                setClockTime(updater);
+                setError(null);
+              }}
+              runtimeMinutes={itemDuration}
+              label="VCR Rerun On-Air Timer"
+            />
           </div>
 
           {/* Live Preview Summary Card */}
@@ -1702,7 +1838,7 @@ function RescheduleRerunModal({
             </div>
             <div className="text-right shrink-0">
               <span className="inline-flex items-center gap-1 rounded-md bg-neutral-800/80 px-2 py-0.5 font-mono text-[10px] font-bold text-neutral-300 border border-neutral-700/60">
-                {blockCount} {blockCount === 1 ? "Block" : "Blocks"} ({blockCount * 30}m)
+                {itemDuration}m Airing
               </span>
             </div>
           </div>
@@ -1758,31 +1894,19 @@ function RescheduleActiveSlotModal({
   const blockCount = item.blockCount && item.blockCount > 0 ? item.blockCount : 1;
   const runtimeMinutes = item.runtimeMinutes ?? blockCount * 30;
 
-  // Determine initial day, meridiem, and slot index from item
-  const initialMeridiem: "AM" | "PM" =
-    Math.floor(item.blockStartMinutes / 60) >= 12 ? "PM" : "AM";
-  const initialHour24 = Math.floor(item.blockStartMinutes / 60) % 24;
-  const initialMin = item.blockStartMinutes % 60;
-  const initialHour12 = initialHour24 % 12 === 0 ? 12 : initialHour24 % 12;
-  const matchedIndex = HALF_DAY_SLOTS.findIndex(
-    (s) => s.hour12 === initialHour12 && s.minute === initialMin,
-  );
-
   const [day, setDay] = useState<number>(item.dayOfWeek);
-  const [meridiem, setMeridiem] = useState<"AM" | "PM">(initialMeridiem);
-  const [selectedSlotIndex, setSelectedSlotIndex] = useState<number>(
-    matchedIndex !== -1 ? matchedIndex : 16,
-  );
+  const [clockTime, setClockTime] = useState<ClockTime>(() => parseMinutesToTime(item.blockStartMinutes));
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const currentSlot = HALF_DAY_SLOTS[selectedSlotIndex] ?? HALF_DAY_SLOTS[16];
   const targetBlockStartMinutes = toMinutesFromMidnight(
-    currentSlot.hour12,
-    currentSlot.minute,
-    meridiem,
+    clockTime.hour,
+    clockTime.minute,
+    clockTime.meridiem,
   );
-  const timeRangeLabel = formatBlockTimeRange(targetBlockStartMinutes, blockCount);
+  const itemDuration =
+    item.runtimeMinutes && item.runtimeMinutes > 0 ? item.runtimeMinutes : blockCount * 30;
+  const timeRangeLabel = formatBlockTimeRange(targetBlockStartMinutes, itemDuration, true);
   const dayName = DAYS_OF_WEEK.find((d) => d.day === day)?.name ?? `Day ${day}`;
 
   const isSameSlot =
@@ -1791,24 +1915,26 @@ function RescheduleActiveSlotModal({
   // Conflict validation: check target day, excluding this slot itself
   const conflict = useMemo(() => {
     const dayItems = schedule.filter((s) => s.dayOfWeek === day && s.id !== item.id);
-    const requestedEnd = targetBlockStartMinutes + blockCount * 30;
+    const requestedEnd = targetBlockStartMinutes + itemDuration;
 
     for (const s of dayItems) {
-      const sEnd = s.blockStartMinutes + s.blockCount * 30;
+      const sDuration =
+        s.runtimeMinutes && s.runtimeMinutes > 0 ? s.runtimeMinutes : s.blockCount * 30;
+      const sEnd = s.blockStartMinutes + sDuration;
       const overlaps = targetBlockStartMinutes < sEnd && requestedEnd > s.blockStartMinutes;
       if (overlaps) {
         return {
           title: s.title,
-          timeStr: formatBlockTimeRange(s.blockStartMinutes, s.blockCount),
+          timeStr: formatBlockTimeRange(s.blockStartMinutes, sDuration, true),
         };
       }
     }
     return null;
-  }, [schedule, day, targetBlockStartMinutes, blockCount, item.id]);
+  }, [schedule, day, targetBlockStartMinutes, itemDuration, item.id]);
 
   const currentDayName =
     DAYS_OF_WEEK.find((d) => d.day === item.dayOfWeek)?.name ?? `Day ${item.dayOfWeek}`;
-  const currentTimeRange = formatBlockTimeRange(item.blockStartMinutes, blockCount);
+  const currentTimeRange = formatBlockTimeRange(item.blockStartMinutes, itemDuration, true);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1920,67 +2046,17 @@ function RescheduleActiveSlotModal({
             </div>
           </div>
 
-          {/* Step 2: Select New Time */}
+          {/* Step 2: Select New Time with Digital VCR Clock Display */}
           <div className="border-t border-neutral-900 pt-4 space-y-2">
-            <div className="flex items-center justify-between">
-              <label className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-neutral-400">
-                <Clock className="h-3.5 w-3.5 text-neutral-500" />
-                2. Select New Time ({formatBlockTime(targetBlockStartMinutes)})
-              </label>
-
-              {/* AM / PM Segmented Switch */}
-              <div className="flex items-center rounded-xl bg-neutral-950 p-1 border border-neutral-800">
-                <button
-                  type="button"
-                  onClick={() => setMeridiem("AM")}
-                  className={`flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
-                    meridiem === "AM"
-                      ? "bg-neutral-800 text-white shadow-md"
-                      : "text-neutral-400 hover:text-neutral-200"
-                  }`}
-                >
-                  <Sun className="h-3 w-3" />
-                  <span>AM</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setMeridiem("PM")}
-                  className={`flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
-                    meridiem === "PM"
-                      ? "bg-neutral-800 text-white shadow-md"
-                      : "text-neutral-400 hover:text-neutral-200"
-                  }`}
-                >
-                  <Moon className="h-3 w-3" />
-                  <span>PM</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Time Slot Matrix */}
-            <div className="grid grid-cols-4 sm:grid-cols-6 gap-1 max-h-[120px] overflow-y-auto no-scrollbar rounded-xl border border-neutral-800 bg-neutral-950 p-2">
-              {HALF_DAY_SLOTS.map((slot, index) => {
-                const isSelected = selectedSlotIndex === index;
-                return (
-                  <button
-                    key={`${slot.label}-${meridiem}`}
-                    type="button"
-                    onClick={() => {
-                      setSelectedSlotIndex(index);
-                      setError(null);
-                    }}
-                    className={`rounded-lg px-1.5 py-1 font-mono text-xs font-semibold transition-all cursor-pointer ${
-                      isSelected
-                        ? "border border-yellow-500/70 bg-yellow-500/15 text-yellow-300 font-bold shadow-md ring-1 ring-yellow-500/40"
-                        : "border border-neutral-800/80 bg-neutral-900/60 text-neutral-400 hover:border-neutral-700 hover:text-white"
-                    }`}
-                  >
-                    {slot.label}
-                  </button>
-                );
-              })}
-            </div>
+            <DigitalVcrTimeDisplay
+              value={clockTime}
+              onChange={(updater) => {
+                setClockTime(updater);
+                setError(null);
+              }}
+              runtimeMinutes={itemDuration}
+              label="VCR Broadcast On-Air Timer"
+            />
           </div>
 
           {/* New Air Window Preview Card */}
@@ -1995,7 +2071,7 @@ function RescheduleActiveSlotModal({
             </div>
             <div className="text-right shrink-0">
               <span className="inline-flex items-center gap-1 rounded-md bg-neutral-800/80 px-2 py-0.5 font-mono text-[10px] font-bold text-neutral-300 border border-neutral-700/60">
-                {blockCount} {blockCount === 1 ? "Block" : "Blocks"} ({blockCount * 30}m)
+                {itemDuration}m Airing
               </span>
             </div>
           </div>
