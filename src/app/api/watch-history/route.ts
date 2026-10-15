@@ -176,19 +176,23 @@ export async function DELETE(request: NextRequest) {
     const id = searchParams.get("id");
     const tmdbId = searchParams.get("tmdbId");
 
-    if (tmdbId) {
-      const numTmdbId = Number(tmdbId);
+    if (tmdbId || id) {
+      const numTmdbId = tmdbId ? Number(tmdbId) : null;
+      const orConditions: any[] = [];
+      if (numTmdbId && !isNaN(numTmdbId)) {
+        orConditions.push({ tmdbId: numTmdbId });
+      }
+      if (id) {
+        orConditions.push({ id });
+      }
+
       const deleted = await prisma.userWatchHistory.deleteMany({
-        where: { tmdbId: numTmdbId, sessionId: { in: userKeys } },
+        where: {
+          sessionId: { in: userKeys },
+          OR: orConditions,
+        },
       });
       return NextResponse.json({ success: true, count: deleted.count });
-    }
-
-    if (id) {
-      await prisma.userWatchHistory.deleteMany({
-        where: { id, sessionId: { in: userKeys } },
-      });
-      return NextResponse.json({ success: true, deletedId: id });
     }
 
     return NextResponse.json({ error: "Provide id or tmdbId to delete" }, { status: 400 });

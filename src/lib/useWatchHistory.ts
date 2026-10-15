@@ -108,18 +108,20 @@ export function useWatchHistory() {
   const removeEntry = useCallback(
     async (target: { id?: string; tmdbId?: number }) => {
       // Optimistic state update
-      setContinueWatching((prev) =>
-        prev.filter((item) => {
+      setContinueWatching((prev) => {
+        const next = prev.filter((item) => {
           if (target.id && item.id === target.id) return false;
           if (target.tmdbId && item.tmdbId === target.tmdbId) return false;
           return true;
-        })
-      );
+        });
+        safeSetStorage(LOCAL_WATCH_HISTORY_KEY, next);
+        return next;
+      });
 
       try {
         const params = new URLSearchParams();
         if (target.tmdbId) params.set("tmdbId", String(target.tmdbId));
-        else if (target.id) params.set("id", target.id);
+        if (target.id) params.set("id", target.id);
 
         const res = await fetch(`/api/watch-history?${params.toString()}`, {
           method: "DELETE",

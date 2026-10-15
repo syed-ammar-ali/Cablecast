@@ -568,7 +568,7 @@ export async function GET(request: NextRequest) {
     ]);
 
     const calendarItems: PersonalScheduleItem[] = calendarEntries.map((c) => {
-      const liveState = computeLiveState(todayDayOfWeek, c.blockStartMinutes, c.blockCount, now, userTzOffset);
+      const liveState = computeLiveState(todayDayOfWeek, c.blockStartMinutes, c.blockCount, now, userTzOffset, c.runtimeMinutes);
       return {
         id: `cal-${c.id}`,
         sessionId: c.sessionId,

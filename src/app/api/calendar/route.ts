@@ -46,12 +46,14 @@ export async function GET(request: NextRequest) {
       const dateObj = new Date(year, month - 1, day);
       const dayOfWeek = dateObj.getDay();
 
-      const entryEnd = entry.blockStartMinutes + entry.blockCount * BLOCK_MINUTES;
+      const entryDuration = entry.runtimeMinutes && entry.runtimeMinutes > 0 ? entry.runtimeMinutes : entry.blockCount * BLOCK_MINUTES;
+      const entryEnd = entry.blockStartMinutes + entryDuration;
 
       // Find any overlapping weekly appointment on that day
       const conflict = weeklySchedule.find((app) => {
         if (app.dayOfWeek !== dayOfWeek) return false;
-        const appEnd = app.blockStartMinutes + app.blockCount * BLOCK_MINUTES;
+        const appDuration = app.runtimeMinutes && app.runtimeMinutes > 0 ? app.runtimeMinutes : app.blockCount * BLOCK_MINUTES;
+        const appEnd = app.blockStartMinutes + appDuration;
         return entry.blockStartMinutes < appEnd && entryEnd > app.blockStartMinutes;
       });
 

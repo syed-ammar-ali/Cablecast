@@ -1234,6 +1234,8 @@ export async function POST(req: NextRequest) {
 
               const calendarRows = rawEntries.map((e: any) => {
                 const startMin = parseTimeToBlockMinutes(e.time) ?? 1260; // default 9:00 PM if unspecified
+                const isDrama = /vampire|tree hill|o\.c\./i.test(matchedVaultItem.title);
+                const exactRuntime = Number(e.runtimeMinutes) || (matchedVaultItem.mediaType === "tv" ? (isDrama ? 45 : 20) : 105);
                 return {
                   sessionId: ctx.userId,
                   tmdbId: matchedVaultItem.tmdbId,
@@ -1244,6 +1246,7 @@ export async function POST(req: NextRequest) {
                   scheduledDate: String(e.date),
                   blockStartMinutes: startMin,
                   blockCount: 1,
+                  runtimeMinutes: exactRuntime,
                   startSeason: Number(e.season) || reqSeason,
                   startEpisode: Number(e.episode) || 1,
                 };

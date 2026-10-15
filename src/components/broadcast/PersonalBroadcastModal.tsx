@@ -1483,7 +1483,8 @@ export function PersonalBroadcastModal({
                 <div className="space-y-3">
                   {calendarEntries.map((entry) => {
                     const poster = getSafePosterUrl(entry.posterPath, entry.backdropUrl);
-                    const timeRange = formatBlockTimeRange(entry.blockStartMinutes, entry.blockCount);
+                    const exactDuration = entry.runtimeMinutes && entry.runtimeMinutes > 0 ? entry.runtimeMinutes : (entry.blockCount || 1) * 30;
+                    const timeRange = formatBlockTimeRange(entry.blockStartMinutes, exactDuration, true);
 
                     return (
                       <div
@@ -1516,7 +1517,7 @@ export function PersonalBroadcastModal({
                               <span className="text-purple-300 font-bold">{entry.scheduledDate}</span>
                               <span>·</span>
                               <span>{timeRange}</span>
-                              <span>({entry.blockCount * 30}m)</span>
+                              <span>({exactDuration}m)</span>
                             </div>
 
                             {entry.conflictWarning && (
