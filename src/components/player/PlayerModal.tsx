@@ -10,6 +10,7 @@ import { triggerHaptic } from "@/lib/haptics";
 import { useAppData } from "@/lib/AppDataContext";
 import { playMechanicalClick, playChannelStatic } from "@/lib/soundEffects";
 import { Tooltip } from "@/components/ui/Tooltip";
+import { useToast } from "@/components/ui/ToastProvider";
 
 /**
  * A single, already-resolved embed URL with no fallback chain — used for
@@ -64,18 +65,33 @@ export function PlayerModal({
 
   // App context watch history reporting
   const { watchHistory } = useAppData();
+  const { showToast } = useToast();
   const sessionStartTimeRef = useRef(Date.now());
+  const [isRemovedFromContinueWatching, setIsRemovedFromContinueWatching] = useState(false);
 
   // Track progress only for on-demand/manual playback (exclude live guide tune-ins & direct streams)
   const isManualPlayback = !initialLiveEntry && !directBroadcast && Boolean(media?.tmdbId);
 
   useEffect(() => {
     sessionStartTimeRef.current = Date.now();
+    setIsRemovedFromContinueWatching(false);
   }, [media?.tmdbId, season, episode]);
+
+  const handleRemoveFromContinueWatching = useCallback(async () => {
+    if (!media?.tmdbId) return;
+    setIsRemovedFromContinueWatching(true);
+    triggerHaptic(8);
+    playMechanicalClick();
+    await watchHistory.removeEntry({ tmdbId: media.tmdbId });
+    showToast({
+      type: "info",
+      message: `Removed "${media.title}" from Continue Watching`,
+    });
+  }, [media?.tmdbId, media?.title, watchHistory, showToast]);
 
   const reportCurrentProgress = useCallback(
     (isCompleted = false) => {
-      if (!isManualPlayback || !media?.tmdbId) return;
+      if (!isManualPlayback || !media?.tmdbId || isRemovedFromContinueWatching) return;
 
       const elapsedSeconds = Math.max(0, Math.floor((Date.now() - sessionStartTimeRef.current) / 1000));
       const currentProgress = offsetSeconds + elapsedSeconds;
@@ -99,7 +115,7 @@ export function PlayerModal({
         completed: isCompleted,
       });
     },
-    [isManualPlayback, media, offsetSeconds, watchHistory, isTv, season, episode]
+    [isManualPlayback, media, offsetSeconds, watchHistory, isTv, season, episode, isRemovedFromContinueWatching]
   );
 
   // Periodic report every 30 seconds + final report on unmount
@@ -681,6 +697,9 @@ export function PlayerModal({
           hasNextEpisode={canGoNext}
           onPreviousEpisode={canGoPrev ? handlePreviousEpisode : undefined}
           onNextEpisode={canGoNext ? handleNextEpisode : undefined}
+          canRemoveFromContinueWatching={isManualPlayback}
+          isRemovedFromContinueWatching={isRemovedFromContinueWatching}
+          onRemoveFromContinueWatching={handleRemoveFromContinueWatching}
           onClose={handleInitiateClose}
         />
       )}

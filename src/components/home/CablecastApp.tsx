@@ -89,6 +89,7 @@ function CablecastAppContent({ initialView = "home" }: CablecastAppProps) {
 
   // Shared Library & Favourites & Broadcast & Watch History state from AppDataContext
   const { library, personalBroadcast, watchHistory } = useAppData();
+  const { showToast } = useToast();
   const [isLibraryOpen, setIsLibraryOpen] = useState(initialView === "library");
   const [isAdmin, setIsAdmin] = useState(false);
 
@@ -470,6 +471,29 @@ function CablecastAppContent({ initialView = "home" }: CablecastAppProps) {
                 }}
                 onRemove={(item) => {
                   void watchHistory.removeEntry({ id: item.id, tmdbId: item.tmdbId });
+                  showToast({
+                    type: "info",
+                    message: `Removed "${item.title}" from Continue Watching`,
+                    action: {
+                      label: "Undo",
+                      onClick: () => {
+                        watchHistory.reportProgress({
+                          tmdbId: item.tmdbId,
+                          mediaType: item.mediaType,
+                          title: item.title,
+                          posterPath: item.posterPath,
+                          backdropUrl: item.backdropUrl,
+                          releaseYear: item.releaseYear,
+                          season: item.season,
+                          episode: item.episode,
+                          episodeTitle: item.episodeTitle,
+                          progressSeconds: item.progressSeconds,
+                          durationSeconds: item.durationSeconds,
+                          completed: false,
+                        });
+                      },
+                    },
+                  });
                 }}
               />
 

@@ -3,6 +3,8 @@ import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from "@google/ge
 import { prisma } from "@/lib/prisma";
 import { getSession, getPersistentUserId, type CurrentSession } from "@/lib/auth/server";
 import { formatBlockTime, formatBlockTimeRange } from "@/types/broadcast";
+import { addLibraryItem } from "@/lib/mediaOwnership";
+import { searchMedia } from "@/lib/tmdb";
 
 /* ─── Types ──────────────────────────────────────────────────────────────── */
 
@@ -30,7 +32,7 @@ interface VaultItem {
 }
 
 export interface BroadcasterAction {
-  type: "schedule" | "navigate" | "tune_in" | "search" | "rent_buy";
+  type: "schedule" | "navigate" | "tune_in" | "search" | "rent_buy" | "add_to_library" | "remove";
   target?: string;
   payload?: Record<string, unknown>;
 }
@@ -249,7 +251,26 @@ When executing an action, append an action block at the VERY END of your message
 }
 \`\`\`
 
-4. Rent or buy tape from VHS Store:
+4. BUY / ACQUIRE VHS TAPES FOR THE VAULT (when user asks to buy, purchase, acquire, or add tapes or seasons to their collection or shelf, single or in bulk):
+\`\`\`cablecast_action
+{
+  "type": "buy_tape",
+  "items": [
+    { "title": "The O.C.", "season": 1, "mediaType": "tv" },
+    { "title": "Friends", "season": 1, "mediaType": "tv" }
+  ]
+}
+\`\`\`
+Or for a single title:
+\`\`\`cablecast_action
+{
+  "type": "buy_tape",
+  "title": "Friends",
+  "season": 1,
+  "mediaType": "tv"
+}
+\`\`\`
+
 5. Multi-Episode Pacing, Season Cadence, or Holiday Marathon:
 When the user asks for a complex pacing schedule (e.g. "Ep 1 to 7 on Thursdays at 9 PM, then 3 episodes the next week, then 2/week until the finale"):
 \`\`\`cablecast_action
@@ -987,6 +1008,46 @@ export async function POST(req: NextRequest) {
           }
         }
 
+        // ── Action 1E: Remove from Continue Watching ──
+        else if (
+          parsedAction.type === "remove_continue_watching" ||
+          parsedAction.type === "clear_continue_watching" ||
+          parsedAction.type === "delete_continue_watching"
+        ) {
+          const reqTitle = String(parsedAction.title || "").trim();
+          const clearAll = Boolean(parsedAction.clearAll);
+
+          try {
+            let deletedCount = 0;
+            if (clearAll) {
+              const res = await prisma.userWatchHistory.deleteMany({
+                where: { sessionId: ctx.userId },
+              });
+              deletedCount = res.count;
+            } else if (reqTitle) {
+              const res = await prisma.userWatchHistory.deleteMany({
+                where: {
+                  sessionId: ctx.userId,
+                  title: { contains: reqTitle, mode: "insensitive" },
+                },
+              });
+              deletedCount = res.count;
+            }
+
+            executedAction = {
+              type: "remove",
+              target: "home",
+              payload: {
+                removed: true,
+                title: reqTitle || "Continue Watching",
+                deletedCount,
+              },
+            };
+          } catch (dbErr) {
+            console.error("[broadcaster/route] Continue Watching removal error:", dbErr);
+          }
+        }
+
         // ── Action 2: Navigate ──
         else if (parsedAction.type === "navigate") {
           executedAction = {
@@ -1010,7 +1071,111 @@ export async function POST(req: NextRequest) {
           };
         }
 
-        // ── Action 4: Rent / Buy in VHS Store ──
+        // ── Action 4: Direct Buy Tape / Add to Library ──
+        else if (
+          parsedAction.type === "buy_tape" ||
+          parsedAction.type === "add_to_library" ||
+          (parsedAction.type === "rent_buy" && parsedAction.action === "BUY")
+        ) {
+          const rawItems = Array.isArray(parsedAction.items)
+            ? parsedAction.items
+            : [
+                {
+                  title: parsedAction.title,
+                  season: parsedAction.season ?? parsedAction.seasonNumber ?? 1,
+                  mediaType: parsedAction.mediaType ?? "tv",
+                  tmdbId: parsedAction.tmdbId,
+                },
+              ];
+
+          const addedList: Array<{
+            tmdbId: number;
+            title: string;
+            season: number;
+            mediaType: string;
+          }> = [];
+
+          for (const item of rawItems) {
+            const reqTitle = String(item.title || "").trim();
+            if (!reqTitle) continue;
+            const reqSeason = item.mediaType === "movie" ? 0 : Number(item.season || item.seasonNumber) || 1;
+            const reqType = (item.mediaType === "movie" ? "movie" : "tv") as "tv" | "movie";
+
+            try {
+              let tmdbId = Number(item.tmdbId) || 0;
+              let title = reqTitle;
+              let posterPath: string | undefined = undefined;
+              let backdropUrl: string | undefined = undefined;
+              let releaseYear: string | undefined = undefined;
+              let overview: string | undefined = undefined;
+              let voteAverage: number | undefined = undefined;
+
+              if (!tmdbId || tmdbId <= 0) {
+                const searchRes = await searchMedia(reqTitle);
+                const match = searchRes.results.find((r) => r.mediaType === reqType) || searchRes.results[0];
+                if (match) {
+                  tmdbId = match.tmdbId;
+                  title = match.title;
+                  posterPath = match.posterPath || undefined;
+                  backdropUrl = match.backdropUrl || undefined;
+                  releaseYear = match.releaseYear || undefined;
+                  overview = match.overview || undefined;
+                  voteAverage = match.voteAverage || undefined;
+                }
+              }
+
+              if (!tmdbId) {
+                let hash = 0;
+                for (let i = 0; i < reqTitle.length; i++) {
+                  hash = (hash << 5) - hash + reqTitle.charCodeAt(i);
+                  hash |= 0;
+                }
+                tmdbId = Math.abs(hash) + 100000;
+              }
+
+              await addLibraryItem(ctx.userId, tmdbId, reqType, reqSeason, {
+                title,
+                posterPath,
+                backdropUrl,
+                releaseYear,
+                overview,
+                voteAverage,
+              });
+
+              addedList.push({
+                tmdbId,
+                title,
+                season: reqSeason,
+                mediaType: reqType,
+              });
+            } catch (addErr) {
+              console.error("[broadcaster/route] Error adding library item:", reqTitle, addErr);
+            }
+          }
+
+          if (addedList.length > 0) {
+            executedAction = {
+              type: "add_to_library",
+              target: "library",
+              payload: {
+                count: addedList.length,
+                items: addedList,
+                title:
+                  addedList.length === 1
+                    ? `${addedList[0].title}${addedList[0].mediaType === "tv" ? ` (Season ${addedList[0].season})` : ""}`
+                    : `${addedList.length} VHS Seasons`,
+              },
+            };
+          } else {
+            executedAction = {
+              type: "navigate",
+              target: "explore",
+              payload: { searchQuery: parsedAction.title ? String(parsedAction.title) : undefined },
+            };
+          }
+        }
+
+        // ── Action 4B: Pure VHS Store Rent Modal ──
         else if (parsedAction.type === "rent_buy") {
           executedAction = {
             type: "rent_buy",

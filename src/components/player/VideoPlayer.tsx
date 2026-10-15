@@ -14,6 +14,7 @@ import {
   Volume2,
   VolumeX,
   X,
+  Trash2,
 } from "lucide-react";
 import {
   buildPlayerSource,
@@ -62,6 +63,9 @@ interface VideoPlayerProps {
   hasNextEpisode?: boolean;
   onPreviousEpisode?: () => void;
   onNextEpisode?: () => void;
+  canRemoveFromContinueWatching?: boolean;
+  isRemovedFromContinueWatching?: boolean;
+  onRemoveFromContinueWatching?: () => void;
   onClose?: () => void;
 }
 
@@ -85,6 +89,9 @@ export function VideoPlayer({
   hasNextEpisode = false,
   onPreviousEpisode,
   onNextEpisode,
+  canRemoveFromContinueWatching = false,
+  isRemovedFromContinueWatching = false,
+  onRemoveFromContinueWatching,
   country,
   initialRegion,
   onClose,
@@ -922,6 +929,39 @@ export function VideoPlayer({
                 </button>
               )}
             </div>
+          )}
+
+          {/* Delete what you're watching from Continue Watching */}
+          {canRemoveFromContinueWatching && (
+            <button
+              type="button"
+              onClick={onRemoveFromContinueWatching}
+              disabled={isRemovedFromContinueWatching}
+              title={
+                isRemovedFromContinueWatching
+                  ? "Removed from Continue Watching"
+                  : "Delete from Continue Watching"
+              }
+              aria-label="Delete from Continue Watching"
+              className={`flex h-8 sm:h-9 items-center gap-1.5 rounded-lg border px-2 sm:px-2.5 text-[10px] sm:text-[11px] font-mono font-medium transition-all cursor-pointer touch-manipulation ${
+                isRemovedFromContinueWatching
+                  ? "border-neutral-800 bg-neutral-900/60 text-neutral-500 cursor-default"
+                  : "border-neutral-800/80 bg-black/85 text-neutral-300 hover:border-red-500/50 hover:bg-red-950/40 hover:text-red-300 active:scale-95 shadow-lg backdrop-blur-md"
+              }`}
+            >
+              {isRemovedFromContinueWatching ? (
+                <>
+                  <Check className="h-3.5 w-3.5 text-emerald-400" />
+                  <span className="hidden md:inline">Removed from Queue</span>
+                </>
+              ) : (
+                <>
+                  <Trash2 className="h-3.5 w-3.5 text-neutral-400 group-hover:text-red-400" />
+                  <span className="hidden md:inline">Delete from Queue</span>
+                  <span className="md:hidden">Remove</span>
+                </>
+              )}
+            </button>
           )}
 
           {/* Episode Navigation Buttons (On-demand TV playback only) */}

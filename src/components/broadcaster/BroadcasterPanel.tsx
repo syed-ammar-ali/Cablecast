@@ -27,12 +27,12 @@ import {
   Sparkles,
 } from "lucide-react";
 import { triggerHaptic } from "@/lib/haptics";
-import { notifyBroadcastMutation } from "@/lib/syncEvents";
+import { notifyBroadcastMutation, notifyLibraryMutation } from "@/lib/syncEvents";
 
 /* ─── Types ──────────────────────────────────────────────────────────────── */
 
 export interface BroadcasterAction {
-  type: "schedule" | "navigate" | "tune_in" | "rent_buy" | "remove";
+  type: "schedule" | "navigate" | "tune_in" | "rent_buy" | "remove" | "add_to_library";
   target: "broadcast" | "library" | "explore" | "home" | "player";
   payload?: {
     id?: string;
@@ -55,6 +55,8 @@ export interface BroadcasterAction {
     removed?: boolean;
     deletedCount?: number;
     date?: string;
+    count?: number;
+    items?: Array<{ tmdbId: number; title: string; season: number; mediaType: string }>;
   };
 }
 
@@ -781,6 +783,10 @@ export function BroadcasterPanel({
         if (data.action?.type === "schedule" || data.action?.type === "remove") {
           notifyBroadcastMutation();
           onRefreshSchedule?.();
+        } else if (data.action?.type === "add_to_library") {
+          notifyLibraryMutation();
+          notifyBroadcastMutation();
+          onRefreshSchedule?.();
         }
 
         setMessages((prev) => [
@@ -1329,6 +1335,34 @@ export function BroadcasterPanel({
                       >
                         <Sparkles className="h-3.5 w-3.5" />
                         <span>Inspect in VHS Store</span>
+                      </button>
+                    </div>
+                  )}
+
+                  {msg.action.type === "add_to_library" && (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-1.5 text-amber-300 text-[11px] font-semibold tracking-wide uppercase font-mono">
+                        <Film className="h-3.5 w-3.5 text-amber-300" />
+                        <span>Tape Vault Updated</span>
+                      </div>
+                      <div className="text-[12.5px] text-white font-medium">
+                        {msg.action.payload?.title || "VHS Tapes Added"}
+                      </div>
+                      <p className="text-[11px] text-emerald-300/90 leading-snug">
+                        {msg.action.payload?.count && msg.action.payload.count > 1
+                          ? `All ${msg.action.payload.count} tape seasons are permanently placed on your vault shelf and cleared for broadcasting.`
+                          : "Permanently placed on your vault shelf and cleared for broadcasting under the CD Rule."}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          triggerHaptic(12);
+                          onNavigate?.("library");
+                        }}
+                        className="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-white font-semibold text-[11.5px] transition-all flex items-center justify-center gap-2 active:scale-[0.98] shadow-sm"
+                      >
+                        <Film className="h-3.5 w-3.5" />
+                        <span>View Tape in Library Vault</span>
                       </button>
                     </div>
                   )}
