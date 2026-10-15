@@ -270,46 +270,45 @@ export function BroadcasterPanel({
 
   /* ── Microphone Speech Recognition & MediaRecorder Fallback ──────────────── */
 
-  const getPlatformMicGuidance = useCallback(() => {
-    if (typeof window === "undefined") return "";
-    const ua = navigator.userAgent || "";
-    const isWindows = /win/i.test(ua);
-    const isMac = /mac/i.test(ua);
-    const isAndroid = /android/i.test(ua);
-    const isIOS = /iphone|ipad|ipod/i.test(ua);
+  const getMicrophoneTroubleshooter = useCallback(async (errName?: string) => {
+    let sitePerm = "unknown";
+    try {
+      const p = await navigator.permissions?.query({ name: "microphone" as PermissionName });
+      sitePerm = p?.state || "unknown";
+    } catch {
+      // ignore
+    }
+
+    const isWindows = typeof navigator !== "undefined" && /win/i.test(navigator.userAgent || navigator.platform);
+
+    if (sitePerm === "denied") {
+      return (
+        "🚫 CHROME HAS BLOCKED MICROPHONE FOR THIS SITE:\n\n" +
+        "Your Chrome browser specifically has this website URL set to Block.\n\n" +
+        "👉 HOW TO UNBLOCK IN 2 CLICKS:\n" +
+        "1. Look at your Chrome address bar at the very top.\n" +
+        "2. Click the Sliders icon 🎛️ (or Padlock 🔒) to the left of the URL.\n" +
+        "3. Toggle 'Microphone' from Block to ALLOW (or click 'Reset permissions').\n" +
+        "4. Click Reload on the page."
+      );
+    }
 
     if (isWindows) {
       return (
-        "Microphone is blocked by Windows. Even if your browser allows it, Windows Privacy blocks desktop browsers by default:\n\n" +
-        "1. Press Win + I to open Windows Settings.\n" +
-        "2. Go to Privacy & security → Microphone.\n" +
-        "3. Turn ON 'Microphone access'.\n" +
-        "4. Scroll down and turn ON 'Let desktop apps access your microphone' (for Google Chrome / Microsoft Edge).\n" +
-        "5. If using Brave Browser, enable Google Services in brave://settings/system."
+        "⚠️ WINDOWS REJECTED CHROME'S MICROPHONE STREAM:\n\n" +
+        "Your Windows privacy toggle is ON, but Chrome cannot open the physical hardware. Here are the 2 essential fixes:\n\n" +
+        "1. 🔄 RESTART GOOGLE CHROME:\n" +
+        "Windows 11 requires completely CLOSING and REOPENING Chrome before newly enabled microphone permissions take effect.\n\n" +
+        "2. 🎙️ PAUSE WISPR FLOW / EXCLUSIVE AUDIO APPS:\n" +
+        "Wispr Flow, Discord, or Zoom running in the background can hold an exclusive lock on your microphone driver. Temporarily pause or close Wispr Flow.\n\n" +
+        "3. ⚙️ DEFAULT DEVICE CHECK:\n" +
+        "In Chrome, go to chrome://settings/content/microphone and verify your laptop microphone is selected."
       );
     }
-    if (isMac) {
-      return (
-        "Microphone is blocked by macOS:\n\n" +
-        "1. Open System Settings → Privacy & Security → Microphone.\n" +
-        "2. Toggle ON your browser (Chrome, Edge, or Safari)."
-      );
-    }
-    if (isAndroid) {
-      return (
-        "Microphone blocked on Android:\n\n" +
-        "1. Tap the 🔒 icon in your browser address bar and set Microphone to Allow.\n" +
-        "2. Check Android Settings → Apps → Chrome → Permissions → Microphone."
-      );
-    }
-    if (isIOS) {
-      return (
-        "Microphone blocked on iOS:\n\n" +
-        "1. Open iOS Settings → Safari (or Chrome) → Microphone.\n" +
-        "2. Set to 'Allow'."
-      );
-    }
-    return "Microphone access blocked. Please allow microphone access in your browser address bar and system settings.";
+
+    return (
+      "Microphone access blocked. Please click the 🔒 or 🎛️ icon in your address bar to ensure Microphone is allowed, or restart your browser."
+    );
   }, []);
 
   const startMediaRecording = useCallback(async () => {
@@ -391,20 +390,30 @@ export function BroadcasterPanel({
       console.warn("[media recorder error]", err);
       setIsListening(false);
       if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
-        setError(getPlatformMicGuidance());
+        const guidance = await getMicrophoneTroubleshooter(err.name);
+        setError(guidance);
       } else if (err.name === "NotFoundError" || err.name === "DevicesNotFoundError") {
         setError("No microphone detected. Please plug in or enable your microphone in Windows Sound Settings.");
       } else if (err.name === "NotReadableError" || err.name === "TrackStartError") {
-        setError("Your microphone is currently in use or muted by another application.");
+        setError("Your microphone is currently in exclusive use by another app (e.g. Wispr Flow or Zoom). Close or pause it to allow Cablecast to listen.");
       } else {
         setError(`Microphone error: ${err.message || err.name}`);
       }
     }
-  }, [getPlatformMicGuidance]);
+  }, [getMicrophoneTroubleshooter]);
 
   const runMicDiagnostic = useCallback(async () => {
     setIsRunningDiagnostic(true);
     setDiagnosticResult(null);
+
+    let sitePerm = "unknown";
+    try {
+      const p = await navigator.permissions?.query({ name: "microphone" as PermissionName });
+      sitePerm = p?.state || "unknown";
+    } catch {
+      // ignore
+    }
+
     try {
       if (!navigator?.mediaDevices?.getUserMedia) {
         setDiagnosticResult("❌ MediaDevices API is not supported in this browser.");
@@ -417,19 +426,17 @@ export function BroadcasterPanel({
       tracks.forEach((t) => t.stop());
 
       setDiagnosticResult(
-        `✅ Microphone Hardware Operational!\n• Active Device: "${label}"\n• Audio hardware opened successfully.\n• Microphone is ready.`
+        `✅ SUCCESS: Microphone is Operational!\n• Active Device: "${label}"\n• Chrome Site Permission: ${sitePerm}\n• Audio hardware opened successfully.`
       );
       setError(null);
     } catch (err: any) {
       console.warn("[mic diagnostic failure]", err);
-      setDiagnosticResult(
-        `❌ Diagnostic Failed (${err.name}): ${err.message || "Access blocked"}\n\n` +
-          `Fix on Windows: Open Windows Settings (Win + I) → Privacy & security → Microphone → turn ON "Let desktop apps access your microphone".`
-      );
+      const guidance = await getMicrophoneTroubleshooter(err.name);
+      setDiagnosticResult(`❌ Diagnostic Result (${err.name}):\n\n${guidance}`);
     } finally {
       setIsRunningDiagnostic(false);
     }
-  }, []);
+  }, [getMicrophoneTroubleshooter]);
 
   const toggleListening = useCallback(() => {
     if (typeof window === "undefined") return;
