@@ -137,9 +137,16 @@ export function BroadcasterPanel({
   const [error, setError] = useState<string | null>(null);
 
   // Voice Input (Speech-to-Text)
+  // Voice Input (Speech-to-Text & MediaRecorder Fallback)
   const [isListening, setIsListening] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
   const [speechSupported, setSpeechSupported] = useState(false);
+  const [diagnosticResult, setDiagnosticResult] = useState<string | null>(null);
+  const [isRunningDiagnostic, setIsRunningDiagnostic] = useState(false);
   const recognitionRef = useRef<any>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
 
   // Voice Output (Speech Synthesis)
   const [voiceEnabled, setVoiceEnabled] = useState(false);
@@ -179,11 +186,29 @@ export function BroadcasterPanel({
     }
   }, []);
 
-  // Stop speech synthesis on unmount
+  // Stop speech synthesis & audio tracks on unmount
   useEffect(() => {
     return () => {
       if (typeof window !== "undefined" && window.speechSynthesis) {
         window.speechSynthesis.cancel();
+      }
+      if (mediaStreamRef.current) {
+        mediaStreamRef.current.getTracks().forEach((track) => track.stop());
+        mediaStreamRef.current = null;
+      }
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
+        try {
+          mediaRecorderRef.current.stop();
+        } catch {
+          // ignore
+        }
+      }
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.abort();
+        } catch {
+          // ignore
+        }
       }
     };
   }, []);
@@ -243,103 +268,279 @@ export function BroadcasterPanel({
     [speakingMessageId]
   );
 
-  /* ── Microphone Speech Recognition ───────────────────────────────────────── */
+  /* ── Microphone Speech Recognition & MediaRecorder Fallback ──────────────── */
+
+  const getPlatformMicGuidance = useCallback(() => {
+    if (typeof window === "undefined") return "";
+    const ua = navigator.userAgent || "";
+    const isWindows = /win/i.test(ua);
+    const isMac = /mac/i.test(ua);
+    const isAndroid = /android/i.test(ua);
+    const isIOS = /iphone|ipad|ipod/i.test(ua);
+
+    if (isWindows) {
+      return (
+        "Microphone is blocked by Windows. Even if your browser allows it, Windows Privacy blocks desktop browsers by default:\n\n" +
+        "1. Press Win + I to open Windows Settings.\n" +
+        "2. Go to Privacy & security → Microphone.\n" +
+        "3. Turn ON 'Microphone access'.\n" +
+        "4. Scroll down and turn ON 'Let desktop apps access your microphone' (for Google Chrome / Microsoft Edge).\n" +
+        "5. If using Brave Browser, enable Google Services in brave://settings/system."
+      );
+    }
+    if (isMac) {
+      return (
+        "Microphone is blocked by macOS:\n\n" +
+        "1. Open System Settings → Privacy & Security → Microphone.\n" +
+        "2. Toggle ON your browser (Chrome, Edge, or Safari)."
+      );
+    }
+    if (isAndroid) {
+      return (
+        "Microphone blocked on Android:\n\n" +
+        "1. Tap the 🔒 icon in your browser address bar and set Microphone to Allow.\n" +
+        "2. Check Android Settings → Apps → Chrome → Permissions → Microphone."
+      );
+    }
+    if (isIOS) {
+      return (
+        "Microphone blocked on iOS:\n\n" +
+        "1. Open iOS Settings → Safari (or Chrome) → Microphone.\n" +
+        "2. Set to 'Allow'."
+      );
+    }
+    return "Microphone access blocked. Please allow microphone access in your browser address bar and system settings.";
+  }, []);
+
+  const startMediaRecording = useCallback(async () => {
+    if (typeof window === "undefined" || !navigator?.mediaDevices?.getUserMedia) {
+      setError("Direct audio recording is not supported in this browser.");
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaStreamRef.current = stream;
+      audioChunksRef.current = [];
+
+      const preferredMime = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+        ? "audio/webm;codecs=opus"
+        : MediaRecorder.isTypeSupported("audio/webm")
+        ? "audio/webm"
+        : MediaRecorder.isTypeSupported("audio/mp4")
+        ? "audio/mp4"
+        : "";
+
+      const recorder = preferredMime
+        ? new MediaRecorder(stream, { mimeType: preferredMime })
+        : new MediaRecorder(stream);
+
+      recorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) {
+          audioChunksRef.current.push(e.data);
+        }
+      };
+
+      recorder.onstop = async () => {
+        stream.getTracks().forEach((track) => track.stop());
+        mediaStreamRef.current = null;
+        setIsListening(false);
+
+        if (audioChunksRef.current.length === 0) return;
+
+        const audioBlob = new Blob(audioChunksRef.current, {
+          type: recorder.mimeType || "audio/webm",
+        });
+
+        if (audioBlob.size < 400) return;
+
+        setIsTranscribing(true);
+        setError(null);
+
+        try {
+          const formData = new FormData();
+          formData.append("audio", audioBlob, "voice_input.webm");
+
+          const res = await fetch("/api/broadcaster/transcribe", {
+            method: "POST",
+            body: formData,
+          });
+
+          if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            throw new Error(data.error || "Failed to transcribe audio.");
+          }
+
+          const data = await res.json();
+          if (data.text && data.text.trim()) {
+            setInput(data.text.trim());
+          }
+        } catch (err: any) {
+          console.warn("[transcribe error]", err);
+          setError(err.message || "Failed to transcribe audio.");
+        } finally {
+          setIsTranscribing(false);
+        }
+      };
+
+      mediaRecorderRef.current = recorder;
+      recorder.start(250);
+      setIsListening(true);
+      setError(null);
+    } catch (err: any) {
+      console.warn("[media recorder error]", err);
+      setIsListening(false);
+      if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
+        setError(getPlatformMicGuidance());
+      } else if (err.name === "NotFoundError" || err.name === "DevicesNotFoundError") {
+        setError("No microphone detected. Please plug in or enable your microphone in Windows Sound Settings.");
+      } else if (err.name === "NotReadableError" || err.name === "TrackStartError") {
+        setError("Your microphone is currently in use or muted by another application.");
+      } else {
+        setError(`Microphone error: ${err.message || err.name}`);
+      }
+    }
+  }, [getPlatformMicGuidance]);
+
+  const runMicDiagnostic = useCallback(async () => {
+    setIsRunningDiagnostic(true);
+    setDiagnosticResult(null);
+    try {
+      if (!navigator?.mediaDevices?.getUserMedia) {
+        setDiagnosticResult("❌ MediaDevices API is not supported in this browser.");
+        return;
+      }
+
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const tracks = stream.getAudioTracks();
+      const label = tracks[0]?.label || "Default Input Device";
+      tracks.forEach((t) => t.stop());
+
+      setDiagnosticResult(
+        `✅ Microphone Hardware Operational!\n• Active Device: "${label}"\n• Audio hardware opened successfully.\n• Microphone is ready.`
+      );
+      setError(null);
+    } catch (err: any) {
+      console.warn("[mic diagnostic failure]", err);
+      setDiagnosticResult(
+        `❌ Diagnostic Failed (${err.name}): ${err.message || "Access blocked"}\n\n` +
+          `Fix on Windows: Open Windows Settings (Win + I) → Privacy & security → Microphone → turn ON "Let desktop apps access your microphone".`
+      );
+    } finally {
+      setIsRunningDiagnostic(false);
+    }
+  }, []);
 
   const toggleListening = useCallback(() => {
     if (typeof window === "undefined") return;
-    const win = window as unknown as IWindow;
-    const SpeechRecognitionClass = win.SpeechRecognition || win.webkitSpeechRecognition;
 
-    if (!SpeechRecognitionClass) {
-      setError("Voice input is not supported in this browser. Please open Cablecast in Google Chrome, Safari, or Edge.");
+    if (!window.isSecureContext && location.hostname !== "localhost" && location.hostname !== "127.0.0.1") {
+      setError("Microphone access requires a secure connection (HTTPS). Please access Cablecast via HTTPS.");
       return;
     }
 
     triggerHaptic(15);
 
+    // If currently listening, stop whichever engine is active
     if (isListening) {
-      try {
-        recognitionRef.current?.stop();
-      } catch {
-        // ignore
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
+        try {
+          mediaRecorderRef.current.stop();
+        } catch {
+          // ignore
+        }
+      }
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop();
+        } catch {
+          // ignore
+        }
       }
       setIsListening(false);
       return;
     }
 
-    try {
-      if (recognitionRef.current) {
-        try {
-          recognitionRef.current.abort();
-        } catch {
-          // ignore
-        }
-      }
+    const win = window as unknown as IWindow;
+    const SpeechRecognitionClass = win.SpeechRecognition || win.webkitSpeechRecognition;
 
-      const recognition = new SpeechRecognitionClass();
-      recognition.continuous = false;
-      recognition.interimResults = true;
-      recognition.lang = typeof navigator !== "undefined" && navigator.language ? navigator.language : "en-US";
-
-      recognition.onstart = () => {
-        setIsListening(true);
-        setError(null);
-      };
-
-      recognition.onresult = (event: any) => {
-        let finalTranscript = "";
-        let interimTranscript = "";
-        for (let i = 0; i < event.results.length; i++) {
-          const item = event.results[i];
-          if (item.isFinal) {
-            finalTranscript += item[0].transcript;
-          } else {
-            interimTranscript += item[0].transcript;
+    // If SpeechRecognition is supported, try it first for instant real-time transcription
+    if (SpeechRecognitionClass) {
+      try {
+        if (recognitionRef.current) {
+          try {
+            recognitionRef.current.abort();
+          } catch {
+            // ignore
           }
         }
-        const text = (finalTranscript || interimTranscript).trim();
-        if (text) {
-          setInput(text);
+
+        const recognition = new SpeechRecognitionClass();
+        recognition.continuous = false;
+        recognition.interimResults = true;
+        recognition.lang = typeof navigator !== "undefined" && navigator.language ? navigator.language : "en-US";
+
+        recognition.onstart = () => {
+          setIsListening(true);
           setError(null);
-        }
-      };
+        };
 
-      recognition.onerror = (event: any) => {
-        console.warn("[broadcaster voice error]", event.error);
-        setIsListening(false);
-        if (event.error === "no-speech") {
-          // User paused or stayed quiet; end listening cleanly without error
-          return;
-        }
-        if (event.error === "aborted") {
-          // Normal manual stop or cancellation
-          return;
-        }
-        if (event.error === "not-allowed" || event.error === "service-not-allowed") {
-          setError(
-            "Microphone access blocked. If allowed in the address bar (🔒 icon), please also ensure microphone is turned on in your phone's Settings → Apps → Chrome → Permissions."
-          );
-        } else if (event.error === "network") {
-          setError("Speech recognition service network error. Please check your internet connection.");
-        } else if (event.error === "audio-capture") {
-          setError("No microphone detected, or another app is currently using the microphone.");
-        } else {
-          setError(`Voice input error (${event.error || "unknown"}). Tap mic to retry.`);
-        }
-      };
+        recognition.onresult = (event: any) => {
+          let finalTranscript = "";
+          let interimTranscript = "";
+          for (let i = 0; i < event.results.length; i++) {
+            const item = event.results[i];
+            if (item.isFinal) {
+              finalTranscript += item[0].transcript;
+            } else {
+              interimTranscript += item[0].transcript;
+            }
+          }
+          const text = (finalTranscript || interimTranscript).trim();
+          if (text) {
+            setInput(text);
+            setError(null);
+          }
+        };
 
-      recognition.onend = () => {
-        setIsListening(false);
-      };
+        recognition.onerror = (event: any) => {
+          console.warn("[broadcaster speech error]", event.error);
+          setIsListening(false);
 
-      recognitionRef.current = recognition;
-      recognition.start();
-    } catch (err: any) {
-      console.warn("[broadcaster voice start error]", err);
-      setIsListening(false);
-      setError("Could not activate microphone. Tap the mic button again to retry.");
+          if (event.error === "no-speech" || event.error === "aborted") {
+            return;
+          }
+
+          // If speech recognition failed due to not-allowed or network (e.g. Brave / ad-block / Google cloud speech issue),
+          // fallback directly to native MediaRecorder with Gemini transcription!
+          if (event.error === "not-allowed" || event.error === "service-not-allowed" || event.error === "network") {
+            console.log("[broadcaster] Falling back to MediaRecorder + Gemini...");
+            void startMediaRecording();
+            return;
+          }
+
+          if (event.error === "audio-capture") {
+            setError("No microphone detected, or another app is currently using the microphone.");
+          } else {
+            setError(`Voice input error (${event.error || "unknown"}). Tap mic to retry.`);
+          }
+        };
+
+        recognition.onend = () => {
+          setIsListening(false);
+        };
+
+        recognitionRef.current = recognition;
+        recognition.start();
+        return;
+      } catch (err: any) {
+        console.warn("[broadcaster speech start exception, falling back to MediaRecorder]", err);
+      }
     }
-  }, [isListening]);
+
+    // If SpeechRecognition is not available or threw on start, use MediaRecorder
+    void startMediaRecording();
+  }, [isListening, startMediaRecording]);
 
   /* ── Magnetic Edge Dragging (FAB Launcher) ────────────────────────────────── */
 
@@ -1186,18 +1387,43 @@ export function BroadcasterPanel({
             </div>
           )}
 
-          {/* Error Message with Dismiss Button */}
-          {error && (
-            <div className="flex items-start justify-between gap-2.5 text-[11.5px] text-red-200 py-2.5 px-3.5 rounded-2xl bg-red-950/70 border border-red-400/40 backdrop-blur-md break-words [overflow-wrap:anywhere] max-w-full animate-in fade-in">
-              <div className="flex-1">{error}</div>
-              <button
-                type="button"
-                onClick={() => setError(null)}
-                aria-label="Dismiss error"
-                className="text-red-300 hover:text-white p-0.5 rounded transition-colors shrink-0 cursor-pointer"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
+          {/* Error Message with Dismiss Button & Diagnostic Action */}
+          {(error || diagnosticResult) && (
+            <div className="flex flex-col gap-2 py-2.5 px-3.5 rounded-2xl bg-red-950/80 border border-red-400/40 backdrop-blur-md text-[11.5px] text-red-200 animate-in fade-in max-w-full">
+              <div className="flex items-start justify-between gap-2.5">
+                <div className="flex-1 whitespace-pre-line leading-relaxed break-words [overflow-wrap:anywhere]">
+                  {diagnosticResult || error}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setError(null);
+                    setDiagnosticResult(null);
+                  }}
+                  aria-label="Dismiss message"
+                  className="text-red-300 hover:text-white p-0.5 rounded transition-colors shrink-0 cursor-pointer"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+
+              {!diagnosticResult && (
+                <div className="pt-1.5 flex items-center gap-2 border-t border-red-400/20">
+                  <button
+                    type="button"
+                    onClick={runMicDiagnostic}
+                    disabled={isRunningDiagnostic}
+                    className="px-2.5 py-1 rounded-lg bg-red-800/60 hover:bg-red-700/80 text-white font-medium text-[10.5px] border border-red-300/30 transition-all flex items-center gap-1.5 active:scale-95"
+                  >
+                    {isRunningDiagnostic ? (
+                      <Loader2 className="h-3 w-3 animate-spin text-white" />
+                    ) : (
+                      <Mic className="h-3 w-3 text-red-200" />
+                    )}
+                    <span>Run Mic Hardware Test</span>
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
@@ -1218,18 +1444,28 @@ export function BroadcasterPanel({
 
         {/* ── Active Voice Listening Banner ───────────────────────────────── */}
         {isListening && (
-          <div className="flex items-center justify-between px-4 py-2 bg-violet-900/80 border-t border-violet-400/40 backdrop-blur-md animate-pulse z-20">
+          <div className="flex items-center justify-between px-4 py-2 bg-violet-900/85 border-t border-violet-400/40 backdrop-blur-md animate-pulse z-20">
             <div className="flex items-center gap-2 text-[11px] text-violet-100 font-medium">
               <span className="h-2 w-2 rounded-full bg-red-500 animate-ping" />
-              <span>Listening… speak your inquiry</span>
+              <span>Listening… speak your inquiry (tap Done when finished)</span>
             </div>
             <button
               type="button"
               onClick={toggleListening}
-              className="text-[10px] uppercase font-bold text-white px-2 py-0.5 rounded bg-violet-800/60 border border-white/20"
+              className="text-[10px] uppercase font-bold text-white px-2 py-0.5 rounded bg-violet-800/80 hover:bg-violet-700 border border-white/20 active:scale-95 transition-all"
             >
               Done
             </button>
+          </div>
+        )}
+
+        {/* ── Active Voice Transcribing Banner ────────────────────────────── */}
+        {isTranscribing && (
+          <div className="flex items-center justify-between px-4 py-2 bg-indigo-950/90 border-t border-indigo-400/40 backdrop-blur-md animate-in fade-in z-20">
+            <div className="flex items-center gap-2 text-[11px] text-indigo-100 font-medium">
+              <Loader2 className="h-3 w-3 text-indigo-300 animate-spin" />
+              <span>Transcribing your speech via Broadcaster AI…</span>
+            </div>
           </div>
         )}
 
@@ -1253,10 +1489,12 @@ export function BroadcasterPanel({
               className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full transition-all duration-200 active:scale-90 outline-none focus:outline-none focus-visible:outline-none ring-0 focus:ring-0 select-none ${
                 isListening
                   ? "bg-red-500 text-white shadow-[0_0_14px_rgba(239,68,68,0.7)] animate-pulse"
+                  : isTranscribing
+                  ? "bg-indigo-600 text-white animate-pulse"
                   : "bg-white/[0.08] text-neutral-300 hover:text-white hover:bg-white/[0.16] border border-white/[0.06]"
               }`}
             >
-              {isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+              {isListening ? <MicOff className="h-4 w-4" /> : isTranscribing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mic className="h-4 w-4" />}
             </button>
 
             {/* Input Field */}
@@ -1267,11 +1505,12 @@ export function BroadcasterPanel({
               autoComplete="off"
               autoCorrect="off"
               spellCheck="false"
-              placeholder={isListening ? "Listening…" : "Ask Broadcaster or tap mic…"}
+              placeholder={isTranscribing ? "Transcribing voice…" : isListening ? "Listening… (speak now)" : "Ask Broadcaster or tap mic…"}
               value={input}
               onChange={(e) => {
                 setInput(e.target.value);
                 if (error) setError(null);
+                if (diagnosticResult) setDiagnosticResult(null);
               }}
               onKeyDown={onKeyDown}
               disabled={isLoading}
