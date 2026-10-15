@@ -32,7 +32,7 @@ import { notifyBroadcastMutation } from "@/lib/syncEvents";
 /* ─── Types ──────────────────────────────────────────────────────────────── */
 
 export interface BroadcasterAction {
-  type: "schedule" | "navigate" | "tune_in" | "rent_buy";
+  type: "schedule" | "navigate" | "tune_in" | "rent_buy" | "remove";
   target: "broadcast" | "library" | "explore" | "home" | "player";
   payload?: {
     id?: string;
@@ -49,6 +49,12 @@ export interface BroadcasterAction {
     episodeCount?: number;
     firstDate?: string;
     lastDate?: string;
+    oneTime?: boolean;
+    dailyStrip?: boolean;
+    frequency?: string;
+    removed?: boolean;
+    deletedCount?: number;
+    date?: string;
   };
 }
 
@@ -239,7 +245,7 @@ export function BroadcasterPanel({
 
   /* ── Microphone Speech Recognition ───────────────────────────────────────── */
 
-  const toggleListening = useCallback(() => {
+  const toggleListening = useCallback(async () => {
     if (typeof window === "undefined") return;
     const win = window as unknown as IWindow;
     const SpeechRecognitionClass = win.SpeechRecognition || win.webkitSpeechRecognition;
@@ -259,6 +265,20 @@ export function BroadcasterPanel({
       }
       setIsListening(false);
       return;
+    }
+
+    // Explicitly request microphone stream first if getUserMedia is available.
+    // This forces Android Chrome & iOS Safari to display the browser's native permission prompt.
+    if (navigator?.mediaDevices?.getUserMedia) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        stream.getTracks().forEach((track) => track.stop());
+      } catch (mediaErr: any) {
+        console.warn("[broadcaster mic permission denied]", mediaErr);
+        setIsListening(false);
+        setError("Microphone permission was not granted. Tap the 🔒 icon in your browser address bar to allow microphone access, then tap again.");
+        return;
+      }
     }
 
     try {
@@ -294,6 +314,7 @@ export function BroadcasterPanel({
         const text = (finalTranscript || interimTranscript).trim();
         if (text) {
           setInput(text);
+          setError(null);
         }
       };
 
@@ -301,7 +322,7 @@ export function BroadcasterPanel({
         console.warn("[broadcaster voice error]", event.error);
         setIsListening(false);
         if (event.error === "not-allowed" || event.error === "service-not-allowed") {
-          setError("Microphone permission was denied. Please allow microphone access in your browser settings.");
+          setError("Microphone permission was denied. Tap the 🔒 icon in your browser address bar to allow microphone access, then tap again.");
         }
       };
 
@@ -314,7 +335,7 @@ export function BroadcasterPanel({
     } catch (err) {
       console.warn("[broadcaster voice start error]", err);
       setIsListening(false);
-      setError("Could not activate microphone. Please tap again or check browser permissions.");
+      setError("Could not activate microphone. Tap the mic button again to retry.");
     }
   }, [isListening]);
 
@@ -547,7 +568,7 @@ export function BroadcasterPanel({
         const replyMsgId = generateId();
         const replyText = data.reply ?? "I received your transmission.";
 
-        if (data.action?.type === "schedule") {
+        if (data.action?.type === "schedule" || data.action?.type === "remove") {
           notifyBroadcastMutation();
           onRefreshSchedule?.();
         }
@@ -907,41 +928,139 @@ export function BroadcasterPanel({
                 <div className="mt-2.5 w-full max-w-[88%] rounded-2xl bg-white/[0.08] border border-white/20 p-3 shadow-lg backdrop-blur-md space-y-2 animate-in fade-in duration-200">
                   {msg.action.type === "schedule" && (
                     <div className="space-y-2">
-                      <div className="flex items-center gap-1.5 text-emerald-400 text-[11px] font-semibold tracking-wide uppercase font-mono">
-                        <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.9)] animate-pulse" />
-                        <span>{msg.action.payload?.campaign ? "Season Campaign Locked In" : "Locked Into Broadcast Schedule"}</span>
-                      </div>
-                      <div className="text-[12.5px] text-white font-medium">
-                        {msg.action.payload?.title}
-                        {msg.action.payload?.campaign ? (
-                          <span className="text-violet-200 ml-1.5 text-[11.5px]">
-                            ({msg.action.payload.episodeCount} episodes mapped across calendar)
-                          </span>
-                        ) : msg.action.payload?.season && msg.action.payload?.episode ? (
-                          <span className="text-violet-200 ml-1.5 text-[11.5px]">
-                            (S{msg.action.payload.season} E{msg.action.payload.episode})
-                          </span>
-                        ) : null}
-                      </div>
-                      <div className="flex items-center gap-2 text-[11px] text-neutral-200 bg-white/[0.06] rounded-lg px-2.5 py-1.5 border border-white/10">
-                        <Calendar className="h-3.5 w-3.5 text-violet-300" />
-                        <span>
-                          {msg.action.payload?.campaign
-                            ? `${msg.action.payload?.firstDate} → ${msg.action.payload?.lastDate}`
-                            : `${msg.action.payload?.dayName} • ${msg.action.payload?.timeLabel}`}
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          triggerHaptic(12);
-                          onNavigate?.("broadcast");
-                        }}
-                        className="w-full mt-1.5 py-2 px-3 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-semibold text-[11.5px] transition-all flex items-center justify-center gap-2 shadow-sm active:scale-[0.98]"
-                      >
-                        <Tv2 className="h-3.5 w-3.5" />
-                        <span>{msg.action.payload?.campaign ? "View in Broadcast Studio Calendar" : "View in Broadcast Studio"}</span>
-                      </button>
+                      {msg.action.payload?.removed ? (
+                        <>
+                          <div className="flex items-center gap-1.5 text-rose-400 text-[11px] font-semibold tracking-wide uppercase font-mono">
+                            <span className="h-2 w-2 rounded-full bg-rose-400 shadow-[0_0_8px_rgba(244,63,94,0.9)] animate-pulse" />
+                            <span>Removed From Broadcast Schedule</span>
+                          </div>
+                          <div className="text-[12.5px] text-white font-medium">
+                            {msg.action.payload?.title}
+                          </div>
+                          {msg.action.payload?.timeLabel && (
+                            <div className="flex items-center gap-2 text-[11px] text-neutral-200 bg-white/[0.06] rounded-lg px-2.5 py-1.5 border border-white/10">
+                              <Calendar className="h-3.5 w-3.5 text-rose-300" />
+                              <span>
+                                {msg.action.payload?.dayName ? `${msg.action.payload?.dayName} • ` : ""}
+                                {msg.action.payload?.timeLabel} (Slot Cleared)
+                              </span>
+                            </div>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              triggerHaptic(12);
+                              onNavigate?.("broadcast");
+                            }}
+                            className="w-full mt-1.5 py-2 px-3 rounded-xl bg-white/15 hover:bg-white/25 text-white font-semibold text-[11.5px] transition-all flex items-center justify-center gap-2 active:scale-[0.98] border border-white/20"
+                          >
+                            <Tv2 className="h-3.5 w-3.5" />
+                            <span>View Updated Schedule</span>
+                          </button>
+                        </>
+                      ) : msg.action.payload?.oneTime ? (
+                        <>
+                          <div className="flex items-center gap-1.5 text-cyan-400 text-[11px] font-semibold tracking-wide uppercase font-mono">
+                            <span className="h-2 w-2 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.9)] animate-pulse" />
+                            <span>One-Time Special Screening</span>
+                          </div>
+                          <div className="text-[12.5px] text-white font-medium">
+                            {msg.action.payload?.title}
+                            {msg.action.payload?.season && msg.action.payload?.episode ? (
+                              <span className="text-cyan-200 ml-1.5 text-[11.5px]">
+                                (Single Showing • S{msg.action.payload.season} E{msg.action.payload.episode})
+                              </span>
+                            ) : null}
+                          </div>
+                          <div className="flex items-center gap-2 text-[11px] text-neutral-200 bg-white/[0.06] rounded-lg px-2.5 py-1.5 border border-white/10">
+                            <Calendar className="h-3.5 w-3.5 text-cyan-300" />
+                            <span>
+                              {msg.action.payload?.date} ({msg.action.payload?.dayName}) at {msg.action.payload?.timeLabel}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              triggerHaptic(12);
+                              onNavigate?.("broadcast");
+                            }}
+                            className="w-full mt-1.5 py-2 px-3 rounded-xl bg-gradient-to-r from-cyan-600 to-teal-600 hover:from-cyan-500 hover:to-teal-500 text-white font-semibold text-[11.5px] transition-all flex items-center justify-center gap-2 shadow-sm active:scale-[0.98]"
+                          >
+                            <Tv2 className="h-3.5 w-3.5" />
+                            <span>View in Broadcast Studio Calendar</span>
+                          </button>
+                        </>
+                      ) : msg.action.payload?.dailyStrip ? (
+                        <>
+                          <div className="flex items-center gap-1.5 text-purple-400 text-[11px] font-semibold tracking-wide uppercase font-mono">
+                            <span className="h-2 w-2 rounded-full bg-purple-400 shadow-[0_0_8px_rgba(192,132,252,0.9)] animate-pulse" />
+                            <span>Daily Strip Scheduled ({msg.action.payload?.frequency})</span>
+                          </div>
+                          <div className="text-[12.5px] text-white font-medium">
+                            {msg.action.payload?.title}
+                            {msg.action.payload?.season && msg.action.payload?.episode ? (
+                              <span className="text-purple-200 ml-1.5 text-[11.5px]">
+                                (Starts S{msg.action.payload.season} E{msg.action.payload.episode})
+                              </span>
+                            ) : null}
+                          </div>
+                          <div className="flex items-center gap-2 text-[11px] text-neutral-200 bg-white/[0.06] rounded-lg px-2.5 py-1.5 border border-white/10">
+                            <Calendar className="h-3.5 w-3.5 text-purple-300" />
+                            <span>
+                              {msg.action.payload?.frequency} at {msg.action.payload?.timeLabel}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              triggerHaptic(12);
+                              onNavigate?.("broadcast");
+                            }}
+                            className="w-full mt-1.5 py-2 px-3 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-semibold text-[11.5px] transition-all flex items-center justify-center gap-2 shadow-sm active:scale-[0.98]"
+                          >
+                            <Tv2 className="h-3.5 w-3.5" />
+                            <span>View Lineup</span>
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <div className="flex items-center gap-1.5 text-emerald-400 text-[11px] font-semibold tracking-wide uppercase font-mono">
+                            <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.9)] animate-pulse" />
+                            <span>{msg.action.payload?.campaign ? "Season Campaign Locked In" : "Ongoing Weekly Broadcast Scheduled"}</span>
+                          </div>
+                          <div className="text-[12.5px] text-white font-medium">
+                            {msg.action.payload?.title}
+                            {msg.action.payload?.campaign ? (
+                              <span className="text-violet-200 ml-1.5 text-[11.5px]">
+                                ({msg.action.payload.episodeCount} episodes mapped across calendar)
+                              </span>
+                            ) : msg.action.payload?.season && msg.action.payload?.episode ? (
+                              <span className="text-violet-200 ml-1.5 text-[11.5px]">
+                                (S{msg.action.payload.season} E{msg.action.payload.episode})
+                              </span>
+                            ) : null}
+                          </div>
+                          <div className="flex items-center gap-2 text-[11px] text-neutral-200 bg-white/[0.06] rounded-lg px-2.5 py-1.5 border border-white/10">
+                            <Calendar className="h-3.5 w-3.5 text-violet-300" />
+                            <span>
+                              {msg.action.payload?.campaign
+                                ? `${msg.action.payload?.firstDate} → ${msg.action.payload?.lastDate}`
+                                : `Every ${msg.action.payload?.dayName} at ${msg.action.payload?.timeLabel}`}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              triggerHaptic(12);
+                              onNavigate?.("broadcast");
+                            }}
+                            className="w-full mt-1.5 py-2 px-3 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-semibold text-[11.5px] transition-all flex items-center justify-center gap-2 shadow-sm active:scale-[0.98]"
+                          >
+                            <Tv2 className="h-3.5 w-3.5" />
+                            <span>{msg.action.payload?.campaign ? "View in Broadcast Studio Calendar" : "View in Broadcast Studio"}</span>
+                          </button>
+                        </>
+                      )}
                     </div>
                   )}
 
@@ -1065,10 +1184,18 @@ export function BroadcasterPanel({
             </div>
           )}
 
-          {/* Error Message */}
+          {/* Error Message with Dismiss Button */}
           {error && (
-            <div className="text-[11.5px] text-red-200 py-2.5 px-3.5 rounded-2xl bg-red-950/70 border border-red-400/40 backdrop-blur-md break-words [overflow-wrap:anywhere] max-w-full">
-              {error}
+            <div className="flex items-start justify-between gap-2.5 text-[11.5px] text-red-200 py-2.5 px-3.5 rounded-2xl bg-red-950/70 border border-red-400/40 backdrop-blur-md break-words [overflow-wrap:anywhere] max-w-full animate-in fade-in">
+              <div className="flex-1">{error}</div>
+              <button
+                type="button"
+                onClick={() => setError(null)}
+                aria-label="Dismiss error"
+                className="text-red-300 hover:text-white p-0.5 rounded transition-colors shrink-0 cursor-pointer"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
             </div>
           )}
 
@@ -1135,7 +1262,10 @@ export function BroadcasterPanel({
               spellCheck="false"
               placeholder={isListening ? "Listening…" : "Ask Broadcaster or tap mic…"}
               value={input}
-              onChange={(e) => setInput(e.target.value)}
+              onChange={(e) => {
+                setInput(e.target.value);
+                if (error) setError(null);
+              }}
               onKeyDown={onKeyDown}
               disabled={isLoading}
               aria-label="Message Broadcaster"

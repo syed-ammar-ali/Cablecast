@@ -239,7 +239,7 @@ export function AppHeader({
 
         <div className="flex w-full max-w-md items-center gap-2 justify-self-center sm:w-[32rem]">
           {onOpenBroadcastStudio && (
-            <Tooltip content="Broadcast Studio" position="bottom">
+            <Tooltip content="Broadcast Studio" position="bottom" className="shrink-0">
               <button
                 type="button"
                 onClick={() => {
@@ -263,10 +263,14 @@ export function AppHeader({
               e.preventDefault();
               (document.activeElement as HTMLElement)?.blur();
             }}
-            className="relative flex-1"
+            className="relative flex-1 flex items-center h-10"
           >
             {isExploreActive || searchQuery.trim() ? (
-              <Tooltip content="Back to Cablecast" position="bottom">
+              <Tooltip
+                content="Back to Cablecast"
+                position="bottom"
+                className="absolute left-2 top-1/2 -translate-y-1/2 z-10"
+              >
                 <button
                   type="button"
                   onClick={() => {
@@ -274,13 +278,15 @@ export function AppHeader({
                     onSearchQueryChange("");
                     onHomeClick?.();
                   }}
-                  className="absolute left-2.5 top-1/2 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-full text-neutral-400 hover:text-white hover:bg-neutral-800/80 transition-all cursor-pointer z-10"
+                  className="flex h-7 w-7 items-center justify-center rounded-full text-neutral-400 hover:text-white hover:bg-neutral-800/80 transition-all cursor-pointer"
                 >
-                  <ArrowLeft className="h-4 w-4 transition-transform hover:-translate-x-0.5" />
+                  <ArrowLeft className="h-4 w-4" />
                 </button>
               </Tooltip>
             ) : (
-              <Search className="pointer-events-none absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-neutral-500" />
+              <div className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 flex items-center justify-center text-neutral-500">
+                <Search className="h-4.5 w-4.5" />
+              </div>
             )}
 
             <input
@@ -297,32 +303,38 @@ export function AppHeader({
                 }
               }}
               placeholder="Search movies & TV shows..."
-              className={`h-10 w-full rounded-full border bg-white/[0.03] backdrop-blur-sm pl-10 pr-9 text-base text-neutral-200 placeholder:text-neutral-500 transition-all [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-decoration]:hidden [&::-webkit-search-results-button]:hidden [&::-webkit-search-results-decoration]:hidden ${
+              className={`h-10 w-full rounded-full border bg-white/[0.03] backdrop-blur-sm pl-10 pr-9 text-sm leading-normal text-neutral-200 placeholder:text-neutral-500 transition-all [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-decoration]:hidden [&::-webkit-search-results-button]:hidden [&::-webkit-search-results-decoration]:hidden ${
                 isExploreActive
                   ? "border-sky-500/60 shadow-[0_0_15px_rgba(14,165,233,0.18)] ring-1 ring-sky-500/30"
                   : "border-neutral-700/80 hover:border-neutral-500 focus:border-sky-500/60 focus:ring-1 focus:ring-sky-500/40"
               } focus:outline-none`}
             />
             {searchQuery ? (
-              <Tooltip content="Clear search" position="bottom">
+              <Tooltip
+                content="Clear search"
+                position="bottom"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 z-10"
+              >
                 <button
                   type="button"
                   onClick={() => {
                     playMechanicalClick();
                     onSearchQueryChange("");
                   }}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 rounded-full p-0.5 text-neutral-400 hover:text-white transition-colors cursor-pointer"
+                  className="flex h-6 w-6 items-center justify-center rounded-full text-neutral-400 hover:text-white hover:bg-neutral-800 transition-colors cursor-pointer"
                 >
-                  <X className="h-4 w-4" />
+                  <X className="h-3.5 w-3.5" />
                 </button>
               </Tooltip>
             ) : isSearchLoading ? (
-              <Loader2 className="pointer-events-none absolute right-3.5 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-neutral-500" />
+              <div className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 flex items-center justify-center text-neutral-500">
+                <Loader2 className="h-4 w-4 animate-spin" />
+              </div>
             ) : null}
           </form>
 
           {onOpenLibrary && (
-            <Tooltip content="My Library (Vault & Tapes)" position="bottom">
+            <Tooltip content="My Library (Vault & Tapes)" position="bottom" className="shrink-0">
               <button
                 type="button"
                 onClick={() => {

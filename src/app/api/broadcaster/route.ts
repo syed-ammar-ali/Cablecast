@@ -103,6 +103,17 @@ function parseDayOfWeek(input: unknown, defaultDay: number): number {
   return idx >= 0 ? idx : defaultDay;
 }
 
+function computeUpcomingDateForDay(baseDateStr: string, targetDay: number): string {
+  let d = new Date(baseDateStr);
+  if (isNaN(d.getTime())) {
+    d = new Date();
+  }
+  const currentDay = d.getDay();
+  let diff = (targetDay - currentDay + 7) % 7;
+  d.setDate(d.getDate() + diff);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 /* ─── System Prompt Builder ──────────────────────────────────────────────── */
 
 function buildSystemPrompt(ctx: {
@@ -173,19 +184,55 @@ ${ctx.scheduleSummary || "No shows currently scheduled on this channel (entire w
 You have full authority to execute and recommend Cablecast actions.
 When executing an action, append an action block at the VERY END of your message (after two newlines) using this exact syntax:
 
-1. Schedule a broadcast (if user asks for a specific time like "3 PM" or requests next open block):
+1. Schedule an ONGOING RECURRING broadcast (for weekly appointments, series runs, or when user asks for a regular time like "every Thursday at 9 PM" or "put Dawson's Creek on Thursdays at 9 PM"):
 \`\`\`cablecast_action
 {
   "type": "schedule_broadcast",
   "title": "Dawson's Creek",
   "season": 1,
   "episode": 6,
-  "time": "3:00 PM",
+  "time": "9:00 PM",
   "dayOfWeek": "Thursday"
 }
 \`\`\`
 
-2. Navigate views:
+2. Schedule a ONE-TIME / SPECIAL SCREENING broadcast (CRITICAL: When the user asks for a single specific episode or one-time viewing, e.g. "I want to see just episode 6 on Thursday at 9 pm", "Air episode 6 only once this Thursday", "Single special screening"):
+\`\`\`cablecast_action
+{
+  "type": "schedule_one_time_broadcast",
+  "title": "Dawson's Creek",
+  "season": 1,
+  "episode": 6,
+  "time": "9:00 PM",
+  "dayOfWeek": "Thursday"
+}
+\`\`\`
+
+3. Schedule a DAILY SYNDICATION STRIP (when the user asks to air a show "every day at 9 PM" or "daily at 9 PM" or "weekdays at 9 PM"):
+\`\`\`cablecast_action
+{
+  "type": "schedule_daily_strip",
+  "title": "Dawson's Creek",
+  "season": 1,
+  "episode": 1,
+  "time": "9:00 PM",
+  "frequency": "daily"
+}
+\`\`\`
+
+4. REMOVE / UNSCHEDULE a pre-existing broadcast block (when user says "Remove Dawson's Creek from Thursday 9 PM", "Clear my Thursday schedule", "Take Dawson's Creek off the air", "Delete the 9 PM broadcast", "Clear my lineup"):
+\`\`\`cablecast_action
+{
+  "type": "remove_broadcast",
+  "title": "Dawson's Creek",
+  "dayOfWeek": "Thursday",
+  "time": "9:00 PM",
+  "clearDay": false,
+  "clearAll": false
+}
+\`\`\`
+
+5. Navigate views:
 \`\`\`cablecast_action
 {
   "type": "navigate",
@@ -194,7 +241,7 @@ When executing an action, append an action block at the VERY END of your message
 }
 \`\`\`
 
-3. Tune in now:
+6. Tune in now:
 \`\`\`cablecast_action
 {
   "type": "tune_in",
@@ -689,6 +736,254 @@ export async function POST(req: NextRequest) {
                 dbErr instanceof Error ? dbErr.message : "Database error"
               })*`;
             }
+          }
+        }
+
+        // ── Action 1B: One-Time / Special Screening Broadcast ──
+        else if (parsedAction.type === "schedule_one_time_broadcast") {
+          const reqTitle = String(parsedAction.title || "");
+          const reqTmdbId = Number(parsedAction.tmdbId) || 0;
+          const reqSeason = Number(parsedAction.season || parsedAction.seasonNumber) || 1;
+          const reqEpisode = Number(parsedAction.episode || parsedAction.episodeNumber) || 1;
+          const reqDayOfWeek = parseDayOfWeek(parsedAction.dayOfWeek, ctx.currentDayOfWeek);
+
+          let reqStartMinutes =
+            parseTimeToBlockMinutes(parsedAction.blockStartMinutes) ??
+            parseTimeToBlockMinutes(parsedAction.startTime) ??
+            parseTimeToBlockMinutes(parsedAction.time) ??
+            parseTimeToBlockMinutes(parsedAction.timeLabel) ??
+            parseTimeToBlockMinutes(parsedAction.airTime);
+
+          if (reqStartMinutes === null) {
+            reqStartMinutes = ctx.nextAvailableBlockMinutes;
+          }
+
+          const matchedVaultItem = ctx.userVault.find(
+            (v) =>
+              (reqTmdbId > 0 && v.tmdbId === reqTmdbId) ||
+              v.title.toLowerCase() === reqTitle.toLowerCase() ||
+              v.title.toLowerCase().includes(reqTitle.toLowerCase()) ||
+              reqTitle.toLowerCase().includes(v.title.toLowerCase())
+          );
+
+          if (!matchedVaultItem) {
+            cleanReply += `\n\n*(Note: Under Cablecast's CD Rule, you need to own or rent "${reqTitle}" in your vault before putting it on the air. Head to the VHS Store to check out the tape!)*`;
+            executedAction = {
+              type: "navigate",
+              target: "explore",
+              payload: { searchQuery: reqTitle },
+            };
+          } else {
+            try {
+              const targetDate = computeUpcomingDateForDay(ctx.clientDate, reqDayOfWeek);
+              const newEntry = await prisma.calendarEntry.create({
+                data: {
+                  sessionId: ctx.userId,
+                  tmdbId: matchedVaultItem.tmdbId,
+                  mediaType: matchedVaultItem.mediaType,
+                  title: matchedVaultItem.title,
+                  posterPath: matchedVaultItem.posterPath,
+                  backdropUrl: matchedVaultItem.backdropUrl,
+                  scheduledDate: targetDate,
+                  blockStartMinutes: reqStartMinutes,
+                  blockCount: 1,
+                  startSeason: matchedVaultItem.mediaType === "tv" ? reqSeason : 1,
+                  startEpisode: matchedVaultItem.mediaType === "tv" ? reqEpisode : 1,
+                },
+              });
+
+              executedAction = {
+                type: "schedule",
+                target: "broadcast",
+                payload: {
+                  id: newEntry.id,
+                  oneTime: true,
+                  title: newEntry.title,
+                  date: targetDate,
+                  timeLabel: formatBlockTime(newEntry.blockStartMinutes),
+                  dayName: DAYS_NAMES[reqDayOfWeek],
+                  season: newEntry.startSeason ?? 1,
+                  episode: newEntry.startEpisode ?? 1,
+                },
+              };
+            } catch (dbErr) {
+              console.error("[broadcaster/route] One-time schedule save error:", dbErr);
+              cleanReply += `\n\n*(Notice: Could not save one-time screening: ${
+                dbErr instanceof Error ? dbErr.message : "Database error"
+              })*`;
+            }
+          }
+        }
+
+        // ── Action 1C: Daily Syndication Strip ──
+        else if (parsedAction.type === "schedule_daily_strip") {
+          const reqTitle = String(parsedAction.title || "");
+          const reqTmdbId = Number(parsedAction.tmdbId) || 0;
+          const reqSeason = Number(parsedAction.season || parsedAction.seasonNumber) || 1;
+          const reqEpisode = Number(parsedAction.episode || parsedAction.episodeNumber) || 1;
+          const frequency = String(parsedAction.frequency || "daily").toLowerCase();
+
+          let reqStartMinutes =
+            parseTimeToBlockMinutes(parsedAction.blockStartMinutes) ??
+            parseTimeToBlockMinutes(parsedAction.startTime) ??
+            parseTimeToBlockMinutes(parsedAction.time) ??
+            parseTimeToBlockMinutes(parsedAction.timeLabel) ??
+            parseTimeToBlockMinutes(parsedAction.airTime);
+
+          if (reqStartMinutes === null) {
+            reqStartMinutes = 1260; // 9:00 PM default prime time
+          }
+
+          const matchedVaultItem = ctx.userVault.find(
+            (v) =>
+              (reqTmdbId > 0 && v.tmdbId === reqTmdbId) ||
+              v.title.toLowerCase() === reqTitle.toLowerCase() ||
+              v.title.toLowerCase().includes(reqTitle.toLowerCase()) ||
+              reqTitle.toLowerCase().includes(v.title.toLowerCase())
+          );
+
+          if (!matchedVaultItem) {
+            cleanReply += `\n\n*(Note: Under Cablecast's CD Rule, you need to own or rent "${reqTitle}" in your vault before putting it on the air. Head to the VHS Store to check out the tape!)*`;
+            executedAction = {
+              type: "navigate",
+              target: "explore",
+              payload: { searchQuery: reqTitle },
+            };
+          } else {
+            try {
+              const daysToSchedule = frequency === "weekdays" ? [1, 2, 3, 4, 5] : [0, 1, 2, 3, 4, 5, 6];
+
+              for (const day of daysToSchedule) {
+                await prisma.userPersonalSchedule.upsert({
+                  where: {
+                    sessionId_dayOfWeek_blockStartMinutes: {
+                      sessionId: ctx.userId,
+                      dayOfWeek: day,
+                      blockStartMinutes: reqStartMinutes,
+                    },
+                  },
+                  create: {
+                    sessionId: ctx.userId,
+                    tmdbId: matchedVaultItem.tmdbId,
+                    mediaType: matchedVaultItem.mediaType,
+                    title: matchedVaultItem.title,
+                    posterPath: matchedVaultItem.posterPath,
+                    backdropUrl: matchedVaultItem.backdropUrl,
+                    dayOfWeek: day,
+                    blockStartMinutes: reqStartMinutes,
+                    blockCount: 1,
+                    currentSeason: matchedVaultItem.mediaType === "tv" ? reqSeason : 1,
+                    currentEpisode: matchedVaultItem.mediaType === "tv" ? reqEpisode : 1,
+                    totalEpisodes: 24,
+                    timezoneOffset: ctx.tzOffset ?? 0,
+                  },
+                  update: {
+                    tmdbId: matchedVaultItem.tmdbId,
+                    mediaType: matchedVaultItem.mediaType,
+                    title: matchedVaultItem.title,
+                    posterPath: matchedVaultItem.posterPath,
+                    backdropUrl: matchedVaultItem.backdropUrl,
+                    currentSeason: matchedVaultItem.mediaType === "tv" ? reqSeason : 1,
+                    currentEpisode: matchedVaultItem.mediaType === "tv" ? reqEpisode : 1,
+                    timezoneOffset: ctx.tzOffset ?? 0,
+                  },
+                });
+              }
+
+              executedAction = {
+                type: "schedule",
+                target: "broadcast",
+                payload: {
+                  dailyStrip: true,
+                  title: matchedVaultItem.title,
+                  timeLabel: formatBlockTime(reqStartMinutes),
+                  frequency: frequency === "weekdays" ? "Monday–Friday" : "Every Day",
+                  season: reqSeason,
+                  episode: reqEpisode,
+                },
+              };
+            } catch (dbErr) {
+              console.error("[broadcaster/route] Daily strip save error:", dbErr);
+              cleanReply += `\n\n*(Notice: Could not save daily strip: ${
+                dbErr instanceof Error ? dbErr.message : "Database error"
+              })*`;
+            }
+          }
+        }
+
+        // ── Action 1D: Remove / Unschedule Broadcast Block ──
+        else if (
+          parsedAction.type === "remove_broadcast" ||
+          parsedAction.type === "clear_schedule" ||
+          parsedAction.type === "delete_broadcast"
+        ) {
+          const reqTitle = String(parsedAction.title || "").trim();
+          const reqDayOfWeek =
+            parsedAction.dayOfWeek !== undefined ? parseDayOfWeek(parsedAction.dayOfWeek, -1) : -1;
+          const reqStartMinutes =
+            parseTimeToBlockMinutes(parsedAction.blockStartMinutes) ??
+            parseTimeToBlockMinutes(parsedAction.startTime) ??
+            parseTimeToBlockMinutes(parsedAction.time);
+          const clearAll = Boolean(parsedAction.clearAll);
+          const clearDay = Boolean(parsedAction.clearDay);
+
+          try {
+            let deletedCount = 0;
+
+            if (clearAll) {
+              const pRes = await prisma.userPersonalSchedule.deleteMany({
+                where: { sessionId: ctx.userId },
+              });
+              const cRes = await prisma.calendarEntry.deleteMany({
+                where: { sessionId: ctx.userId },
+              });
+              deletedCount = pRes.count + cRes.count;
+            } else if (clearDay && reqDayOfWeek >= 0) {
+              const pRes = await prisma.userPersonalSchedule.deleteMany({
+                where: { sessionId: ctx.userId, dayOfWeek: reqDayOfWeek },
+              });
+              deletedCount = pRes.count;
+            } else if (reqDayOfWeek >= 0 && reqStartMinutes !== null) {
+              const pRes = await prisma.userPersonalSchedule.deleteMany({
+                where: {
+                  sessionId: ctx.userId,
+                  dayOfWeek: reqDayOfWeek,
+                  blockStartMinutes: reqStartMinutes,
+                },
+              });
+              deletedCount = pRes.count;
+            } else if (reqTitle) {
+              const pRes = await prisma.userPersonalSchedule.deleteMany({
+                where: {
+                  sessionId: ctx.userId,
+                  title: { contains: reqTitle, mode: "insensitive" },
+                },
+              });
+              const cRes = await prisma.calendarEntry.deleteMany({
+                where: {
+                  sessionId: ctx.userId,
+                  title: { contains: reqTitle, mode: "insensitive" },
+                },
+              });
+              deletedCount = pRes.count + cRes.count;
+            }
+
+            executedAction = {
+              type: "schedule",
+              target: "broadcast",
+              payload: {
+                removed: true,
+                title: reqTitle || (reqDayOfWeek >= 0 ? `${DAYS_NAMES[reqDayOfWeek]} slot` : "broadcast slot"),
+                timeLabel: reqStartMinutes !== null ? formatBlockTime(reqStartMinutes) : undefined,
+                dayName: reqDayOfWeek >= 0 ? DAYS_NAMES[reqDayOfWeek] : undefined,
+                deletedCount,
+              },
+            };
+          } catch (dbErr) {
+            console.error("[broadcaster/route] Schedule removal error:", dbErr);
+            cleanReply += `\n\n*(Notice: Could not remove broadcast: ${
+              dbErr instanceof Error ? dbErr.message : "Database error"
+            })*`;
           }
         }
 
