@@ -46,17 +46,35 @@ button,
 a,
 nav,
 header,
+footer,
+input,
+textarea,
+select {
+  -webkit-tap-highlight-color: transparent !important;
+}
+
+button,
+a,
+nav,
+header,
 footer {
   -webkit-user-select: none;
   user-select: none;
   -webkit-touch-callout: none;
 }
 
+button:focus,
+button:focus-visible,
+button:active {
+  outline: none !important;
+  box-shadow: none !important;
+  -webkit-tap-highlight-color: transparent !important;
+}
+
 input,
 textarea {
   -webkit-user-select: text;
   user-select: text;
-  -webkit-tap-highlight-color: transparent;
 }
 
 input:focus,

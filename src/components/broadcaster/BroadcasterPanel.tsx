@@ -245,13 +245,13 @@ export function BroadcasterPanel({
 
   /* ── Microphone Speech Recognition ───────────────────────────────────────── */
 
-  const toggleListening = useCallback(async () => {
+  const toggleListening = useCallback(() => {
     if (typeof window === "undefined") return;
     const win = window as unknown as IWindow;
     const SpeechRecognitionClass = win.SpeechRecognition || win.webkitSpeechRecognition;
 
     if (!SpeechRecognitionClass) {
-      setError("Voice input is not supported in this browser. Please use Chrome, Safari, or Edge.");
+      setError("Voice input is not supported in this browser. Please open Cablecast in Google Chrome, Safari, or Edge.");
       return;
     }
 
@@ -267,20 +267,6 @@ export function BroadcasterPanel({
       return;
     }
 
-    // Explicitly request microphone stream first if getUserMedia is available.
-    // This forces Android Chrome & iOS Safari to display the browser's native permission prompt.
-    if (navigator?.mediaDevices?.getUserMedia) {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        stream.getTracks().forEach((track) => track.stop());
-      } catch (mediaErr: any) {
-        console.warn("[broadcaster mic permission denied]", mediaErr);
-        setIsListening(false);
-        setError("Microphone permission was not granted. Tap the 🔒 icon in your browser address bar to allow microphone access, then tap again.");
-        return;
-      }
-    }
-
     try {
       if (recognitionRef.current) {
         try {
@@ -293,7 +279,7 @@ export function BroadcasterPanel({
       const recognition = new SpeechRecognitionClass();
       recognition.continuous = false;
       recognition.interimResults = true;
-      recognition.lang = "en-US";
+      recognition.lang = typeof navigator !== "undefined" && navigator.language ? navigator.language : "en-US";
 
       recognition.onstart = () => {
         setIsListening(true);
@@ -321,8 +307,24 @@ export function BroadcasterPanel({
       recognition.onerror = (event: any) => {
         console.warn("[broadcaster voice error]", event.error);
         setIsListening(false);
+        if (event.error === "no-speech") {
+          // User paused or stayed quiet; end listening cleanly without error
+          return;
+        }
+        if (event.error === "aborted") {
+          // Normal manual stop or cancellation
+          return;
+        }
         if (event.error === "not-allowed" || event.error === "service-not-allowed") {
-          setError("Microphone permission was denied. Tap the 🔒 icon in your browser address bar to allow microphone access, then tap again.");
+          setError(
+            "Microphone access blocked. If allowed in the address bar (🔒 icon), please also ensure microphone is turned on in your phone's Settings → Apps → Chrome → Permissions."
+          );
+        } else if (event.error === "network") {
+          setError("Speech recognition service network error. Please check your internet connection.");
+        } else if (event.error === "audio-capture") {
+          setError("No microphone detected, or another app is currently using the microphone.");
+        } else {
+          setError(`Voice input error (${event.error || "unknown"}). Tap mic to retry.`);
         }
       };
 
@@ -332,7 +334,7 @@ export function BroadcasterPanel({
 
       recognitionRef.current = recognition;
       recognition.start();
-    } catch (err) {
+    } catch (err: any) {
       console.warn("[broadcaster voice start error]", err);
       setIsListening(false);
       setError("Could not activate microphone. Tap the mic button again to retry.");
@@ -1243,7 +1245,12 @@ export function BroadcasterPanel({
               title={isListening ? "Stop listening" : "Talk to Broadcaster"}
               aria-label="Voice input"
               onClick={toggleListening}
-              className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full transition-all duration-200 active:scale-90 ${
+              style={{
+                outline: "none",
+                boxShadow: "none",
+                WebkitTapHighlightColor: "transparent",
+              }}
+              className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full transition-all duration-200 active:scale-90 outline-none focus:outline-none focus-visible:outline-none ring-0 focus:ring-0 select-none ${
                 isListening
                   ? "bg-red-500 text-white shadow-[0_0_14px_rgba(239,68,68,0.7)] animate-pulse"
                   : "bg-white/[0.08] text-neutral-300 hover:text-white hover:bg-white/[0.16] border border-white/[0.06]"
@@ -1285,7 +1292,12 @@ export function BroadcasterPanel({
               aria-label="Send message"
               onClick={() => void sendMessage()}
               disabled={!input.trim() || isLoading}
-              className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full transition-all duration-200 active:scale-90 shadow-md ${
+              style={{
+                outline: "none",
+                boxShadow: "none",
+                WebkitTapHighlightColor: "transparent",
+              }}
+              className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full transition-all duration-200 active:scale-90 outline-none focus:outline-none focus-visible:outline-none ring-0 focus:ring-0 select-none shadow-md ${
                 input.trim() && !isLoading
                   ? "bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-[0_0_12px_rgba(139,92,246,0.45)] hover:brightness-110 cursor-pointer"
                   : "bg-white/[0.06] text-neutral-500 border border-white/[0.06] cursor-not-allowed opacity-40"
