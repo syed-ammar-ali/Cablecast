@@ -543,6 +543,10 @@ export async function POST(req: NextRequest) {
     // 1. Session resolution (guests can chat with Broadcaster; persistent actions require session)
     const session = await getSession();
 
+    const host = req.headers.get("x-forwarded-host") || req.headers.get("host");
+    const proto = req.headers.get("x-forwarded-proto") || "https";
+    const requestOrigin = host ? `${proto}://${host}` : req.nextUrl.origin;
+
     // 2. Parse request body
     const body = (await req.json()) as {
       message?: string;
@@ -812,6 +816,23 @@ export async function POST(req: NextRequest) {
                   startEpisode: matchedVaultItem.mediaType === "tv" ? reqEpisode : 1,
                 },
               });
+
+              // Automatically schedule delayed alert via QStash (10 mins before air)
+              try {
+                const { scheduleDelayedBroadcastAlert } = await import("@/lib/notifications/qstash");
+                const sub = await prisma.pushSubscription.findFirst({
+                  where: { userId: { in: [ctx.userId, session?.id, session?.accessCodeId].filter(Boolean) as string[] } },
+                  select: { timezoneOffset: true },
+                });
+                const effectiveOffset = typeof sub?.timezoneOffset === "number" ? sub.timezoneOffset : (typeof ctx.tzOffset === "number" ? ctx.tzOffset : 0);
+                const [year, month, day] = targetDate.split("-").map(Number);
+                const airTime = new Date(Date.UTC(year, month - 1, day, Math.floor(reqStartMinutes / 60), reqStartMinutes % 60));
+                airTime.setTime(airTime.getTime() + effectiveOffset * 60_000);
+                const alertTime = new Date(airTime.getTime() - 10 * 60 * 1000);
+                await scheduleDelayedBroadcastAlert({ scheduleId: `cal-${newEntry.id}`, alertTime, requestOrigin });
+              } catch (alertErr) {
+                console.warn("[broadcaster/route] Failed to schedule QStash alert:", alertErr);
+              }
 
               executedAction = {
                 type: "schedule",
@@ -1223,15 +1244,50 @@ export async function POST(req: NextRequest) {
                   scheduledDate: String(e.date),
                   blockStartMinutes: startMin,
                   blockCount: 1,
-                  startSeason: reqSeason,
+                  startSeason: Number(e.season) || reqSeason,
                   startEpisode: Number(e.episode) || 1,
                 };
               });
 
               if (calendarRows.length > 0) {
+                await prisma.calendarEntry.deleteMany({
+                  where: {
+                    sessionId: ctx.userId,
+                    tmdbId: matchedVaultItem.tmdbId,
+                    scheduledDate: { in: Array.from(new Set(calendarRows.map((r) => r.scheduledDate))) },
+                  },
+                });
+
                 await prisma.calendarEntry.createMany({
                   data: calendarRows,
                 });
+
+                // Schedule QStash alerts for each created entry in the campaign
+                try {
+                  const { scheduleDelayedBroadcastAlert } = await import("@/lib/notifications/qstash");
+                  const createdEntries = await prisma.calendarEntry.findMany({
+                    where: {
+                      sessionId: ctx.userId,
+                      tmdbId: matchedVaultItem.tmdbId,
+                      scheduledDate: { in: Array.from(new Set(calendarRows.map((r) => r.scheduledDate))) },
+                    },
+                  });
+                  const sub = await prisma.pushSubscription.findFirst({
+                    where: { userId: { in: [ctx.userId, session?.id, session?.accessCodeId].filter(Boolean) as string[] } },
+                    select: { timezoneOffset: true },
+                  });
+                  const effectiveOffset = typeof sub?.timezoneOffset === "number" ? sub.timezoneOffset : (typeof ctx.tzOffset === "number" ? ctx.tzOffset : 0);
+
+                  for (const entry of createdEntries) {
+                    const [year, month, day] = entry.scheduledDate.split("-").map(Number);
+                    const airTime = new Date(Date.UTC(year, month - 1, day, Math.floor(entry.blockStartMinutes / 60), entry.blockStartMinutes % 60));
+                    airTime.setTime(airTime.getTime() + effectiveOffset * 60_000);
+                    const alertTime = new Date(airTime.getTime() - 10 * 60 * 1000);
+                    await scheduleDelayedBroadcastAlert({ scheduleId: `cal-${entry.id}`, alertTime, requestOrigin });
+                  }
+                } catch (alertErr) {
+                  console.warn("[broadcaster/route] Failed to schedule campaign QStash alerts:", alertErr);
+                }
 
                 executedAction = {
                   type: "schedule",

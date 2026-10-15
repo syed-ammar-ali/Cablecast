@@ -22,6 +22,9 @@ export function getAppBaseUrl(requestOrigin?: string | null): string {
   if (requestOrigin) {
     return requestOrigin.replace(/\/$/, "");
   }
+  if (process.env.NODE_ENV === "production") {
+    return "https://cablecast.tv";
+  }
   return "http://localhost:3000";
 }
 

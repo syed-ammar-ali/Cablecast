@@ -12,25 +12,35 @@ vi.mock("@/lib/prisma", () => ({
   prisma: {
     userPersonalSchedule: {
       findUnique: vi.fn(),
+      findMany: vi.fn().mockResolvedValue([]),
+    },
+    calendarEntry: {
+      findUnique: vi.fn(),
+      findMany: vi.fn().mockResolvedValue([]),
     },
     session: {
       findFirst: vi.fn(),
+      findMany: vi.fn().mockResolvedValue([]),
     },
     notificationLog: {
       findFirst: vi.fn(),
+      findMany: vi.fn().mockResolvedValue([]),
       create: vi.fn(),
     },
     rental: {
       findFirst: vi.fn(),
+      findMany: vi.fn().mockResolvedValue([]),
     },
     libraryItem: {
       findFirst: vi.fn(),
+      findMany: vi.fn().mockResolvedValue([]),
     },
     pushSubscription: {
-      findMany: vi.fn(),
+      findMany: vi.fn().mockResolvedValue([]),
+      findFirst: vi.fn(),
     },
     userPhoneNotification: {
-      findMany: vi.fn(),
+      findMany: vi.fn().mockResolvedValue([]),
     },
   },
 }));
@@ -246,6 +256,22 @@ describe("Upstash QStash Notification Integration", () => {
       expect(res.status).toBe(401);
       const data = await res.json();
       expect(data.error).toBe("Missing QStash signature");
+    });
+
+    it("handles recurring_dispatch from QStash cron schedule", async () => {
+      const { POST } = await import("@/app/api/notifications/dispatch-appointment/route");
+      const { NextRequest } = await import("next/server");
+
+      const req = new NextRequest("http://localhost:3000/api/notifications/dispatch-appointment", {
+        method: "POST",
+        body: JSON.stringify({ type: "recurring_dispatch" }),
+      });
+
+      const res = await POST(req);
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data.success).toBe(true);
+      expect(data.mode).toBe("recurring_dispatch");
     });
   });
 });

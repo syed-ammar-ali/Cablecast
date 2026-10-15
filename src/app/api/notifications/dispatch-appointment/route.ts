@@ -43,12 +43,20 @@ export async function POST(request: NextRequest) {
       }
 
       if (!isValid) {
-        console.error("[dispatch-appointment] Rejected: invalid QStash signature. Check that QSTASH_CURRENT_SIGNING_KEY and QSTASH_NEXT_SIGNING_KEY in Vercel env match the keys at console.upstash.com.");
+        console.error("[dispatch-appointment] Rejected: invalid QStash signature. Check that QSTASH_CURRENT_SIGNING_KEY and QSTASH_NEXT_SIGNING_KEY match the keys at console.upstash.com.");
         return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
       }
     }
 
-    const { scheduleId } = body;
+    const { scheduleId, type } = body;
+
+    // Handle recurring QStash background dispatch
+    if (type === "recurring_dispatch" || scheduleId === "all") {
+      const { dispatchStartingSoonAlerts } = await import("@/lib/notifications/notificationDispatcher");
+      const summary = await dispatchStartingSoonAlerts(new Date());
+      return NextResponse.json({ success: true, mode: "recurring_dispatch", summary });
+    }
+
     if (!scheduleId || typeof scheduleId !== "string") {
       return NextResponse.json({ error: "scheduleId is required" }, { status: 400 });
     }

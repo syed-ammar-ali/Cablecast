@@ -207,22 +207,24 @@ export function ContinueWatchingRow({ items, onPlay, onRemove }: ContinueWatchin
                 </div>
 
                 {/* Dismiss / Delete button (top right) */}
-                <Tooltip content="Delete from Continue Watching" position="left">
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      playMechanicalClick();
-                      triggerHaptic(8);
-                      onRemove(item);
-                    }}
-                    aria-label={`Delete ${item.title} from Continue Watching`}
-                    title="Delete from Continue Watching"
-                    className="absolute top-1.5 right-1.5 h-7 w-7 rounded-full border border-neutral-700/80 bg-black/85 hover:border-red-500/80 hover:bg-red-950 text-neutral-400 hover:text-red-300 flex items-center justify-center transition-all opacity-85 sm:opacity-0 group-hover:opacity-100 shadow-lg backdrop-blur-md z-20 cursor-pointer hover:scale-110 active:scale-95"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
-                </Tooltip>
+                <div className="absolute top-2 right-2 z-20">
+                  <Tooltip content="Delete from Continue Watching" position="left">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        playMechanicalClick();
+                        triggerHaptic(8);
+                        onRemove(item);
+                      }}
+                      aria-label={`Delete ${item.title} from Continue Watching`}
+                      title="Delete from Continue Watching"
+                      className="h-7 w-7 rounded-full border border-neutral-700/80 bg-black/85 hover:border-red-500/80 hover:bg-red-950/90 text-neutral-300 hover:text-red-400 flex items-center justify-center transition-all shadow-md backdrop-blur-md cursor-pointer hover:scale-110 active:scale-95"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </Tooltip>
+                </div>
               </div>
 
               {/* Card Meta & Progress Bar */}

@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { sendPushNotification } from "./webpush";
 import type { PushNotificationPayload } from "./webpush";
+import { getNextAirDate } from "@/lib/schedule";
 
 export interface DispatchSummary {
   startingSoon: number;
@@ -191,10 +192,22 @@ export async function dispatchStartingSoonAlerts(now: Date = new Date()): Promis
   // Candidate days across all possible global timezones (-12h to +14h)
   const candidateDays = Array.from(new Set([(now.getUTCDay() + 6) % 7, now.getUTCDay(), (now.getUTCDay() + 1) % 7]));
 
-  // Fetch active schedules for relevant days, user subscriptions, and session aliases
-  const [upcomingSlots, subscriptions, sessions] = await Promise.all([
+  // Candidate dates across all possible global timezones (-12h to +14h)
+  const dMinus1 = new Date(now.getTime() - 24 * 3600 * 1000);
+  const dPlus1 = new Date(now.getTime() + 24 * 3600 * 1000);
+  const candidateDates = [
+    dMinus1.toISOString().slice(0, 10),
+    now.toISOString().slice(0, 10),
+    dPlus1.toISOString().slice(0, 10),
+  ];
+
+  // Fetch active schedules for relevant days, calendar entries, user subscriptions, and session aliases
+  const [upcomingSlots, calendarEntries, subscriptions, sessions] = await Promise.all([
     prisma.userPersonalSchedule.findMany({
       where: { dayOfWeek: { in: candidateDays } },
+    }) || [],
+    prisma.calendarEntry.findMany({
+      where: { scheduledDate: { in: candidateDates } },
     }) || [],
     prisma.pushSubscription.findMany({ select: { userId: true, timezoneOffset: true } }) || [],
     prisma.session.findMany({ select: { id: true, accessCodeId: true, role: true } }) || [],
@@ -221,9 +234,21 @@ export async function dispatchStartingSoonAlerts(now: Date = new Date()): Promis
     }
   }
 
+  interface CandidateSlotItem {
+    id: string;
+    sessionId: string;
+    tmdbId: number;
+    mediaType: string;
+    title: string;
+    posterPath: string | null;
+    blockStartMinutes: number;
+    currentSeason: number | null;
+    currentEpisode: number | null;
+  }
+
   // Identify candidate slots starting soon in memory first before firing any DB queries
   const candidateSlots: Array<{
-    slot: (typeof upcomingSlots)[number];
+    slot: CandidateSlotItem;
     localIsoDate: string;
     referenceId: string;
   }> = [];
@@ -241,6 +266,41 @@ export async function dispatchStartingSoonAlerts(now: Date = new Date()): Promis
       slot,
       localIsoDate,
       referenceId: `${slot.id}_${localIsoDate}`,
+    });
+  }
+
+  // Date-specific calendar entries (e.g. multi-week broadcast schedules)
+  for (const cal of calendarEntries) {
+    const effectiveOffset = userTimezoneMap.get(cal.sessionId) ?? 0;
+    const localTimeMs = now.getTime() - effectiveOffset * 60_000;
+    const localNow = new Date(localTimeMs);
+    const localIsoDate = localNow.toISOString().slice(0, 10);
+
+    if (cal.scheduledDate !== localIsoDate) continue;
+
+    const localMinutes = localNow.getUTCHours() * 60 + localNow.getUTCMinutes();
+    const targetMinStart = localMinutes - 2;
+    const targetMinEnd = localMinutes + 10;
+
+    const isStartingSoon =
+      cal.blockStartMinutes >= targetMinStart && cal.blockStartMinutes <= targetMinEnd;
+
+    if (!isStartingSoon) continue;
+
+    candidateSlots.push({
+      slot: {
+        id: `cal-${cal.id}`,
+        sessionId: cal.sessionId,
+        tmdbId: cal.tmdbId,
+        mediaType: cal.mediaType,
+        title: cal.title,
+        posterPath: cal.posterPath,
+        blockStartMinutes: cal.blockStartMinutes,
+        currentSeason: cal.startSeason ?? 1,
+        currentEpisode: cal.startEpisode ?? 1,
+      },
+      localIsoDate,
+      referenceId: `cal_${cal.id}_${localIsoDate}`,
     });
   }
 
@@ -583,12 +643,39 @@ export async function dispatchStartingSoonForSlot(
   now: Date = new Date(),
   requestOrigin?: string | null,
 ): Promise<{ success: boolean; reason?: string }> {
-  const slot = await prisma.userPersonalSchedule.findUnique({
-    where: { id: slotId },
-  });
+  let slot: any = null;
+  let isCalendar = false;
 
-  if (!slot) {
-    return { success: true, reason: "Slot no longer exists (removed or deleted)" };
+  if (slotId.startsWith("cal-")) {
+    const rawId = slotId.replace(/^cal-/, "");
+    const cal = await prisma.calendarEntry.findUnique({
+      where: { id: rawId },
+    });
+    if (!cal) {
+      return { success: true, reason: "Calendar appointment no longer exists (removed or deleted)" };
+    }
+    slot = {
+      id: slotId,
+      sessionId: cal.sessionId,
+      tmdbId: cal.tmdbId,
+      mediaType: cal.mediaType,
+      title: cal.title,
+      posterPath: cal.posterPath,
+      blockStartMinutes: cal.blockStartMinutes,
+      currentSeason: cal.startSeason ?? 1,
+      currentEpisode: cal.startEpisode ?? 1,
+      timezoneOffset: 0,
+      scheduledDate: cal.scheduledDate,
+      blockCount: cal.blockCount,
+    };
+    isCalendar = true;
+  } else {
+    slot = await prisma.userPersonalSchedule.findUnique({
+      where: { id: slotId },
+    });
+    if (!slot) {
+      return { success: true, reason: "Slot no longer exists (removed or deleted)" };
+    }
   }
 
   // Determine canonical user ID
@@ -605,25 +692,47 @@ export async function dispatchStartingSoonForSlot(
     // fallback to slot.sessionId
   }
 
-  const effectiveOffset = slot.timezoneOffset ?? 0;
+  let effectiveOffset = slot.timezoneOffset ?? 0;
+  if (isCalendar) {
+    try {
+      const sub = await prisma.pushSubscription.findFirst({
+        where: { userId: { in: [slot.sessionId, canonUserId] } },
+        select: { timezoneOffset: true },
+      });
+      if (typeof sub?.timezoneOffset === "number") {
+        effectiveOffset = sub.timezoneOffset;
+      }
+    } catch {
+      // fallback to 0
+    }
 
-  // Verify the slot is actually scheduled to start soon (within -10m to +25m of airtime).
-  // If the user rescheduled or moved the slot, the old QStash delayed alert will arrive
-  // at the wrong time/day. We detect this and discard the obsolete alert cleanly.
-  const { getNextAirDate } = await import("@/lib/schedule");
-  const nextAir = getNextAirDate(
-    slot.dayOfWeek,
-    slot.blockStartMinutes,
-    new Date(now.getTime() - 20 * 60 * 1000),
-    effectiveOffset,
-    slot.blockCount,
-  );
-  const diffMs = nextAir.getTime() - now.getTime();
-  if (diffMs > 25 * 60 * 1000 || diffMs < -10 * 60 * 1000) {
-    return {
-      success: true,
-      reason: `Obsolete alert discarded (slot moved or rescheduled; next air in ${Math.round(diffMs / 60000)}m)`,
-    };
+    const [year, month, day] = slot.scheduledDate.split("-").map((v: string) => parseInt(v, 10));
+    const slotAirTime = new Date(Date.UTC(year, month - 1, day, Math.floor(slot.blockStartMinutes / 60), slot.blockStartMinutes % 60));
+    slotAirTime.setTime(slotAirTime.getTime() + effectiveOffset * 60_000);
+    const diffMs = slotAirTime.getTime() - now.getTime();
+    if (diffMs > 25 * 60 * 1000 || diffMs < -10 * 60 * 1000) {
+      return {
+        success: true,
+        reason: `Obsolete calendar alert discarded (diffMs=${diffMs})`,
+      };
+    }
+  } else {
+    // Verify the slot is actually scheduled to start soon (within -10m to +25m of airtime).
+    const { getNextAirDate } = await import("@/lib/schedule");
+    const nextAir = getNextAirDate(
+      slot.dayOfWeek,
+      slot.blockStartMinutes,
+      new Date(now.getTime() - 20 * 60 * 1000),
+      effectiveOffset,
+      slot.blockCount,
+    );
+    const diffMs = nextAir.getTime() - now.getTime();
+    if (diffMs > 25 * 60 * 1000 || diffMs < -10 * 60 * 1000) {
+      return {
+        success: true,
+        reason: `Obsolete alert discarded (slot moved or rescheduled; next air in ${Math.round(diffMs / 60000)}m)`,
+      };
+    }
   }
 
   const localTimeMs = now.getTime() - effectiveOffset * 60_000;
@@ -721,6 +830,7 @@ export async function dispatchStartingSoonForSlot(
   if (!slot.isRerun) {
     try {
       const { scheduleDelayedBroadcastAlert } = await import("./qstash");
+      const { getNextAirDate } = await import("@/lib/schedule");
       // Advance past the slot's full duration so getNextAirDate locks to next week's occurrence
       const durationMs = slot.blockCount * 30 * 60 * 1000;
       const reference = new Date(now.getTime() + Math.max(60 * 60 * 1000, durationMs + 30 * 60 * 1000));

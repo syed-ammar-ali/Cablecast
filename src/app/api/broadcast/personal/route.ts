@@ -7,6 +7,7 @@ import type { CreatePersonalScheduleInput, PersonalScheduleItem } from "@/types/
 import type { MediaType } from "@/types/media";
 import { checkMediaOwnership, getBroadcastSlotStatus, type BroadcastSlotStatus } from "@/lib/mediaOwnership";
 import { getShowDetails, getMovieDetails } from "@/lib/tmdb";
+import { dispatchStartingSoonAlerts } from "@/lib/notifications/notificationDispatcher";
 
 /**
  * Calculates whether an appointment is live at the current second and its elapsed offset.
@@ -673,6 +674,11 @@ export async function GET(request: NextRequest) {
 
     const combinedSchedule = [...schedule, ...calendarItems];
     const liveNow = combinedSchedule.find((item) => item.isLiveNow) ?? null;
+
+    // Automatically check and dispatch starting-soon alerts for today's upcoming broadcast slots / calendar entries
+    void dispatchStartingSoonAlerts(now).catch((err) => {
+      console.warn("[api/broadcast/personal] Background starting-soon alert check warning:", err);
+    });
 
     return NextResponse.json(
       {

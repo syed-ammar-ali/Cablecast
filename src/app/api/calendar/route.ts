@@ -167,6 +167,32 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    // Automatically schedule exact-time delayed alert via QStash (10 mins before air)
+    try {
+      const { scheduleDelayedBroadcastAlert } = await import("@/lib/notifications/qstash");
+      const sub = await prisma.pushSubscription.findFirst({
+        where: { userId: { in: userKeys } },
+        select: { timezoneOffset: true },
+      });
+      const effectiveOffset = typeof sub?.timezoneOffset === "number" ? sub.timezoneOffset : 0;
+      const [year, month, day] = scheduledDate.split("-").map(Number);
+      const airTime = new Date(Date.UTC(year, month - 1, day, Math.floor(Number(blockStartMinutes) / 60), Number(blockStartMinutes) % 60));
+      airTime.setTime(airTime.getTime() + effectiveOffset * 60_000);
+      const alertTime = new Date(airTime.getTime() - 10 * 60 * 1000);
+
+      const host = request.headers.get("x-forwarded-host") || request.headers.get("host");
+      const proto = request.headers.get("x-forwarded-proto") || "https";
+      const requestOrigin = host ? `${proto}://${host}` : request.nextUrl.origin;
+
+      await scheduleDelayedBroadcastAlert({
+        scheduleId: `cal-${newEntry.id}`,
+        alertTime,
+        requestOrigin,
+      });
+    } catch (alertErr) {
+      console.warn("[api/calendar POST] Failed to schedule QStash alert:", alertErr);
+    }
+
     return NextResponse.json({
       entry: {
         ...newEntry,
