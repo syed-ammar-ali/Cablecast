@@ -235,13 +235,13 @@ You are an authentic, smart broadcaster and cinephile friend. Direct, insightful
 /* ─── Assemble User & Time Context ───────────────────────────────────────── */
 
 async function assembleUserContext(
-  session: CurrentSession,
+  session: CurrentSession | null,
   timeCtx: ClientTimeContext
 ) {
-  const userId = getPersistentUserId(session);
-  const userKeys = Array.from(new Set([userId, session.id, session.accessCodeId])).filter(
-    Boolean
-  ) as string[];
+  const userId = session ? getPersistentUserId(session) : "guest";
+  const userKeys = session
+    ? (Array.from(new Set([userId, session.id, session.accessCodeId])).filter(Boolean) as string[])
+    : [];
 
   // 1. Fetch library items (owned)
   const libraryItems = await prisma.libraryItem.findMany({
@@ -336,7 +336,7 @@ async function assembleUserContext(
 
   const channelName =
     channelSettings?.channelName ||
-    (session.displayName ? `${session.displayName}'s TV` : "Personal Broadcast Channel");
+    (session?.displayName ? `${session.displayName}'s TV` : "Personal Broadcast Channel");
 
   // 5. Time & Block Calculations
   let currentMinutes = 0;
@@ -472,14 +472,8 @@ async function assembleUserContext(
 
 export async function POST(req: NextRequest) {
   try {
-    // 1. Auth check
+    // 1. Session resolution (guests can chat with Broadcaster; persistent actions require session)
     const session = await getSession();
-    if (!session) {
-      return NextResponse.json(
-        { error: "You must be signed in to talk to Broadcaster." },
-        { status: 401 }
-      );
-    }
 
     // 2. Parse request body
     const body = (await req.json()) as {
@@ -529,16 +523,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 5. Initialize Google Generative AI
+    // 5. Initialize Google Generative AI with fast, verified active models
     const genAI = new GoogleGenerativeAI(apiKey);
     const candidateModels = [
-      "gemini-1.5-flash",
-      "gemini-2.0-flash",
-      "gemini-2.5-flash",
-      "gemini-1.5-pro",
       "gemini-3.5-flash-lite",
       "gemini-3.1-flash-lite",
       "gemini-3.8-flash",
+      "gemini-2.5-flash-lite",
+      "gemini-flash-latest",
     ];
 
     const systemInstruction = buildSystemPrompt(ctx);

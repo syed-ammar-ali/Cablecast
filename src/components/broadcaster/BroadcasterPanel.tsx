@@ -162,31 +162,13 @@ export function BroadcasterPanel({
   const inputRef = useRef<HTMLInputElement>(null);
   const inputId = useId();
 
-  // Initialize Speech Recognition on mount
+  // Check Speech Recognition capability on mount
   useEffect(() => {
     if (typeof window !== "undefined") {
       const win = window as unknown as IWindow;
       const SpeechRecognitionClass = win.SpeechRecognition || win.webkitSpeechRecognition;
       if (SpeechRecognitionClass) {
         setSpeechSupported(true);
-        const recognition = new SpeechRecognitionClass();
-        recognition.continuous = false;
-        recognition.interimResults = true;
-        recognition.lang = "en-US";
-
-        recognition.onresult = (event: any) => {
-          let transcript = "";
-          for (let i = event.resultIndex; i < event.results.length; i++) {
-            transcript += event.results[i][0].transcript;
-          }
-          if (transcript) {
-            setInput((prev) => (prev ? `${prev} ${transcript}` : transcript));
-          }
-        };
-
-        recognition.onerror = () => setIsListening(false);
-        recognition.onend = () => setIsListening(false);
-        recognitionRef.current = recognition;
       }
     }
   }, []);
@@ -258,24 +240,83 @@ export function BroadcasterPanel({
   /* ── Microphone Speech Recognition ───────────────────────────────────────── */
 
   const toggleListening = useCallback(() => {
-    if (!speechSupported || !recognitionRef.current) {
-      alert("Voice input is not supported in this browser. Please use Chrome, Safari, or Edge.");
+    if (typeof window === "undefined") return;
+    const win = window as unknown as IWindow;
+    const SpeechRecognitionClass = win.SpeechRecognition || win.webkitSpeechRecognition;
+
+    if (!SpeechRecognitionClass) {
+      setError("Voice input is not supported in this browser. Please use Chrome, Safari, or Edge.");
       return;
     }
 
     triggerHaptic(15);
+
     if (isListening) {
-      recognitionRef.current.stop();
-      setIsListening(false);
-    } else {
       try {
-        recognitionRef.current.start();
-        setIsListening(true);
+        recognitionRef.current?.stop();
       } catch {
-        setIsListening(false);
+        // ignore
       }
+      setIsListening(false);
+      return;
     }
-  }, [isListening, speechSupported]);
+
+    try {
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.abort();
+        } catch {
+          // ignore
+        }
+      }
+
+      const recognition = new SpeechRecognitionClass();
+      recognition.continuous = false;
+      recognition.interimResults = true;
+      recognition.lang = "en-US";
+
+      recognition.onstart = () => {
+        setIsListening(true);
+        setError(null);
+      };
+
+      recognition.onresult = (event: any) => {
+        let finalTranscript = "";
+        let interimTranscript = "";
+        for (let i = 0; i < event.results.length; i++) {
+          const item = event.results[i];
+          if (item.isFinal) {
+            finalTranscript += item[0].transcript;
+          } else {
+            interimTranscript += item[0].transcript;
+          }
+        }
+        const text = (finalTranscript || interimTranscript).trim();
+        if (text) {
+          setInput(text);
+        }
+      };
+
+      recognition.onerror = (event: any) => {
+        console.warn("[broadcaster voice error]", event.error);
+        setIsListening(false);
+        if (event.error === "not-allowed" || event.error === "service-not-allowed") {
+          setError("Microphone permission was denied. Please allow microphone access in your browser settings.");
+        }
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+      };
+
+      recognitionRef.current = recognition;
+      recognition.start();
+    } catch (err) {
+      console.warn("[broadcaster voice start error]", err);
+      setIsListening(false);
+      setError("Could not activate microphone. Please tap again or check browser permissions.");
+    }
+  }, [isListening]);
 
   /* ── Magnetic Edge Dragging (FAB Launcher) ────────────────────────────────── */
 
