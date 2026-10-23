@@ -18,8 +18,10 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const adminSecret = process.env.ADMIN_PASSWORD_HASH || process.env.ADMIN_PASSWORD;
-  if (!adminSecret) {
+  const hashSecret = process.env.ADMIN_PASSWORD_HASH;
+  const plainSecret = process.env.ADMIN_PASSWORD;
+
+  if (!hashSecret && !plainSecret) {
     console.error("[api/auth/admin-login] ADMIN_PASSWORD_HASH or ADMIN_PASSWORD is not set — admin login is disabled.");
     return NextResponse.json({ error: "Admin login isn't configured." }, { status: 500 });
   }
@@ -44,7 +46,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid request verification." }, { status: 400 });
   }
 
-  const isValid = await verifyPassword(password, adminSecret);
+  let isValid = false;
+  if (hashSecret) {
+    isValid = await verifyPassword(password, hashSecret);
+  }
+  if (!isValid && plainSecret) {
+    isValid = await verifyPassword(password, plainSecret);
+  }
+
   if (!isValid) {
     return NextResponse.json({ error: "Incorrect password." }, { status: 401 });
   }
