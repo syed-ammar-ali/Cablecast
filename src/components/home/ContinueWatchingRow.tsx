@@ -152,7 +152,11 @@ export function ContinueWatchingRow({ items, onPlay, onRemove }: ContinueWatchin
                 <div
                   role="button"
                   tabIndex={0}
-                  onClick={() => {
+                  onClick={(e) => {
+                    // Guard: Never start playback if the click originated on or near the delete button
+                    if ((e.target as HTMLElement)?.closest?.('[data-action="delete-continue"]')) {
+                      return;
+                    }
                     playMechanicalClick();
                     triggerHaptic(10);
                     onPlay(item);
@@ -243,10 +247,17 @@ export function ContinueWatchingRow({ items, onPlay, onRemove }: ContinueWatchin
                 </div>
 
                 {/* Independent Dismiss / Delete button: outside clickable play container */}
-                <div className="absolute top-2 right-2 z-30">
+                <div
+                  data-action="delete-continue"
+                  className="absolute top-2 right-2 z-40"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                  }}
+                >
                   <Tooltip content="Delete from Continue Watching" position="left">
                     <button
                       type="button"
+                      data-action="delete-continue"
                       onClick={(e) => {
                         e.stopPropagation();
                         e.preventDefault();
@@ -257,14 +268,26 @@ export function ContinueWatchingRow({ items, onPlay, onRemove }: ContinueWatchin
                       onMouseDown={(e) => {
                         e.stopPropagation();
                       }}
+                      onMouseUp={(e) => {
+                        e.stopPropagation();
+                      }}
                       onPointerDown={(e) => {
+                        e.stopPropagation();
+                      }}
+                      onPointerUp={(e) => {
+                        e.stopPropagation();
+                      }}
+                      onTouchStart={(e) => {
+                        e.stopPropagation();
+                      }}
+                      onTouchEnd={(e) => {
                         e.stopPropagation();
                       }}
                       aria-label={`Delete ${item.title} from Continue Watching`}
                       title="Delete from Continue Watching"
-                      className="h-7 w-7 rounded-full border border-neutral-700/80 bg-black/90 hover:border-red-500 hover:bg-red-950 text-neutral-300 hover:text-red-400 flex items-center justify-center transition-all shadow-xl backdrop-blur-md cursor-pointer hover:scale-110 active:scale-90"
+                      className="h-8 w-8 rounded-full border border-neutral-700/80 bg-black/90 hover:border-red-500 hover:bg-red-950 text-neutral-300 hover:text-red-400 flex items-center justify-center transition-all shadow-xl backdrop-blur-md cursor-pointer hover:scale-110 active:scale-95"
                     >
-                      <Trash2 className="h-3.5 w-3.5" />
+                      <Trash2 className="h-3.5 w-3.5 pointer-events-none" />
                     </button>
                   </Tooltip>
                 </div>

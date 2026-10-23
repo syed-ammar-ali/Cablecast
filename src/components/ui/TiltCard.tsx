@@ -101,7 +101,7 @@ export function TiltCard({
         transition: isHovered
           ? "transform 0.08s ease-out"
           : "transform 0.4s cubic-bezier(0.16, 1, 0.3, 1)",
-        transformStyle: "preserve-3d",
+        transformStyle: (style?.transformStyle as any) || "flat",
         ...style,
       }}
       {...rest}

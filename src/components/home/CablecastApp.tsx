@@ -424,6 +424,14 @@ function CablecastAppContent({ initialView = "home" }: CablecastAppProps) {
             onSearchQueryChange={setQuery}
             onClose={() => navigateTo("home")}
             onLoadingChange={setIsSearchLoading}
+            onPlay={(target) => {
+              setPlayerTarget({
+                media: target.media,
+                initialSeason: target.season,
+                initialEpisode: target.episode,
+                startOffsetSeconds: 0,
+              });
+            }}
           />
         </div>
       ) : (

@@ -62,6 +62,7 @@ export interface ExploreViewProps {
   onSearchQueryChange?: (query: string) => void;
   onLoadingChange?: (isLoading: boolean) => void;
   isEmbedded?: boolean;
+  onPlay?: (target: { media: MediaSearchResult; season?: number; episode?: number }) => void;
 }
 
 export function ExploreView({
@@ -73,6 +74,7 @@ export function ExploreView({
   onSearchQueryChange,
   onLoadingChange,
   isEmbedded = false,
+  onPlay,
 }: ExploreViewProps = {}) {
   const { library, personalBroadcast } = useAppData();
 
@@ -348,10 +350,10 @@ export function ExploreView({
   };
 
   const handleEpisodePlay = (episode: SeasonalEpisodeItem) => {
-    setPlayerTarget({
+    const target = {
       media: {
         tmdbId: episode.showId,
-        mediaType: "tv",
+        mediaType: "tv" as const,
         title: episode.showTitle,
         releaseYear: episode.airDate.slice(0, 4),
         posterPath: null,
@@ -362,7 +364,12 @@ export function ExploreView({
       },
       season: episode.seasonNumber,
       episode: episode.episodeNumber,
-    });
+    };
+    if (onPlay) {
+      onPlay(target);
+    } else {
+      setPlayerTarget(target);
+    }
   };
 
   const handleSelectMedia = (media: MediaSearchResult) => {
@@ -800,11 +807,15 @@ export function ExploreView({
           initialPosterUrl={selectedMedia.posterUrl}
           onPlayEpisode={(media, season, episode) => {
             setSelectedMedia(null);
-            setPlayerTarget({
-              media,
-              season,
-              episode,
-            });
+            if (onPlay) {
+              onPlay({ media, season, episode });
+            } else {
+              setPlayerTarget({
+                media,
+                season,
+                episode,
+              });
+            }
           }}
         />
       )}
@@ -822,8 +833,8 @@ export function ExploreView({
         />
       )}
 
-      {/* ── Modals: Retro Player ─────────────────────────────────────────── */}
-      {playerTarget && (
+      {/* ── Modals: Retro Player (fallback when not embedded with onPlay) ── */}
+      {!onPlay && playerTarget && (
         <PlayerModal
           media={playerTarget.media}
           initialSeason={playerTarget.season}
