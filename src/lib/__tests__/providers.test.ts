@@ -8,15 +8,19 @@ import {
 } from "@/lib/providers";
 
 describe("Stream Providers Engine", () => {
-  it("has 6 verified, ordered embedded providers in the fallback chain", () => {
-    expect(PROVIDER_COUNT).toBe(6);
-    expect(PROVIDERS.length).toBe(6);
+  it("has 10 verified, ordered embedded providers in the fallback chain", () => {
+    expect(PROVIDER_COUNT).toBe(10);
+    expect(PROVIDERS.length).toBe(10);
     expect(PROVIDERS[0].id).toBe("cinesrc-primary");
     expect(PROVIDERS[1].id).toBe("vixsrc-relay");
     expect(PROVIDERS[2].id).toBe("vidlink-primary");
     expect(PROVIDERS[3].id).toBe("vidcore-edge");
     expect(PROVIDERS[4].id).toBe("anyembed-matrix");
     expect(PROVIDERS[5].id).toBe("vidsrc-pm");
+    expect(PROVIDERS[6].id).toBe("vidfast-vc");
+    expect(PROVIDERS[7].id).toBe("embedwave-ultra");
+    expect(PROVIDERS[8].id).toBe("nontongo-asian");
+    expect(PROVIDERS[9].id).toBe("2embed-skin");
   });
 
   it("builds correct movie and tv URLs with live-offset parameters and case-insensitivity", () => {
@@ -113,16 +117,16 @@ describe("Stream Providers Engine", () => {
 
   it("correctly navigates fallback chain", () => {
     expect(getNextProviderIndex(0)).toBe(1);
-    expect(getNextProviderIndex(4)).toBe(5);
-    expect(getNextProviderIndex(5)).toBeNull();
+    expect(getNextProviderIndex(8)).toBe(9);
+    expect(getNextProviderIndex(9)).toBeNull();
   });
 
-  it("lists all 6 providers for Global and US", () => {
+  it("lists all 10 providers for Global and 6 for US", () => {
     const list = listProviders();
-    expect(list.length).toBe(6);
+    expect(list.length).toBe(10);
     expect(list[0].id).toBe("cinesrc-primary");
 
-    // US list
+    // US list (only core US providers)
     const usList = listProviders("US");
     expect(usList.length).toBe(6);
     expect(usList[0].id).toBe("cinesrc-primary");

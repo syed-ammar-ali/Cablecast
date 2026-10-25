@@ -163,6 +163,65 @@ export const PROVIDERS: Provider[] = [
       return `https://vidsrc.pm/embed/tv/${tmdbId}/${season ?? 1}/${episode ?? 1}?autoplay=1${offsetParam}`;
     },
   },
+  {
+    id: "vidfast-vc",
+    name: "VidFast (High-Speed Mirror)",
+    regions: ["ALL"],
+    benchmarkLatencyMs: 370,
+    buildUrl: (kind, { tmdbId, season, episode, startOffsetSeconds }) => {
+      const isMovie = String(kind).toLowerCase() === "movie";
+      const offsetParam =
+        startOffsetSeconds && startOffsetSeconds > 0
+          ? `&startAt=${Math.floor(startOffsetSeconds)}`
+          : "";
+      if (isMovie) {
+        return `https://vidfast.vc/movie/${tmdbId}?autoPlay=true${offsetParam}`;
+      }
+      return `https://vidfast.vc/tv/${tmdbId}/${season ?? 1}/${episode ?? 1}?autoPlay=true${offsetParam}`;
+    },
+  },
+  {
+    id: "embedwave-ultra",
+    name: "EmbedWave Ultra (Failover Relay)",
+    regions: ["ALL"],
+    benchmarkLatencyMs: 440,
+    buildUrl: (kind, { tmdbId, season, episode, startOffsetSeconds }) => {
+      const isMovie = String(kind).toLowerCase() === "movie";
+      const offsetParam = getStartParam(startOffsetSeconds, "start");
+      if (isMovie) {
+        return `https://embedwave.cc/embed/movie/${tmdbId}?autoplay=1${offsetParam}`;
+      }
+      return `https://embedwave.cc/embed/tv/${tmdbId}/${season ?? 1}/${episode ?? 1}?autoplay=1${offsetParam}`;
+    },
+  },
+  {
+    id: "nontongo-asian",
+    name: "NontonGo (Asian Drama & Anime)",
+    regions: ["ALL"],
+    benchmarkLatencyMs: 1010,
+    buildUrl: (kind, { tmdbId, season, episode, startOffsetSeconds }) => {
+      const isMovie = String(kind).toLowerCase() === "movie";
+      const offsetParam = getStartParam(startOffsetSeconds, "start");
+      if (isMovie) {
+        return `https://www.nontongo.win/embed/movie/${tmdbId}?autoplay=1${offsetParam}`;
+      }
+      return `https://www.nontongo.win/embed/tv/${tmdbId}/${season ?? 1}/${episode ?? 1}?autoplay=1${offsetParam}`;
+    },
+  },
+  {
+    id: "2embed-skin",
+    name: "2Embed Skin (Classic & Rare Titles)",
+    regions: ["ALL"],
+    benchmarkLatencyMs: 620,
+    buildUrl: (kind, { tmdbId, season, episode, startOffsetSeconds }) => {
+      const isMovie = String(kind).toLowerCase() === "movie";
+      const offsetParam = getStartParam(startOffsetSeconds, "start");
+      if (isMovie) {
+        return `https://www.2embed.skin/embed/${tmdbId}?autoplay=1${offsetParam}`;
+      }
+      return `https://www.2embed.skin/embedtv/${tmdbId}&s=${season ?? 1}&e=${episode ?? 1}&autoplay=1${offsetParam}`;
+    },
+  },
 ];
 
 export function getProvider(index: number): Provider | undefined {
@@ -170,8 +229,10 @@ export function getProvider(index: number): Provider | undefined {
 }
 
 export function getProvidersForRegion(region: StreamRegion): Provider[] {
-  // All 5 verified embedded providers are active for ALL (Global) and US
-  return PROVIDERS;
+  if (region === "ALL") {
+    return PROVIDERS;
+  }
+  return PROVIDERS.filter((p) => p.regions?.includes(region));
 }
 
 export const PROVIDER_COUNT = PROVIDERS.length;
