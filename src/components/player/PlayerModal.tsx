@@ -68,9 +68,11 @@ export function PlayerModal({
 
   // Track progress only for on-demand/manual playback (exclude live guide tune-ins & direct streams)
   const isManualPlayback = !initialLiveEntry && !directBroadcast && Boolean(media?.tmdbId);
+  const cineSrcProgressRef = useRef<number | null>(null);
 
   useEffect(() => {
     sessionStartTimeRef.current = Date.now();
+    cineSrcProgressRef.current = null;
   }, [media?.tmdbId, season, episode]);
 
   const reportCurrentProgress = useCallback(
@@ -78,7 +80,11 @@ export function PlayerModal({
       if (!isManualPlayback || !media?.tmdbId) return;
 
       const elapsedSeconds = Math.max(0, Math.floor((Date.now() - sessionStartTimeRef.current) / 1000));
-      const currentProgress = offsetSeconds + elapsedSeconds;
+      const exactProgress = cineSrcProgressRef.current;
+      const currentProgress =
+        typeof exactProgress === "number" && exactProgress > 0
+          ? exactProgress
+          : offsetSeconds + elapsedSeconds;
 
       // Only save if at least 10 seconds of playback
       if (currentProgress < 10) return;
@@ -101,6 +107,26 @@ export function PlayerModal({
     },
     [isManualPlayback, media, offsetSeconds, watchHistory, isTv, season, episode]
   );
+
+  // Sync real-time playback events from smart player bridges (e.g. CineSrc)
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.origin !== "https://cinesrc.st") return;
+      const data = event.data;
+      if (!data || typeof data !== "object") return;
+
+      if (data.type === "cinesrc:timeupdate" && typeof data.currentTime === "number") {
+        cineSrcProgressRef.current = Math.floor(data.currentTime);
+      } else if (data.type === "cinesrc:ended") {
+        reportCurrentProgress(true);
+      } else if (data.type === "cinesrc:close") {
+        onClose();
+      }
+    };
+
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, [reportCurrentProgress, onClose]);
 
   // Periodic report every 30 seconds + final report on unmount
   useEffect(() => {

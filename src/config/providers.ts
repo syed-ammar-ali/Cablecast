@@ -69,6 +69,23 @@ function getStartParam(offset?: number, paramName = "start"): string {
  */
 export const PROVIDERS: Provider[] = [
   {
+    id: "cinesrc-primary",
+    name: "CineSrc (Smart Relay)",
+    regions: ["ALL", "US"],
+    benchmarkLatencyMs: 380,
+    buildUrl: (kind, { tmdbId, season, episode, startOffsetSeconds }) => {
+      const isMovie = String(kind).toLowerCase() === "movie";
+      const offsetParam =
+        startOffsetSeconds && startOffsetSeconds > 0
+          ? `&t=${Math.floor(startOffsetSeconds)}&continueprompt=false`
+          : "";
+      if (isMovie) {
+        return `https://cinesrc.st/embed/movie/${tmdbId}?color=%236366f1&autoplay=true${offsetParam}`;
+      }
+      return `https://cinesrc.st/embed/tv/${tmdbId}?s=${season ?? 1}&e=${episode ?? 1}&color=%236366f1&autoplay=true&autoskip=true${offsetParam}`;
+    },
+  },
+  {
     id: "vidlink-primary",
     name: "VidLink Pro (Primary Relay)",
     regions: ["ALL", "US"],
@@ -87,6 +104,20 @@ export const PROVIDERS: Provider[] = [
     },
   },
   {
+    id: "vidcore-edge",
+    name: "VidCore Edge (4K HLS)",
+    regions: ["ALL", "US"],
+    benchmarkLatencyMs: 270,
+    buildUrl: (kind, { tmdbId, season, episode, startOffsetSeconds }) => {
+      const isMovie = String(kind).toLowerCase() === "movie";
+      const offsetParam = getStartParam(startOffsetSeconds, "start");
+      if (isMovie) {
+        return `https://vidcore.org/embed/movie/${tmdbId}?autoplay=1${offsetParam}`;
+      }
+      return `https://vidcore.org/embed/tv/${tmdbId}/${season ?? 1}/${episode ?? 1}?autoplay=1${offsetParam}`;
+    },
+  },
+  {
     id: "anyembed-matrix",
     name: "AnyEmbed Matrix (Direct HLS)",
     regions: ["ALL", "US"],
@@ -101,45 +132,17 @@ export const PROVIDERS: Provider[] = [
     },
   },
   {
-    id: "vidsrc-to",
-    name: "VidSrc TO Global",
+    id: "vidsrc-pm",
+    name: "VidSrc PM Global",
     regions: ["ALL", "US"],
-    benchmarkLatencyMs: 240,
+    benchmarkLatencyMs: 420,
     buildUrl: (kind, { tmdbId, season, episode, startOffsetSeconds }) => {
       const isMovie = String(kind).toLowerCase() === "movie";
       const offsetParam = getStartParam(startOffsetSeconds, "start");
       if (isMovie) {
-        return `https://vidsrc.to/embed/movie/${tmdbId}?autoplay=1${offsetParam}`;
+        return `https://vidsrc.pm/embed/movie/${tmdbId}?autoplay=1${offsetParam}`;
       }
-      return `https://vidsrc.to/embed/tv/${tmdbId}/${season ?? 1}/${episode ?? 1}?autoplay=1${offsetParam}`;
-    },
-  },
-  {
-    id: "embedwave-ultra",
-    name: "EmbedWave Ultra",
-    regions: ["ALL", "US"],
-    benchmarkLatencyMs: 360,
-    buildUrl: (kind, { tmdbId, season, episode, startOffsetSeconds }) => {
-      const isMovie = String(kind).toLowerCase() === "movie";
-      const offsetParam = getStartParam(startOffsetSeconds, "start");
-      if (isMovie) {
-        return `https://embedwave.cc/embed/movie/${tmdbId}?autoplay=1${offsetParam}`;
-      }
-      return `https://embedwave.cc/embed/tv/${tmdbId}/${season ?? 1}/${episode ?? 1}?autoplay=1${offsetParam}`;
-    },
-  },
-  {
-    id: "2embed-skin",
-    name: "2Embed Skin Mirror",
-    regions: ["ALL", "US"],
-    benchmarkLatencyMs: 640,
-    buildUrl: (kind, { tmdbId, season, episode, startOffsetSeconds }) => {
-      const isMovie = String(kind).toLowerCase() === "movie";
-      const offsetParam = getStartParam(startOffsetSeconds, "start");
-      if (isMovie) {
-        return `https://www.2embed.skin/embed/${tmdbId}?autoplay=1${offsetParam}`;
-      }
-      return `https://www.2embed.skin/embedtv/${tmdbId}&s=${season ?? 1}&e=${episode ?? 1}&autoplay=1${offsetParam}`;
+      return `https://vidsrc.pm/embed/tv/${tmdbId}/${season ?? 1}/${episode ?? 1}?autoplay=1${offsetParam}`;
     },
   },
 ];

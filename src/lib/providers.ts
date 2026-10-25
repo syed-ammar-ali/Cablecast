@@ -65,6 +65,12 @@ function appendStartOffset(url: string, startOffsetSeconds?: number): string {
   if (!startOffsetSeconds || startOffsetSeconds <= 0) return url;
   const sec = Math.floor(startOffsetSeconds);
   const separator = url.includes("?") ? "&" : "?";
+  if (url.includes("cinesrc.st")) {
+    if (!url.includes("t=") && !url.includes("time=")) {
+      return `${url}${separator}t=${sec}&continueprompt=false`;
+    }
+    return url;
+  }
   if (url.includes("vidlink.pro")) {
     if (!url.includes("startAt=")) return `${url}${separator}startAt=${sec}`;
     return url;
