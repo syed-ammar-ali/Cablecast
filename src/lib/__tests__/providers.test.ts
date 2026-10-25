@@ -8,14 +8,15 @@ import {
 } from "@/lib/providers";
 
 describe("Stream Providers Engine", () => {
-  it("has 5 verified, ordered embedded providers in the fallback chain", () => {
-    expect(PROVIDER_COUNT).toBe(5);
-    expect(PROVIDERS.length).toBe(5);
+  it("has 6 verified, ordered embedded providers in the fallback chain", () => {
+    expect(PROVIDER_COUNT).toBe(6);
+    expect(PROVIDERS.length).toBe(6);
     expect(PROVIDERS[0].id).toBe("cinesrc-primary");
-    expect(PROVIDERS[1].id).toBe("vidlink-primary");
-    expect(PROVIDERS[2].id).toBe("vidcore-edge");
-    expect(PROVIDERS[3].id).toBe("anyembed-matrix");
-    expect(PROVIDERS[4].id).toBe("vidsrc-pm");
+    expect(PROVIDERS[1].id).toBe("vixsrc-relay");
+    expect(PROVIDERS[2].id).toBe("vidlink-primary");
+    expect(PROVIDERS[3].id).toBe("vidcore-edge");
+    expect(PROVIDERS[4].id).toBe("anyembed-matrix");
+    expect(PROVIDERS[5].id).toBe("vidsrc-pm");
   });
 
   it("builds correct movie and tv URLs with live-offset parameters and case-insensitivity", () => {
@@ -52,9 +53,21 @@ describe("Stream Providers Engine", () => {
     expect(cineTvSource.url).toContain("t=300");
     expect(cineTvSource.url).toContain("autoskip=true");
 
+    // Test Feed: VixSrc
+    const vixsrcIndex = PROVIDERS.findIndex((p) => p.id === "vixsrc-relay");
+    expect(vixsrcIndex).toBe(1);
+    const vixMovieSource = buildPlayerSource({
+      providerIndex: vixsrcIndex,
+      tmdbId: 786892,
+      mediaType: "movie",
+      startOffsetSeconds: 120,
+    });
+    expect(vixMovieSource.url).toContain("vixsrc.to/movie/786892");
+    expect(vixMovieSource.url).toContain("startAt=120");
+
     // Test Feed: VidLink Pro
     const vidlinkIndex = PROVIDERS.findIndex((p) => p.id === "vidlink-primary");
-    expect(vidlinkIndex).toBe(1);
+    expect(vidlinkIndex).toBe(2);
     const movieSource = buildPlayerSource({
       providerIndex: vidlinkIndex,
       tmdbId: 27205,
@@ -67,7 +80,7 @@ describe("Stream Providers Engine", () => {
 
     // Test Feed: VidCore Edge
     const vidcoreIndex = PROVIDERS.findIndex((p) => p.id === "vidcore-edge");
-    expect(vidcoreIndex).toBe(2);
+    expect(vidcoreIndex).toBe(3);
     const vidcoreTv = buildPlayerSource({
       providerIndex: vidcoreIndex,
       tmdbId: 1396,
@@ -81,7 +94,7 @@ describe("Stream Providers Engine", () => {
 
     // Test Feed: AnyEmbed Matrix
     const anyembedIndex = PROVIDERS.findIndex((p) => p.id === "anyembed-matrix");
-    expect(anyembedIndex).toBe(3);
+    expect(anyembedIndex).toBe(4);
     const anyembedMovie = buildPlayerSource({
       providerIndex: anyembedIndex,
       tmdbId: 550,
@@ -100,22 +113,23 @@ describe("Stream Providers Engine", () => {
 
   it("correctly navigates fallback chain", () => {
     expect(getNextProviderIndex(0)).toBe(1);
-    expect(getNextProviderIndex(3)).toBe(4);
-    expect(getNextProviderIndex(4)).toBeNull();
+    expect(getNextProviderIndex(4)).toBe(5);
+    expect(getNextProviderIndex(5)).toBeNull();
   });
 
-  it("lists all 5 providers for Global and US", () => {
+  it("lists all 6 providers for Global and US", () => {
     const list = listProviders();
-    expect(list.length).toBe(5);
+    expect(list.length).toBe(6);
     expect(list[0].id).toBe("cinesrc-primary");
 
     // US list
     const usList = listProviders("US");
-    expect(usList.length).toBe(5);
+    expect(usList.length).toBe(6);
     expect(usList[0].id).toBe("cinesrc-primary");
-    expect(usList[1].id).toBe("vidlink-primary");
-    expect(usList[2].id).toBe("vidcore-edge");
-    expect(usList[3].id).toBe("anyembed-matrix");
-    expect(usList[4].id).toBe("vidsrc-pm");
+    expect(usList[1].id).toBe("vixsrc-relay");
+    expect(usList[2].id).toBe("vidlink-primary");
+    expect(usList[3].id).toBe("vidcore-edge");
+    expect(usList[4].id).toBe("anyembed-matrix");
+    expect(usList[5].id).toBe("vidsrc-pm");
   });
 });

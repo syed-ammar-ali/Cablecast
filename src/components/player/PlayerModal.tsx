@@ -108,19 +108,33 @@ export function PlayerModal({
     [isManualPlayback, media, offsetSeconds, watchHistory, isTv, season, episode]
   );
 
-  // Sync real-time playback events from smart player bridges (e.g. CineSrc)
+  // Sync real-time playback events from smart player bridges (e.g. CineSrc, VixSrc)
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
-      if (event.origin !== "https://cinesrc.st") return;
       const data = event.data;
       if (!data || typeof data !== "object") return;
 
-      if (data.type === "cinesrc:timeupdate" && typeof data.currentTime === "number") {
-        cineSrcProgressRef.current = Math.floor(data.currentTime);
-      } else if (data.type === "cinesrc:ended") {
-        reportCurrentProgress(true);
-      } else if (data.type === "cinesrc:close") {
-        onClose();
+      // 1. CineSrc Player Bridge
+      if (event.origin === "https://cinesrc.st") {
+        if (data.type === "cinesrc:timeupdate" && typeof data.currentTime === "number") {
+          cineSrcProgressRef.current = Math.floor(data.currentTime);
+        } else if (data.type === "cinesrc:ended") {
+          reportCurrentProgress(true);
+        } else if (data.type === "cinesrc:close") {
+          onClose();
+        }
+      }
+
+      // 2. VixSrc Player Bridge
+      if (typeof event.origin === "string" && event.origin.includes("vixsrc.to")) {
+        if (data.type === "PLAYER_EVENT" && data.data) {
+          const { event: evt, currentTime } = data.data;
+          if (evt === "timeupdate" && typeof currentTime === "number") {
+            cineSrcProgressRef.current = Math.floor(currentTime);
+          } else if (evt === "ended") {
+            reportCurrentProgress(true);
+          }
+        }
       }
     };
 

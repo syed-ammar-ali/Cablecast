@@ -86,6 +86,24 @@ export const PROVIDERS: Provider[] = [
     },
   },
   {
+    id: "vixsrc-relay",
+    name: "VixSrc (Player Events Relay)",
+    regions: ["ALL", "US"],
+    benchmarkLatencyMs: 340,
+    buildUrl: (kind, { tmdbId, season, episode, startOffsetSeconds }) => {
+      const isMovie = String(kind).toLowerCase() === "movie";
+      const offsetParam =
+        startOffsetSeconds && startOffsetSeconds > 0
+          ? `&startAt=${Math.floor(startOffsetSeconds)}`
+          : "";
+      const cleanParams = `primaryColor=6366f1&secondaryColor=a855f7&autoplay=true${offsetParam}`;
+      if (isMovie) {
+        return `https://vixsrc.to/movie/${tmdbId}?${cleanParams}`;
+      }
+      return `https://vixsrc.to/tv/${tmdbId}/${season ?? 1}/${episode ?? 1}?${cleanParams}`;
+    },
+  },
+  {
     id: "vidlink-primary",
     name: "VidLink Pro (Primary Relay)",
     regions: ["ALL", "US"],

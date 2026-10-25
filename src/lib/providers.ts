@@ -71,7 +71,7 @@ function appendStartOffset(url: string, startOffsetSeconds?: number): string {
     }
     return url;
   }
-  if (url.includes("vidlink.pro")) {
+  if (url.includes("vidlink.pro") || url.includes("vixsrc.to")) {
     if (!url.includes("startAt=")) return `${url}${separator}startAt=${sec}`;
     return url;
   }
