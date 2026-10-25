@@ -121,19 +121,28 @@ describe("Stream Providers Engine", () => {
     expect(getNextProviderIndex(9)).toBeNull();
   });
 
-  it("lists all 10 providers for Global and 6 for US", () => {
+  it("lists all 10 providers for Global and applies regional filtering & prioritization", () => {
     const list = listProviders();
     expect(list.length).toBe(10);
     expect(list[0].id).toBe("cinesrc-primary");
+    expect(list[9].id).toBe("2embed-skin");
 
-    // US list (only core US providers)
+    // US list
     const usList = listProviders("US");
-    expect(usList.length).toBe(6);
-    expect(usList[0].id).toBe("cinesrc-primary");
-    expect(usList[1].id).toBe("vixsrc-relay");
-    expect(usList[2].id).toBe("vidlink-primary");
-    expect(usList[3].id).toBe("vidcore-edge");
-    expect(usList[4].id).toBe("anyembed-matrix");
-    expect(usList[5].id).toBe("vidsrc-pm");
+    expect(usList.length).toBe(9);
+    expect(usList.some((p) => p.id === "cinesrc-primary")).toBe(true);
+    expect(usList.some((p) => p.id === "nontongo-asian")).toBe(false);
+
+    // Japan / Korea: Asian drama & anime specialists are prioritized first
+    const jpKrList = listProviders("JP_KR");
+    expect(jpKrList.length).toBe(8);
+    expect(jpKrList[0].id).toBe("nontongo-asian");
+    expect(jpKrList[1].id).toBe("anyembed-matrix");
+
+    // India: Lowest latency engines with comprehensive Bollywood / Indian regional content
+    const inList = listProviders("IN");
+    expect(inList.length).toBe(9);
+    expect(inList[0].id).toBe("anyembed-matrix");
+    expect(inList[1].id).toBe("vidcore-edge");
   });
 });

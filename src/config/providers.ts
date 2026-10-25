@@ -27,6 +27,10 @@ export interface RegionOption {
 export const REGION_OPTIONS: RegionOption[] = [
   { id: "ALL", label: "Global", flag: "🌐" },
   { id: "US", label: "United States", flag: "🇺🇸" },
+  { id: "IN", label: "India", flag: "🇮🇳" },
+  { id: "JP_KR", label: "Japan & Korea", flag: "🇯🇵🇰🇷" },
+  { id: "GB_CA", label: "UK & Canada", flag: "🇬🇧🇨🇦" },
+  { id: "AU_DE_FR", label: "AU, DE, FR", flag: "🇦🇺🇩🇪🇫🇷" },
 ];
 
 export interface ProviderTemplateArgs {
@@ -71,7 +75,7 @@ export const PROVIDERS: Provider[] = [
   {
     id: "cinesrc-primary",
     name: "CineSrc (Smart Relay)",
-    regions: ["ALL", "US"],
+    regions: ["ALL", "US", "IN", "JP_KR", "GB_CA", "AU_DE_FR"],
     benchmarkLatencyMs: 380,
     buildUrl: (kind, { tmdbId, season, episode, startOffsetSeconds }) => {
       const isMovie = String(kind).toLowerCase() === "movie";
@@ -88,7 +92,7 @@ export const PROVIDERS: Provider[] = [
   {
     id: "vixsrc-relay",
     name: "VixSrc (Player Events Relay)",
-    regions: ["ALL", "US"],
+    regions: ["ALL", "US", "IN", "JP_KR", "GB_CA", "AU_DE_FR"],
     benchmarkLatencyMs: 340,
     buildUrl: (kind, { tmdbId, season, episode, startOffsetSeconds }) => {
       const isMovie = String(kind).toLowerCase() === "movie";
@@ -106,7 +110,7 @@ export const PROVIDERS: Provider[] = [
   {
     id: "vidlink-primary",
     name: "VidLink Pro (Primary Relay)",
-    regions: ["ALL", "US"],
+    regions: ["ALL", "US", "IN", "JP_KR", "GB_CA", "AU_DE_FR"],
     benchmarkLatencyMs: 360,
     buildUrl: (kind, { tmdbId, season, episode, startOffsetSeconds }) => {
       const isMovie = String(kind).toLowerCase() === "movie";
@@ -124,7 +128,7 @@ export const PROVIDERS: Provider[] = [
   {
     id: "vidcore-edge",
     name: "VidCore Edge (4K HLS)",
-    regions: ["ALL", "US"],
+    regions: ["ALL", "US", "IN", "JP_KR", "GB_CA", "AU_DE_FR"],
     benchmarkLatencyMs: 270,
     buildUrl: (kind, { tmdbId, season, episode, startOffsetSeconds }) => {
       const isMovie = String(kind).toLowerCase() === "movie";
@@ -138,7 +142,7 @@ export const PROVIDERS: Provider[] = [
   {
     id: "anyembed-matrix",
     name: "AnyEmbed Matrix (Direct HLS)",
-    regions: ["ALL", "US"],
+    regions: ["ALL", "US", "IN", "JP_KR", "GB_CA", "AU_DE_FR"],
     benchmarkLatencyMs: 110,
     buildUrl: (kind, { tmdbId, season, episode, startOffsetSeconds }) => {
       const isMovie = String(kind).toLowerCase() === "movie";
@@ -152,7 +156,7 @@ export const PROVIDERS: Provider[] = [
   {
     id: "vidsrc-pm",
     name: "VidSrc PM Global",
-    regions: ["ALL", "US"],
+    regions: ["ALL", "US", "GB_CA", "AU_DE_FR"],
     benchmarkLatencyMs: 420,
     buildUrl: (kind, { tmdbId, season, episode, startOffsetSeconds }) => {
       const isMovie = String(kind).toLowerCase() === "movie";
@@ -166,7 +170,7 @@ export const PROVIDERS: Provider[] = [
   {
     id: "vidfast-vc",
     name: "VidFast (High-Speed Mirror)",
-    regions: ["ALL"],
+    regions: ["ALL", "US", "IN", "JP_KR", "GB_CA", "AU_DE_FR"],
     benchmarkLatencyMs: 370,
     buildUrl: (kind, { tmdbId, season, episode, startOffsetSeconds }) => {
       const isMovie = String(kind).toLowerCase() === "movie";
@@ -183,7 +187,7 @@ export const PROVIDERS: Provider[] = [
   {
     id: "embedwave-ultra",
     name: "EmbedWave Ultra (Failover Relay)",
-    regions: ["ALL"],
+    regions: ["ALL", "US", "IN", "GB_CA", "AU_DE_FR"],
     benchmarkLatencyMs: 440,
     buildUrl: (kind, { tmdbId, season, episode, startOffsetSeconds }) => {
       const isMovie = String(kind).toLowerCase() === "movie";
@@ -197,7 +201,7 @@ export const PROVIDERS: Provider[] = [
   {
     id: "nontongo-asian",
     name: "NontonGo (Asian Drama & Anime)",
-    regions: ["ALL"],
+    regions: ["ALL", "JP_KR", "IN"],
     benchmarkLatencyMs: 1010,
     buildUrl: (kind, { tmdbId, season, episode, startOffsetSeconds }) => {
       const isMovie = String(kind).toLowerCase() === "movie";
@@ -211,7 +215,7 @@ export const PROVIDERS: Provider[] = [
   {
     id: "2embed-skin",
     name: "2Embed Skin (Classic & Rare Titles)",
-    regions: ["ALL"],
+    regions: ["ALL", "US", "IN", "JP_KR", "GB_CA", "AU_DE_FR"],
     benchmarkLatencyMs: 620,
     buildUrl: (kind, { tmdbId, season, episode, startOffsetSeconds }) => {
       const isMovie = String(kind).toLowerCase() === "movie";
@@ -232,6 +236,49 @@ export function getProvidersForRegion(region: StreamRegion): Provider[] {
   if (region === "ALL") {
     return PROVIDERS;
   }
+
+  if (region === "JP_KR") {
+    // For Japan & South Korea: Dedicated Asian drama & anime specialists come first,
+    // backed by low-latency direct engines:
+    const jpKrPriority = [
+      "nontongo-asian",
+      "anyembed-matrix",
+      "vidcore-edge",
+      "cinesrc-primary",
+      "vixsrc-relay",
+      "vidlink-primary",
+      "vidfast-vc",
+      "2embed-skin",
+    ];
+    const matched = PROVIDERS.filter((p) => p.regions?.includes("JP_KR"));
+    return matched.sort((a, b) => {
+      const idxA = jpKrPriority.indexOf(a.id);
+      const idxB = jpKrPriority.indexOf(b.id);
+      return (idxA === -1 ? 99 : idxA) - (idxB === -1 ? 99 : idxB);
+    });
+  }
+
+  if (region === "IN") {
+    // For India: Highest-speed direct engines with full Bollywood & regional catalog
+    const inPriority = [
+      "anyembed-matrix",
+      "vidcore-edge",
+      "vixsrc-relay",
+      "vidlink-primary",
+      "cinesrc-primary",
+      "vidfast-vc",
+      "embedwave-ultra",
+      "nontongo-asian",
+      "2embed-skin",
+    ];
+    const matched = PROVIDERS.filter((p) => p.regions?.includes("IN"));
+    return matched.sort((a, b) => {
+      const idxA = inPriority.indexOf(a.id);
+      const idxB = inPriority.indexOf(b.id);
+      return (idxA === -1 ? 99 : idxA) - (idxB === -1 ? 99 : idxB);
+    });
+  }
+
   return PROVIDERS.filter((p) => p.regions?.includes(region));
 }
 
