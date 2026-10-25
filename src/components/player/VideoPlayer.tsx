@@ -222,6 +222,7 @@ export function VideoPlayer({
       };
     }
     return buildPlayerSource({
+      providerId: currentProvider?.id,
       providerIndex: currentProvider?.index ?? currentProviderIndex,
       tmdbId: activePlayback.tmdbId,
       mediaType: activePlayback.mediaType,
@@ -972,7 +973,7 @@ export function VideoPlayer({
               referrerPolicy={
                 currentProvider?.id === "youtube-official"
                   ? "strict-origin-when-cross-origin"
-                  : "no-referrer"
+                  : "origin"
               }
               onLoad={handleIframeLoad}
               onError={handleIframeError}

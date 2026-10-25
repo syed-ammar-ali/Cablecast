@@ -2,6 +2,7 @@ import {
   PROVIDER_COUNT,
   PROVIDERS,
   getProvidersForRegion,
+  getProviderById,
   type MediaKind,
   type StreamRegion,
   type Provider,
@@ -43,11 +44,11 @@ export function buildPlayerSource({
 }: BuildPlayerUrlArgs): PlayerSource {
   const resolvedProvider =
     provider ??
-    (providerId ? PROVIDERS.find((p) => p.id === providerId) : undefined) ??
+    (providerId ? getProviderById(providerId) ?? PROVIDERS.find((p) => p.id === providerId) : undefined) ??
     PROVIDERS[Math.min(Math.max(providerIndex, 0), PROVIDER_COUNT - 1)];
 
   const safeIndex = PROVIDERS.findIndex((p) => p.id === resolvedProvider.id);
-  const effectiveIndex = safeIndex >= 0 ? safeIndex : 0;
+  const effectiveIndex = safeIndex >= 0 ? safeIndex : providerIndex;
 
   const baseUrl = resolvedProvider.buildUrl(mediaType, { tmdbId, season, episode, startOffsetSeconds });
   const url = appendStartOffset(baseUrl, startOffsetSeconds);
@@ -108,10 +109,10 @@ export interface ProviderListEntry {
 
 export function listProviders(region?: StreamRegion): ProviderListEntry[] {
   const providers = getProvidersForRegion(region ?? "ALL");
-  return providers.map((provider) => {
+  return providers.map((provider, localIdx) => {
     const globalIndex = PROVIDERS.findIndex((p) => p.id === provider.id);
     return {
-      index: globalIndex >= 0 ? globalIndex : 0,
+      index: globalIndex >= 0 ? globalIndex : localIdx,
       id: provider.id,
       name: provider.name,
       isDynamic: Boolean(provider.isDynamic),

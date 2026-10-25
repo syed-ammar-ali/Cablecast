@@ -127,11 +127,22 @@ describe("Stream Providers Engine", () => {
     expect(list[0].id).toBe("cinesrc-primary");
     expect(list[9].id).toBe("2embed-skin");
 
-    // US list
+    // US list (restored original lineup)
     const usList = listProviders("US");
-    expect(usList.length).toBe(9);
-    expect(usList.some((p) => p.id === "cinesrc-primary")).toBe(true);
-    expect(usList.some((p) => p.id === "nontongo-asian")).toBe(false);
+    expect(usList.length).toBe(10);
+    expect(usList[0].id).toBe("vidlove-express");
+    expect(usList.some((p) => p.id === "zxcstream-direct")).toBe(true);
+    expect(usList.some((p) => p.id === "vidfast-direct")).toBe(true);
+    expect(usList.some((p) => p.id === "videasy-hd")).toBe(true);
+
+    const vidloveSource = buildPlayerSource({
+      providerId: "vidlove-express",
+      tmdbId: 550,
+      mediaType: "movie",
+      startOffsetSeconds: 120,
+    });
+    expect(vidloveSource.url).toContain("player.vidlove.cc/embed/movie/550");
+    expect(vidloveSource.providerName).toBe("VidLove Express");
 
     // Japan / Korea: Asian drama & anime specialists are prioritized first
     const jpKrList = listProviders("JP_KR");

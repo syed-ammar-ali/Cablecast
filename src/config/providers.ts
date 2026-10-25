@@ -228,6 +228,156 @@ export const PROVIDERS: Provider[] = [
   },
 ];
 
+export const US_PROVIDERS: Provider[] = [
+  {
+    id: "vidlove-express",
+    name: "VidLove Express",
+    regions: ["US", "GB_CA", "AU_DE_FR"],
+    benchmarkLatencyMs: 260,
+    buildUrl: (kind, { tmdbId, season, episode, startOffsetSeconds }) => {
+      const isMovie = String(kind).toLowerCase() === "movie";
+      const offsetParam = getStartParam(startOffsetSeconds, "start");
+      if (isMovie) {
+        return `https://player.vidlove.cc/embed/movie/${tmdbId}?autoplay=1${offsetParam}`;
+      }
+      return `https://player.vidlove.cc/embed/tv/${tmdbId}/${season ?? 1}/${episode ?? 1}?autoplay=1${offsetParam}`;
+    },
+  },
+  {
+    id: "anyembed-matrix",
+    name: "AnyEmbed Matrix (Direct HLS)",
+    regions: ["ALL", "IN", "US", "JP_KR", "GB_CA", "AU_DE_FR"],
+    benchmarkLatencyMs: 110,
+    buildUrl: (kind, { tmdbId, season, episode, startOffsetSeconds }) => {
+      const isMovie = String(kind).toLowerCase() === "movie";
+      const offsetParam = getStartParam(startOffsetSeconds, "start");
+      if (isMovie) {
+        return `https://anyembed.xyz/embed/tmdb-movie-${tmdbId}?autoplay=1${offsetParam}`;
+      }
+      return `https://anyembed.xyz/embed/tmdb-tv-${tmdbId}-${season ?? 1}-${episode ?? 1}?autoplay=1${offsetParam}`;
+    },
+  },
+  {
+    id: "zxcstream-direct",
+    name: "ZXCStream (Turbopack Engine)",
+    regions: ["IN", "US", "JP_KR", "GB_CA", "AU_DE_FR"],
+    benchmarkLatencyMs: 380,
+    buildUrl: (kind, { tmdbId, season, episode, startOffsetSeconds }) => {
+      const isMovie = String(kind).toLowerCase() === "movie";
+      const offsetParam = getStartParam(startOffsetSeconds, "start");
+      if (isMovie) {
+        return `https://player.zxcstream.xyz/embed/movie/${tmdbId}?autoplay=1${offsetParam}`;
+      }
+      return `https://player.zxcstream.xyz/embed/tv/${tmdbId}/${season ?? 1}/${episode ?? 1}?autoplay=1${offsetParam}`;
+    },
+  },
+  {
+    id: "vidfast-direct",
+    name: "VidFast Direct",
+    regions: ["US", "GB_CA", "AU_DE_FR"],
+    benchmarkLatencyMs: 348,
+    buildUrl: (kind, { tmdbId, season, episode, startOffsetSeconds }) => {
+      const isMovie = String(kind).toLowerCase() === "movie";
+      const offsetParam = getStartParam(startOffsetSeconds, "start");
+      if (isMovie) {
+        return `https://vidfast.vc/movie/${tmdbId}?autoplay=1${offsetParam}`;
+      }
+      return `https://vidfast.vc/tv/${tmdbId}/${season ?? 1}/${episode ?? 1}?autoplay=1${offsetParam}`;
+    },
+  },
+  {
+    id: "videasy-hd",
+    name: "Videasy HD (Multi-Sub)",
+    regions: ["IN", "US", "JP_KR", "GB_CA", "AU_DE_FR"],
+    benchmarkLatencyMs: 440,
+    buildUrl: (kind, { tmdbId, season, episode, startOffsetSeconds }) => {
+      const isMovie = String(kind).toLowerCase() === "movie";
+      const offsetParam = getStartParam(startOffsetSeconds, "start");
+      if (isMovie) {
+        return `https://player.videasy.to/movie/${tmdbId}?autoplay=1${offsetParam}`;
+      }
+      return `https://player.videasy.to/tv/${tmdbId}/${season ?? 1}/${episode ?? 1}?autoplay=1${offsetParam}`;
+    },
+  },
+  {
+    id: "vidlink-primary",
+    name: "VidLink Pro (Primary Relay)",
+    regions: ["ALL", "IN", "US", "GB_CA", "AU_DE_FR"],
+    benchmarkLatencyMs: 360,
+    buildUrl: (kind, { tmdbId, season, episode, startOffsetSeconds }) => {
+      const isMovie = String(kind).toLowerCase() === "movie";
+      const offsetParam =
+        startOffsetSeconds && startOffsetSeconds > 0
+          ? `&startAt=${Math.floor(startOffsetSeconds)}`
+          : "";
+      const cleanParams = `primaryColor=6366f1&secondaryColor=a855f7&iconColor=ffffff&autoplay=true&nextbutton=false${offsetParam}`;
+      if (isMovie) {
+        return `https://vidlink.pro/movie/${tmdbId}?${cleanParams}`;
+      }
+      return `https://vidlink.pro/tv/${tmdbId}/${season ?? 1}/${episode ?? 1}?${cleanParams}`;
+    },
+  },
+  {
+    id: "vidcore-adaptive",
+    name: "VidCore Adaptive",
+    regions: ["US"],
+    benchmarkLatencyMs: 680,
+    buildUrl: (kind, { tmdbId, season, episode, startOffsetSeconds }) => {
+      const isMovie = String(kind).toLowerCase() === "movie";
+      const offsetParam = getStartParam(startOffsetSeconds, "start");
+      if (isMovie) {
+        return `https://vidcore.org/embed/movie/${tmdbId}?autoplay=1${offsetParam}`;
+      }
+      return `https://vidcore.org/embed/tv/${tmdbId}/${season ?? 1}/${episode ?? 1}?autoplay=1${offsetParam}`;
+    },
+  },
+  {
+    id: "vidsrc-to",
+    name: "VidSrc TO Global",
+    regions: ["US", "GB_CA"],
+    benchmarkLatencyMs: 622,
+    buildUrl: (kind, { tmdbId, season, episode, startOffsetSeconds }) => {
+      const isMovie = String(kind).toLowerCase() === "movie";
+      const offsetParam = getStartParam(startOffsetSeconds, "start");
+      if (isMovie) {
+        return `https://vidsrc.to/embed/movie/${tmdbId}?autoplay=1${offsetParam}`;
+      }
+      return `https://vidsrc.to/embed/tv/${tmdbId}/${season ?? 1}/${episode ?? 1}?autoplay=1${offsetParam}`;
+    },
+  },
+  {
+    id: "vidsrc-pm",
+    name: "VidSrc PM Archive",
+    regions: ["ALL", "US"],
+    benchmarkLatencyMs: 420,
+    buildUrl: (kind, { tmdbId, season, episode, startOffsetSeconds }) => {
+      const isMovie = String(kind).toLowerCase() === "movie";
+      const offsetParam = getStartParam(startOffsetSeconds, "start");
+      if (isMovie) {
+        return `https://vidsrc.pm/embed/movie/${tmdbId}?autoplay=1${offsetParam}`;
+      }
+      return `https://vidsrc.pm/embed/tv/${tmdbId}/${season ?? 1}/${episode ?? 1}?autoplay=1${offsetParam}`;
+    },
+  },
+  {
+    id: "kartoons-direct",
+    name: "Vintage Cartoons",
+    regions: ["US"],
+    benchmarkLatencyMs: 150,
+    isDynamic: true,
+    buildUrl: () => "",
+  },
+];
+
+export const ALL_PROVIDERS: Provider[] = [
+  ...PROVIDERS,
+  ...US_PROVIDERS.filter((u) => !PROVIDERS.some((p) => p.id === u.id)),
+];
+
+export function getProviderById(id: string): Provider | undefined {
+  return ALL_PROVIDERS.find((p) => p.id === id);
+}
+
 export function getProvider(index: number): Provider | undefined {
   return PROVIDERS[index];
 }
@@ -235,6 +385,10 @@ export function getProvider(index: number): Provider | undefined {
 export function getProvidersForRegion(region: StreamRegion): Provider[] {
   if (region === "ALL") {
     return PROVIDERS;
+  }
+
+  if (region === "US") {
+    return US_PROVIDERS;
   }
 
   if (region === "JP_KR") {
@@ -283,3 +437,4 @@ export function getProvidersForRegion(region: StreamRegion): Provider[] {
 }
 
 export const PROVIDER_COUNT = PROVIDERS.length;
+
